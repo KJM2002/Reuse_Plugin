@@ -1,0 +1,30 @@
+{
+  "FileVersion": 3,
+  "Version": 3,
+  "VersionName": "1.1.0",
+  "FriendlyName": "JM Recon",
+  "Description": "Reusable, data-driven listen and peek reconnaissance runtime.",
+  "Category": "JM Plugins",
+  "CreatedBy": "JM",
+  "CanContainContent": true,
+  "EnabledByDefault": true,
+  "Modules": [
+    {
+      "Name": "JMReconRuntime",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "JMReconEditor",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit",
+      "TargetAllowList": ["Editor"]
+    },
+    {
+      "Name": "JMReconTests",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit",
+      "TargetAllowList": ["Editor"]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\hdd_ue5\\p_260729\\plugins\\jmrecon\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\jmreconeditor\\module.jmreconeditor.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\hdd_ue5\\p_260729\\intermediate\\build\\win64\\x64\\p_060715editor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmrecon\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\jmreconeditor\\definitions.jmreconeditor.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmrecon\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\jmreconeditor\\permoduleinline.gen.cpp",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\runtime\\core\\public\\hal\\permoduleinline.inl",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmrecon\\source\\jmreconeditor\\private\\jmreconeditormodule.cpp",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmrecon\\source\\jmreconruntime\\public\\components\\jmrecontargetcomponent.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmrecon\\source\\jmreconruntime\\public\\types\\jmrecontypes.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmrecon\\intermediate\\build\\win64\\unrealeditor\\inc\\jmreconruntime\\uht\\jmrecontypes.generated.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmrecon\\intermediate\\build\\win64\\unrealeditor\\inc\\jmreconruntime\\uht\\jmrecontargetcomponent.generated.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\editor\\unrealed\\public\\componentvisualizer.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\runtime\\engine\\public\\elements\\framework\\engineelementslibrary.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\engineelementslibrary.generated.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\unrealed\\uht\\componentvisualizer.generated.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmrecon\\source\\jmreconruntime\\public\\data\\jmrecondefinition.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmrecon\\intermediate\\build\\win64\\unrealeditor\\inc\\jmreconruntime\\uht\\jmrecondefinition.generated.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\editor\\unrealed\\classes\\editor\\unrealedengine.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\editor\\unrealed\\public\\ipackageautosaver.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\developer\\sourcecontrol\\public\\isourcecontrolprovider.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\developer\\sourcecontrol\\public\\isourcecontrolchangelist.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\developer\\sourcecontrol\\public\\isourcecontrolchangeliststate.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\developer\\sourcecontrol\\public\\isourcecontrolstate.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\developer\\sourcecontrol\\public\\isourcecontroloperation.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\developer\\sourcecontrol\\public\\sourcecontrolresultinfo.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\editor\\unrealed\\public\\componentvisualizermanager.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\editor\\unrealed\\classes\\editor\\templatemapinfo.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\unrealed\\uht\\templatemapinfo.generated.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\unrealed\\uht\\unrealedengine.generated.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\editor\\unrealed\\public\\unrealedglobals.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

@@ -1,0 +1,10 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMDoorReconIntegrationTests.cpp.obj": [
+			"PerModuleInline.gen.cpp.obj",
+			"JMDoorReconIntegrationTestsModule.cpp.obj",
+			"JMDoorReconIntegrationTests.cpp.obj"
+		]
+	}
+}

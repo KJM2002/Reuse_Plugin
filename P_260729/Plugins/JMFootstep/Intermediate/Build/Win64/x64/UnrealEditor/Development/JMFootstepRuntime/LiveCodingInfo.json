@@ -1,0 +1,20 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMFootstepRuntime.cpp.obj": [
+			"JMFootstepComponent.gen.cpp.obj",
+			"JMFootstepRuntime.init.gen.cpp.obj",
+			"JMFootstepSet.gen.cpp.obj",
+			"JMFootstepSettings.gen.cpp.obj",
+			"JMFootstepSurfaceProfile.gen.cpp.obj",
+			"JMFootstepTypes.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"JMFootstepComponent.cpp.obj",
+			"JMFootstepSet.cpp.obj",
+			"JMFootstepSurfaceProfile.cpp.obj",
+			"JMFootstepRuntime.cpp.obj",
+			"JMFootstepSettings.cpp.obj",
+			"JMFootstepRuntimeLogic.cpp.obj"
+		]
+	}
+}

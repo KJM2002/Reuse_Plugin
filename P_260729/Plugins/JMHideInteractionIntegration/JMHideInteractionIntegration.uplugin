@@ -1,0 +1,22 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0.0",
+  "FriendlyName": "JM Hide Interaction Integration",
+  "Description": "Optional JMInteraction adapters for JMHide.",
+  "Category": "JM Plugins",
+  "CreatedBy": "JM",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Plugins": [
+    { "Name": "JMHide", "Enabled": true },
+    { "Name": "JMInteraction", "Enabled": true }
+  ],
+  "Modules": [
+    {
+      "Name": "JMHideInteractionIntegration",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

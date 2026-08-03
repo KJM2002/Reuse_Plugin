@@ -1,0 +1,5 @@
+#include "JMDoorGameplayIntegration.h"
+
+#include "Modules/ModuleManager.h"
+
+IMPLEMENT_MODULE(FJMDoorGameplayIntegrationModule, JMDoorGameplayIntegration)

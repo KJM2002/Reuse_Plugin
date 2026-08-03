@@ -1,0 +1,17 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMThrowableGameplayIntegration.cpp.obj": [
+			"JMThrowableGameplayIntegration.init.gen.cpp.obj",
+			"JMThrowableGameplayIntegrationComponent.gen.cpp.obj",
+			"JMThrowableInventoryContext.gen.cpp.obj",
+			"JMThrowableInventoryUseEffect.gen.cpp.obj",
+			"JMThrowableStatusWidget.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"JMThrowableGameplayIntegrationComponent.cpp.obj",
+			"JMThrowableGameplayIntegrationModule.cpp.obj",
+			"JMThrowableInventoryUseEffect.cpp.obj",
+			"JMThrowableStatusWidget.cpp.obj"
+		]
+	}
+}

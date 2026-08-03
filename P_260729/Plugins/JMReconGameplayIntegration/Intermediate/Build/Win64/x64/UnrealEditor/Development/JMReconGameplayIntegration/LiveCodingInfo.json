@@ -1,0 +1,18 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMReconGameplayIntegration.cpp.obj": [
+			"JMReconGameplayIntegration.init.gen.cpp.obj",
+			"JMReconGameplayIntegrationSettings.gen.cpp.obj",
+			"JMReconGameplayIntegrationWorldSubsystem.gen.cpp.obj",
+			"JMReconPlayerBridgeComponent.gen.cpp.obj",
+			"JMReconPromptWidgetBase.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"JMReconPlayerBridgeComponent.cpp.obj",
+			"JMReconGameplayIntegration.cpp.obj",
+			"JMReconGameplayIntegrationSettings.cpp.obj",
+			"JMReconGameplayIntegrationWorldSubsystem.cpp.obj",
+			"JMReconPromptWidgetBase.cpp.obj"
+		]
+	}
+}

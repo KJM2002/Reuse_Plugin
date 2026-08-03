@@ -1,0 +1,35 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMObjective.cpp.obj": [
+			"JMObjective.init.gen.cpp.obj",
+			"JMObjectiveBlueprintLibrary.gen.cpp.obj",
+			"JMObjectiveDefaultWidget.gen.cpp.obj",
+			"JMObjectiveDefinition.gen.cpp.obj",
+			"JMObjectiveEventPayload.gen.cpp.obj",
+			"JMObjectiveFlowDefinition.gen.cpp.obj",
+			"JMObjectiveFlowEventPayload.gen.cpp.obj",
+			"JMObjectiveFlowStarter.gen.cpp.obj",
+			"JMObjectiveFlowSubsystem.gen.cpp.obj",
+			"JMObjectiveFlowTypes.gen.cpp.obj",
+			"JMObjectiveSettings.gen.cpp.obj",
+			"JMObjectiveSubsystem.gen.cpp.obj",
+			"JMObjectiveTypes.gen.cpp.obj",
+			"JMObjectiveUISubsystem.gen.cpp.obj",
+			"JMObjectiveWidgetBase.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"JMObjectiveFlowStarter.cpp.obj",
+			"JMObjectiveBlueprintLibrary.cpp.obj",
+			"JMObjectiveDefinition.cpp.obj",
+			"JMObjectiveFlowDefinition.cpp.obj",
+			"JMObjective.cpp.obj",
+			"JMObjectiveEventTags.cpp.obj",
+			"JMObjectiveFlowEventTags.cpp.obj",
+			"JMObjectiveFlowSubsystem.cpp.obj",
+			"JMObjectiveSubsystem.cpp.obj",
+			"JMObjectiveUISubsystem.cpp.obj",
+			"JMObjectiveDefaultWidget.cpp.obj",
+			"JMObjectiveWidgetBase.cpp.obj"
+		]
+	}
+}

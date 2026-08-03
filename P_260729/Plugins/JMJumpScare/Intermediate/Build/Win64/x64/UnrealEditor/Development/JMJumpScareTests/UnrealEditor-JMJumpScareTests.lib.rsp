@@ -1,0 +1,12 @@
+/NOLOGO
+/errorReport:prompt
+/MACHINE:x64
+/SUBSYSTEM:WINDOWS
+/DEF
+/NAME:"UnrealEditor-JMJumpScareTests.dll"
+/IGNORE:4221
+/NODEFAULTLIB
+"D:/HDD_UE5/P_260729/Intermediate/Build/Win64/x64/P_060715Editor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h.obj"
+"D:/HDD_UE5/P_260729/Plugins/JMJumpScare/Intermediate/Build/Win64/x64/UnrealEditor/Development/JMJumpScareTests/Module.JMJumpScareTests.cpp.obj"
+"D:/HDD_UE5/P_260729/Plugins/JMJumpScare/Intermediate/Build/Win64/x64/UnrealEditor/Development/JMJumpScareTests/Default.rc2.res"
+/OUT:"D:/HDD_UE5/P_260729/Plugins/JMJumpScare/Intermediate/Build/Win64/x64/UnrealEditor/Development/JMJumpScareTests/UnrealEditor-JMJumpScareTests.lib"

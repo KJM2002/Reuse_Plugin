@@ -1,0 +1,16 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMHideInteractionIntegration.cpp.obj": [
+			"JMHideInputRouterComponent.gen.cpp.obj",
+			"JMHideInputRouterLibrary.gen.cpp.obj",
+			"JMHideInteractableAdapterComponent.gen.cpp.obj",
+			"JMHideInteractionIntegration.init.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"JMHideInputRouterComponent.cpp.obj",
+			"JMHideInteractableAdapterComponent.cpp.obj",
+			"JMHideInputRouterLibrary.cpp.obj",
+			"JMHideInteractionIntegration.cpp.obj"
+		]
+	}
+}

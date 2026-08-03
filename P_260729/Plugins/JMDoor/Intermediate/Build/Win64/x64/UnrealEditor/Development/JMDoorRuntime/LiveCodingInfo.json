@@ -1,0 +1,37 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMDoorRuntime.cpp.obj": [
+			"JMCustomDoorMovementComponent.gen.cpp.obj",
+			"JMDoorAccessProviderInterface.gen.cpp.obj",
+			"JMDoorActor.gen.cpp.obj",
+			"JMDoorBlueprintLibrary.gen.cpp.obj",
+			"JMDoorComponent.gen.cpp.obj",
+			"JMDoorConfigData.gen.cpp.obj",
+			"JMDoorMovementComponent.gen.cpp.obj",
+			"JMDoorRuntime.init.gen.cpp.obj",
+			"JMDoorSaveInterface.gen.cpp.obj",
+			"JMDoorSettings.gen.cpp.obj",
+			"JMDoorStateChangedEventPayload.gen.cpp.obj",
+			"JMDoorTypes.gen.cpp.obj",
+			"JMDoorUsableInterface.gen.cpp.obj",
+			"JMRotatingDoorMovementComponent.gen.cpp.obj",
+			"JMSlidingDoorMovementComponent.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"JMDoorActor.cpp.obj",
+			"JMDoorBlueprintLibrary.cpp.obj",
+			"JMDoorComponent.cpp.obj",
+			"JMDoorEventTags.cpp.obj",
+			"JMDoorTags.cpp.obj",
+			"JMDoorTypes.cpp.obj",
+			"JMDoorAccessProviderInterface.cpp.obj",
+			"JMDoorInterfaceDispatch.cpp.obj",
+			"JMDoorLog.cpp.obj",
+			"JMDoorRuntime.cpp.obj",
+			"JMCustomDoorMovementComponent.cpp.obj",
+			"JMDoorMovementComponent.cpp.obj",
+			"JMRotatingDoorMovementComponent.cpp.obj",
+			"JMSlidingDoorMovementComponent.cpp.obj"
+		]
+	}
+}

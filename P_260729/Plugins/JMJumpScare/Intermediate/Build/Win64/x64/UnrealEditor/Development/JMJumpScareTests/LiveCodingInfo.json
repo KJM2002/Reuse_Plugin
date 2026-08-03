@@ -1,0 +1,13 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMJumpScareTests.cpp.obj": [
+			"JMJumpScareTestActor.gen.cpp.obj",
+			"JMJumpScareTests.init.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"JMJumpScareTestsModule.cpp.obj",
+			"JMJumpScareAutomationTests.cpp.obj",
+			"JMJumpScareTestActor.cpp.obj"
+		]
+	}
+}

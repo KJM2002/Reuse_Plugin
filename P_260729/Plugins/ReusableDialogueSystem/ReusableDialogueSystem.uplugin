@@ -1,0 +1,28 @@
+{
+  "FileVersion": 3,
+  "Version": 3,
+  "VersionName": "0.2.1",
+  "FriendlyName": "Reusable Dialogue System",
+  "Description": "Portable runtime dialogue playback and ItemInspector interaction integration.",
+  "Category": "JM Plugins",
+  "CreatedBy": "Jaemin",
+  "CanContainContent": true,
+  "IsBetaVersion": true,
+  "Plugins": [
+    {
+      "Name": "JMGameplayEvent",
+      "Enabled": true
+    },
+    {
+      "Name": "JMInteraction",
+      "Enabled": true
+    }
+  ],
+  "Modules": [
+    {
+      "Name": "ReusableDialogueSystem",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

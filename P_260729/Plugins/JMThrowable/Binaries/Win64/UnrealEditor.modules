@@ -1,0 +1,9 @@
+{
+	"BuildId": "47537391",
+	"Modules": 
+	{
+		"JMThrowable": "UnrealEditor-JMThrowable.dll",
+		"JMThrowableEditor": "UnrealEditor-JMThrowableEditor.dll",
+		"JMThrowableTests": "UnrealEditor-JMThrowableTests.dll"
+	}
+}

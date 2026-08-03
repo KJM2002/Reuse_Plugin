@@ -1,0 +1,27 @@
+{
+  "FileVersion": 3,
+  "Version": 12,
+  "VersionName": "1.6.0",
+  "FriendlyName": "JM Door System",
+  "Description": "Portable, data-driven doors with extensible movement, access, durability, obstruction and save contracts.",
+  "Category": "JM Plugins",
+  "CreatedBy": "JM",
+  "CanContainContent": true,
+  "EnabledByDefault": true,
+  "Plugins": [
+    { "Name": "JMGameplayEvent", "Enabled": true }
+  ],
+  "Modules": [
+    {
+      "Name": "JMDoorRuntime",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "JMDoorTests",
+      "Type": "Editor",
+      "LoadingPhase": "Default",
+      "TargetAllowList": ["Editor"]
+    }
+  ]
+}

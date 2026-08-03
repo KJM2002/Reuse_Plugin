@@ -1,0 +1,2 @@
+#include "JMHideInteractionIntegration.h"
+IMPLEMENT_MODULE(FJMHideInteractionIntegrationModule, JMHideInteractionIntegration)

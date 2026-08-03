@@ -1,0 +1,28 @@
+{
+  "FileVersion": 3,
+  "Version": 2,
+  "VersionName": "1.1.0",
+  "FriendlyName": "JM Recon Gameplay Integration",
+  "Description": "Optional automatic bridge between JM Recon, JM Interaction, player input, and camera.",
+  "Category": "JM Plugins",
+  "CreatedBy": "JM",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Plugins": [
+    { "Name": "JMRecon", "Enabled": true },
+    { "Name": "JMInteraction", "Enabled": true }
+  ],
+  "Modules": [
+    {
+      "Name": "JMReconGameplayIntegration",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "JMReconGameplayIntegrationTests",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit",
+      "TargetAllowList": ["Editor"]
+    }
+  ]
+}

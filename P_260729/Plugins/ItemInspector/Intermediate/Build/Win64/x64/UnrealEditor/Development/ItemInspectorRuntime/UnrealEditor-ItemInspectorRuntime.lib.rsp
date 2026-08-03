@@ -1,0 +1,12 @@
+/NOLOGO
+/errorReport:prompt
+/MACHINE:x64
+/SUBSYSTEM:WINDOWS
+/DEF
+/NAME:"UnrealEditor-ItemInspectorRuntime.dll"
+/IGNORE:4221
+/NODEFAULTLIB
+"D:/HDD_UE5/P_260729/Intermediate/Build/Win64/x64/P_060715Editor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h.obj"
+"D:/HDD_UE5/P_260729/Plugins/ItemInspector/Intermediate/Build/Win64/x64/UnrealEditor/Development/ItemInspectorRuntime/Module.ItemInspectorRuntime.cpp.obj"
+"D:/HDD_UE5/P_260729/Plugins/ItemInspector/Intermediate/Build/Win64/x64/UnrealEditor/Development/ItemInspectorRuntime/Default.rc2.res"
+/OUT:"D:/HDD_UE5/P_260729/Plugins/ItemInspector/Intermediate/Build/Win64/x64/UnrealEditor/Development/ItemInspectorRuntime/UnrealEditor-ItemInspectorRuntime.lib"

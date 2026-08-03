@@ -1,0 +1,24 @@
+{
+  "FileVersion": 3,
+  "Version": 3,
+  "VersionName": "1.1.1",
+  "FriendlyName": "JM Footstep",
+  "Description": "Reusable distance-driven physical-surface footstep audio system.",
+  "Category": "JM Plugins",
+  "CreatedBy": "JM",
+  "CanContainContent": true,
+  "EnabledByDefault": true,
+  "Modules": [
+    {
+      "Name": "JMFootstepRuntime",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "JMFootstepTests",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit",
+      "TargetAllowList": ["Editor"]
+    }
+  ]
+}

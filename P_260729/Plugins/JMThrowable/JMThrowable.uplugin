@@ -1,0 +1,20 @@
+{
+  "FileVersion": 3,
+  "Version": 6,
+  "VersionName": "1.4.1",
+  "FriendlyName": "JM Throwable",
+  "Description": "Portable first-person throwable item runtime.",
+  "Category": "JM Plugins",
+  "CanContainContent": true,
+  "Modules": [
+    { "Name": "JMThrowable", "Type": "Runtime", "LoadingPhase": "Default" },
+    { "Name": "JMThrowableEditor", "Type": "Editor", "LoadingPhase": "PostEngineInit" },
+    { "Name": "JMThrowableTests", "Type": "Editor", "LoadingPhase": "PostEngineInit" }
+  ],
+  "Plugins": [
+    { "Name": "EnhancedInput", "Enabled": true },
+    { "Name": "ProceduralMeshComponent", "Enabled": true },
+    { "Name": "Niagara", "Enabled": true },
+    { "Name": "JMGameplayEvent", "Enabled": true }
+  ]
+}

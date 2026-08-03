@@ -1,0 +1,27 @@
+{
+  "FileVersion": 3,
+  "Version": 3,
+  "VersionName": "2.0.0",
+  "FriendlyName": "JM JumpScare",
+  "Description": "Simple full-screen 2D image JumpScare runtime.",
+  "Category": "JM Plugins",
+  "CreatedBy": "JM",
+  "CanContainContent": true,
+  "EnabledByDefault": true,
+  "Plugins": [
+    { "Name": "JMGameplayEvent", "Enabled": true }
+  ],
+  "Modules": [
+    {
+      "Name": "JMJumpScare",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "JMJumpScareTests",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit",
+      "TargetAllowList": ["Editor"]
+    }
+  ]
+}

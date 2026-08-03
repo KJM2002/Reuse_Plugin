@@ -1,0 +1,9 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMReconEditor.cpp.obj": [
+			"PerModuleInline.gen.cpp.obj",
+			"JMReconEditorModule.cpp.obj"
+		]
+	}
+}

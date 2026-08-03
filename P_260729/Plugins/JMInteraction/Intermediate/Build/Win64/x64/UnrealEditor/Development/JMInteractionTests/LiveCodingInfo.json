@@ -1,0 +1,10 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMInteractionTests.cpp.obj": [
+			"PerModuleInline.gen.cpp.obj",
+			"JMInteractionTestsModule.cpp.obj",
+			"JMInteractionPromptTests.cpp.obj"
+		]
+	}
+}

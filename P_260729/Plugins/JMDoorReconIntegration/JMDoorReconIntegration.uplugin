@@ -1,0 +1,28 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0.0",
+  "FriendlyName": "JM Door Recon Integration",
+  "Description": "Session-safe temporary door pose bridge for JM Door and JM Recon.",
+  "Category": "JM Plugins",
+  "CreatedBy": "JM",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Plugins": [
+    { "Name": "JMDoor", "Enabled": true },
+    { "Name": "JMRecon", "Enabled": true }
+  ],
+  "Modules": [
+    {
+      "Name": "JMDoorReconIntegration",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "JMDoorReconIntegrationTests",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit",
+      "TargetAllowList": ["Editor"]
+    }
+  ]
+}

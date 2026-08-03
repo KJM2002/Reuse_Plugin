@@ -1,0 +1,10 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.ItemInspectorTests.cpp.obj": [
+			"PerModuleInline.gen.cpp.obj",
+			"ItemInspectorTestsModule.cpp.obj",
+			"JMItemInspectionSurfaceWidgetTests.cpp.obj"
+		]
+	}
+}

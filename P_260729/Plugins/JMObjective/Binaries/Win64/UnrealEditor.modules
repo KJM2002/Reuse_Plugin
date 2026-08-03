@@ -1,0 +1,8 @@
+{
+	"BuildId": "47537391",
+	"Modules": 
+	{
+		"JMObjective": "UnrealEditor-JMObjective.dll",
+		"JMObjectiveTests": "UnrealEditor-JMObjectiveTests.dll"
+	}
+}

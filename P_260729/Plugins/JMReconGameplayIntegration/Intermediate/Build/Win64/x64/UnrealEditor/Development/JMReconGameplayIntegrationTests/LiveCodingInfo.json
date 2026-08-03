@@ -1,0 +1,10 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMReconGameplayIntegrationTests.cpp.obj": [
+			"PerModuleInline.gen.cpp.obj",
+			"JMReconGameplayIntegrationTestsModule.cpp.obj",
+			"JMReconGameplayIntegrationTests.cpp.obj"
+		]
+	}
+}

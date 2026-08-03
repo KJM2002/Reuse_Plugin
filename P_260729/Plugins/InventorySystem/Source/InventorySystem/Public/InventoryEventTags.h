@@ -1,0 +1,15 @@
+#pragma once
+
+#include "NativeGameplayTags.h"
+
+namespace JMInventoryEventTags
+{
+    INVENTORYSYSTEM_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item);
+    INVENTORYSYSTEM_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Acquired);
+    INVENTORYSYSTEM_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Used);
+    INVENTORYSYSTEM_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dropped);
+    INVENTORYSYSTEM_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Removed);
+    /** Modal presentation events. HUD systems can subscribe without Inventory knowing their concrete classes. */
+    INVENTORYSYSTEM_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(UIOpened);
+    INVENTORYSYSTEM_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(UIClosed);
+}

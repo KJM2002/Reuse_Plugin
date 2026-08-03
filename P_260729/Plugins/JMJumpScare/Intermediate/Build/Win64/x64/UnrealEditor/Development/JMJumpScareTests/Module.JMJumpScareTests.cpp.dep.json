@@ -1,0 +1,37 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\jmjumpscaretests\\module.jmjumpscaretests.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\hdd_ue5\\p_260729\\intermediate\\build\\win64\\x64\\p_060715editor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\jmjumpscaretests\\definitions.jmjumpscaretests.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\intermediate\\build\\win64\\unrealeditor\\inc\\jmjumpscaretests\\uht\\jmjumpscaretestactor.gen.cpp",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\source\\jmjumpscaretests\\private\\tests\\jmjumpscaretestactor.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\source\\jmjumpscare\\public\\interfaces\\jmjumpscareactorinterface.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\intermediate\\build\\win64\\unrealeditor\\inc\\jmjumpscare\\uht\\jmjumpscareactorinterface.generated.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\intermediate\\build\\win64\\unrealeditor\\inc\\jmjumpscaretests\\uht\\jmjumpscaretestactor.generated.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\intermediate\\build\\win64\\unrealeditor\\inc\\jmjumpscaretests\\uht\\jmjumpscaretests.init.gen.cpp",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\jmjumpscaretests\\permoduleinline.gen.cpp",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\runtime\\core\\public\\hal\\permoduleinline.inl",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\source\\jmjumpscaretests\\private\\jmjumpscaretestsmodule.cpp",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\source\\jmjumpscaretests\\private\\tests\\jmjumpscareautomationtests.cpp",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\source\\jmjumpscare\\public\\data\\jmjumpscaredefinition.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\source\\jmjumpscare\\public\\types\\jmjumpscaretypes.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\runtime\\gameplaytags\\classes\\gameplaytagcontainer.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\runtime\\core\\public\\misc\\comparisonutility.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\gameplaytags\\uht\\gameplaytagcontainer.generated.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\intermediate\\build\\win64\\unrealeditor\\inc\\jmjumpscare\\uht\\jmjumpscaretypes.generated.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\intermediate\\build\\win64\\unrealeditor\\inc\\jmjumpscare\\uht\\jmjumpscaredefinition.generated.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\source\\jmjumpscare\\public\\subsystems\\jmjumpscaresubsystem.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\intermediate\\build\\win64\\unrealeditor\\inc\\jmjumpscare\\uht\\jmjumpscaresubsystem.generated.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\source\\jmjumpscare\\public\\types\\jmjumpscareeventtags.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\runtime\\gameplaytags\\public\\nativegameplaytags.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\source\\runtime\\gameplaytags\\classes\\gameplaytagsmanager.h",
+            "c:\\program files\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\gameplaytags\\uht\\gameplaytagsmanager.generated.h",
+            "d:\\hdd_ue5\\p_260729\\plugins\\jmjumpscare\\source\\jmjumpscaretests\\private\\tests\\jmjumpscaretestactor.cpp"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

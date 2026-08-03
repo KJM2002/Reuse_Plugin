@@ -1,0 +1,22 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMGameplayEvent.cpp.obj": [
+			"JMGameplayEvent.init.gen.cpp.obj",
+			"JMGameplayEventBlueprintLibrary.gen.cpp.obj",
+			"JMGameplayEventListenerComponent.gen.cpp.obj",
+			"JMGameplayEventPayloadBase.gen.cpp.obj",
+			"JMGameplayEventSettings.gen.cpp.obj",
+			"JMGameplayEventSubsystem.gen.cpp.obj",
+			"JMGameplayEventTypes.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"JMGameplayEventBlueprintLibrary.cpp.obj",
+			"JMGameplayEventListenerComponent.cpp.obj",
+			"JMGameplayEvent.cpp.obj",
+			"JMGameplayUIEventTags.cpp.obj",
+			"JMGameplayEventSettings.cpp.obj",
+			"JMGameplayEventSubsystem.cpp.obj",
+			"JMGameplayEventTestTags.cpp.obj"
+		]
+	}
+}

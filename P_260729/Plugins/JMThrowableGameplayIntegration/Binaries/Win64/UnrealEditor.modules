@@ -1,0 +1,8 @@
+{
+	"BuildId": "47537391",
+	"Modules": 
+	{
+		"JMThrowableGameplayIntegration": "UnrealEditor-JMThrowableGameplayIntegration.dll",
+		"JMThrowableGameplayIntegrationTests": "UnrealEditor-JMThrowableGameplayIntegrationTests.dll"
+	}
+}

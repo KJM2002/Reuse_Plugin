@@ -1,0 +1,11 @@
+#pragma once
+
+#include "NativeGameplayTags.h"
+
+extern JMDOORRUNTIME_API FNativeGameplayTag TAG_JMDoor_Noise_Open;
+extern JMDOORRUNTIME_API FNativeGameplayTag TAG_JMDoor_Noise_Close;
+extern JMDOORRUNTIME_API FNativeGameplayTag TAG_JMDoor_Noise_Break;
+extern JMDOORRUNTIME_API FNativeGameplayTag TAG_JMDoor_Access_Master;
+extern JMDOORRUNTIME_API FNativeGameplayTag TAG_JMDoor_Demo_Key;
+extern JMDOORRUNTIME_API FNativeGameplayTag TAG_JMDoor_Test_Key;
+extern JMDOORRUNTIME_API FNativeGameplayTag TAG_JMDoor_Test_Card;

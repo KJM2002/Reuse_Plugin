@@ -1,0 +1,27 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMInteraction.cpp.obj": [
+			"JMInteractableComponent.gen.cpp.obj",
+			"JMInteractableInterface.gen.cpp.obj",
+			"JMInteraction.init.gen.cpp.obj",
+			"JMInteractionComponent.gen.cpp.obj",
+			"JMInteractionEventPayload.gen.cpp.obj",
+			"JMInteractionInputInterceptorInterface.gen.cpp.obj",
+			"JMInteractionPromptWidgetBase.gen.cpp.obj",
+			"JMInteractionSettings.gen.cpp.obj",
+			"JMInteractionTypes.gen.cpp.obj",
+			"JMInteractorInterface.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"JMInteractableComponent.cpp.obj",
+			"JMInteractionComponent.cpp.obj",
+			"JMInteractableInterface.cpp.obj",
+			"JMInteractorInterface.cpp.obj",
+			"JMInteraction.cpp.obj",
+			"JMInteractionSettings.cpp.obj",
+			"JMInteractionEventTags.cpp.obj",
+			"JMInteractionTypes.cpp.obj",
+			"JMInteractionPromptWidgetBase.cpp.obj"
+		]
+	}
+}

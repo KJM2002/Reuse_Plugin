@@ -1,0 +1,28 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.ItemInspectorRuntime.cpp.obj": [
+			"ItemInspectorRuntime.init.gen.cpp.obj",
+			"ItemInspectorSettings.gen.cpp.obj",
+			"JMInspectableComponent.gen.cpp.obj",
+			"JMItemInspectionData.gen.cpp.obj",
+			"JMItemInspectionPreviewActor.gen.cpp.obj",
+			"JMItemInspectionSubsystem.gen.cpp.obj",
+			"JMItemInspectionSurfaceWidgetBase.gen.cpp.obj",
+			"JMItemInspectionTransitionWidget.gen.cpp.obj",
+			"JMItemInspectionTypes.gen.cpp.obj",
+			"JMItemInspectionWidgetBase.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"ItemInspectorSettings.cpp.obj",
+			"JMGameplayLog.cpp.obj",
+			"JMInspectableComponent.cpp.obj",
+			"JMItemInspectionData.cpp.obj",
+			"JMItemInspectionPreviewActor.cpp.obj",
+			"JMItemInspectionSubsystem.cpp.obj",
+			"JMItemInspectionSurfaceWidgetBase.cpp.obj",
+			"JMItemInspectionTransitionWidget.cpp.obj",
+			"JMItemInspectionWidgetBase.cpp.obj",
+			"ItemInspectorRuntime.cpp.obj"
+		]
+	}
+}

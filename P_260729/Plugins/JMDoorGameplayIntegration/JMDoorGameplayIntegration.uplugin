@@ -1,0 +1,23 @@
+{
+  "FileVersion": 3,
+  "Version": 4,
+  "VersionName": "1.1.0",
+  "FriendlyName": "JM Door Gameplay Integration",
+  "Description": "Optional bridge between JMDoor, JM interaction, and InventorySystem.",
+  "Category": "JM Plugins",
+  "CreatedBy": "JM",
+  "CanContainContent": true,
+  "EnabledByDefault": true,
+  "Plugins": [
+    { "Name": "JMDoor", "Enabled": true },
+    { "Name": "JMInteraction", "Enabled": true },
+    { "Name": "InventorySystem", "Enabled": true }
+  ],
+  "Modules": [
+    {
+      "Name": "JMDoorGameplayIntegration",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

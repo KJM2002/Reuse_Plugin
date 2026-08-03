@@ -1,0 +1,30 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMHideRuntime.cpp.obj": [
+			"JMHideAnchorComponent.gen.cpp.obj",
+			"JMHideCharacterParticipantComponent.gen.cpp.obj",
+			"JMHideDefinition.gen.cpp.obj",
+			"JMHideInteractorComponent.gen.cpp.obj",
+			"JMHideMechanismComponent.gen.cpp.obj",
+			"JMHideParticipantDriverComponent.gen.cpp.obj",
+			"JMHideRuntime.init.gen.cpp.obj",
+			"JMHideSettings.gen.cpp.obj",
+			"JMHideSimplePanelMechanismComponent.gen.cpp.obj",
+			"JMHideSpotComponent.gen.cpp.obj",
+			"JMHideTypes.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"JMHideAnchorComponent.cpp.obj",
+			"JMHideCharacterParticipantComponent.cpp.obj",
+			"JMHideInteractorComponent.cpp.obj",
+			"JMHideMechanismComponent.cpp.obj",
+			"JMHideParticipantDriverComponent.cpp.obj",
+			"JMHideSimplePanelMechanismComponent.cpp.obj",
+			"JMHideSpotComponent.cpp.obj",
+			"JMHideDefinition.cpp.obj",
+			"JMHideRuntime.cpp.obj",
+			"JMHideTags.cpp.obj",
+			"JMHideTypes.cpp.obj"
+		]
+	}
+}

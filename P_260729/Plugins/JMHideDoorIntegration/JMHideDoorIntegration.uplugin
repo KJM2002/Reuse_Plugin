@@ -1,0 +1,28 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0.0",
+  "FriendlyName": "JM Hide Door Integration",
+  "Description": "JMDoor command adapter implementing the JMHide mechanism contract.",
+  "Category": "JM Plugins",
+  "CreatedBy": "JM",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Plugins": [
+    { "Name": "JMHide", "Enabled": true },
+    { "Name": "JMDoor", "Enabled": true }
+  ],
+  "Modules": [
+    {
+      "Name": "JMHideDoorIntegration",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "JMHideDoorIntegrationTests",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit",
+      "TargetAllowList": ["Editor"]
+    }
+  ]
+}

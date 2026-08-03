@@ -1,0 +1,24 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0.0",
+  "FriendlyName": "JM Hide",
+  "Description": "Reusable session-driven hiding domain with participant and mechanism contracts.",
+  "Category": "JM Plugins",
+  "CreatedBy": "JM",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Modules": [
+    {
+      "Name": "JMHideRuntime",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "JMHideTests",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit",
+      "TargetAllowList": ["Editor"]
+    }
+  ]
+}

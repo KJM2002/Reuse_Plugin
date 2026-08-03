@@ -1,0 +1,27 @@
+{
+  "FileVersion": 3,
+  "Version": 3,
+  "VersionName": "1.1.1",
+  "FriendlyName": "JM Objective",
+  "Description": "Reusable event-driven objectives with data-driven linear flows and automatic local-player UI.",
+  "Category": "JM Plugins",
+  "CreatedBy": "JM",
+  "CanContainContent": true,
+  "EnabledByDefault": true,
+  "Plugins": [
+    { "Name": "JMGameplayEvent", "Enabled": true }
+  ],
+  "Modules": [
+    {
+      "Name": "JMObjective",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "JMObjectiveTests",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit",
+      "TargetAllowList": ["Editor"]
+    }
+  ]
+}

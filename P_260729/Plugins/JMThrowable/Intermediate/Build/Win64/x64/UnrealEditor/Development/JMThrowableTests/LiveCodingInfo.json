@@ -1,0 +1,10 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.JMThrowableTests.cpp.obj": [
+			"PerModuleInline.gen.cpp.obj",
+			"JMThrowableAutomationTests.cpp.obj",
+			"JMThrowableTestsModule.cpp.obj"
+		]
+	}
+}

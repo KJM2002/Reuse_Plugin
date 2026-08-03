@@ -1,0 +1,58 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.7",
+	"Category": "",
+	"Description": "",
+	"Modules": [
+		{
+			"Name": "P_060715",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine"
+			]
+		},
+		{
+			"Name": "P_060715Tests",
+			"Type": "Editor",
+			"LoadingPhase": "PostEngineInit"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ModelingToolsEditorMode",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
+			"Name": "JMReconGameplayIntegration",
+			"Enabled": true
+		},
+		{
+			"Name": "JMDoorReconIntegration",
+			"Enabled": true
+		},
+		{
+			"Name": "JMHide",
+			"Enabled": true
+		},
+		{
+			"Name": "JMHideInteractionIntegration",
+			"Enabled": true
+		},
+		{
+			"Name": "JMHideDoorIntegration",
+			"Enabled": true
+		},
+		{
+			"Name": "JMThrowable",
+			"Enabled": true
+		},
+		{
+			"Name": "JMThrowableGameplayIntegration",
+			"Enabled": true
+		}
+	]
+}

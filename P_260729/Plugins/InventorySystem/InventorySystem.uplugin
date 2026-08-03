@@ -1,0 +1,36 @@
+{
+	"FileVersion": 3,
+	"Version": 6,
+	"VersionName": "0.5.0",
+	"FriendlyName": "Reusable Inventory System",
+	"Description": "Reusable, data-driven inventory, pickup, UI and inspector bridge runtime plugin.",
+	"Category": "JM Plugins",
+	"CreatedBy": "JM",
+	"CanContainContent": true,
+	"EnabledByDefault": true,
+	"Plugins": [
+		{
+			"Name": "JMGameplayEvent",
+			"Enabled": true
+		},
+		{
+			"Name": "EnhancedInput",
+			"Enabled": true
+		},
+		{
+			"Name": "ItemInspector",
+			"Enabled": true
+		},
+		{
+			"Name": "JMInteraction",
+			"Enabled": true
+		}
+	],
+	"Modules": [
+		{
+			"Name": "InventorySystem",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
