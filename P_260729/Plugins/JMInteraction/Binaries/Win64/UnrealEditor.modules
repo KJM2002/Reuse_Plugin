@@ -1,8 +1,0 @@
-{
-	"BuildId": "47537391",
-	"Modules": 
-	{
-		"JMInteraction": "UnrealEditor-JMInteraction.dll",
-		"JMInteractionTests": "UnrealEditor-JMInteractionTests.dll"
-	}
-}

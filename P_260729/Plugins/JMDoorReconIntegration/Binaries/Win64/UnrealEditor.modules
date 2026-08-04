@@ -1,8 +1,0 @@
-{
-	"BuildId": "47537391",
-	"Modules": 
-	{
-		"JMDoorReconIntegration": "UnrealEditor-JMDoorReconIntegration.dll",
-		"JMDoorReconIntegrationTests": "UnrealEditor-JMDoorReconIntegrationTests.dll"
-	}
-}

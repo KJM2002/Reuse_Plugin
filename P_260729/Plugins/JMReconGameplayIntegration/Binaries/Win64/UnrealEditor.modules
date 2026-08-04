@@ -1,8 +1,0 @@
-{
-	"BuildId": "47537391",
-	"Modules": 
-	{
-		"JMReconGameplayIntegration": "UnrealEditor-JMReconGameplayIntegration.dll",
-		"JMReconGameplayIntegrationTests": "UnrealEditor-JMReconGameplayIntegrationTests.dll"
-	}
-}

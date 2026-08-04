@@ -1,9 +1,0 @@
-{
-	"BuildId": "47537391",
-	"Modules": 
-	{
-		"JMReconEditor": "UnrealEditor-JMReconEditor.dll",
-		"JMReconRuntime": "UnrealEditor-JMReconRuntime.dll",
-		"JMReconTests": "UnrealEditor-JMReconTests.dll"
-	}
-}

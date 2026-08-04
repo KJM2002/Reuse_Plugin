@@ -1,8 +1,0 @@
-{
-	"BuildId": "47537391",
-	"Modules": 
-	{
-		"JMHideRuntime": "UnrealEditor-JMHideRuntime.dll",
-		"JMHideTests": "UnrealEditor-JMHideTests.dll"
-	}
-}

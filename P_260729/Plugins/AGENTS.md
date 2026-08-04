@@ -61,6 +61,7 @@
 | `JMHide` | `JMHideRuntime`, `JMHideTests` | Session 기반 은신 Domain, Spot 예약/점유, Participant Driver, Simple Panel Mechanism | 없음 | 독립 Runtime + Editor Tests |
 | `JMHideInteractionIntegration` | `JMHideInteractionIntegration` | JMInteraction 명령을 JMHide 진입으로 연결하고 호스트 입력 라우팅 지원 | `JMHide`, `JMInteraction` | Runtime Bridge |
 | `JMHideDoorIntegration` | `JMHideDoorIntegration`, `JMHideDoorIntegrationTests` | JMDoor 공개 Command/상태를 JMHide Mechanism 계약으로 번역 | `JMHide`, `JMDoor` | Runtime Adapter + Editor Tests |
+| `JMRoomGrid` | `JMRoomGridRuntime`, `JMRoomGridEditor`, `JMRoomGridTests` | 편집 가능한 모듈 방, 데이터 기반 결정적 5x5 배치, 에셋 생성·검증 도구 | 없음 | 독립 Runtime + Editor Tools/Tests, Content 가능 |
 
 현재 허용된 방향은 다음뿐이다.
 

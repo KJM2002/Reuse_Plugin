@@ -1,9 +1,0 @@
-{
-	"RemapUnityFiles": 
-	{
-		"Module.JMThrowableEditor.cpp.obj": [
-			"PerModuleInline.gen.cpp.obj",
-			"JMThrowableEditorModule.cpp.obj"
-		]
-	}
-}

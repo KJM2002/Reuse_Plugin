@@ -1,8 +1,0 @@
-{
-	"BuildId": "47537391",
-	"Modules": 
-	{
-		"ItemInspectorRuntime": "UnrealEditor-ItemInspectorRuntime.dll",
-		"ItemInspectorTests": "UnrealEditor-ItemInspectorTests.dll"
-	}
-}

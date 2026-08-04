@@ -1,8 +1,0 @@
-{
-	"BuildId": "47537391",
-	"Modules": 
-	{
-		"JMFootstepRuntime": "UnrealEditor-JMFootstepRuntime.dll",
-		"JMFootstepTests": "UnrealEditor-JMFootstepTests.dll"
-	}
-}
