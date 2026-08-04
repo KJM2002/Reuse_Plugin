@@ -4,6 +4,7 @@
 
 - Fixed generated 13x13 floor, wall, and ceiling components failing to attach to the movable `StructureRoot`.
 - Existing generated room structures are upgraded to version 3 while user-authored Blueprint components remain preserved.
+- Updated the Korean guide with the complete 13x13 specification, editor regeneration workflow, room editing, ceiling visibility, runtime generation, and troubleshooting.
 
 ## 1.4.0
 
