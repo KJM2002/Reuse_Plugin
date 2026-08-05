@@ -62,7 +62,6 @@ protected:
 
 	void BuildSortButtonIfNeeded();
 	void BuildPanelBlurIfNeeded();
-	void ApplyDuckovPanelLayout();
 	void ApplyDuckovPanelStyle();
 	void ApplySortButtonStyle();
 	void ResetAllSlotHoverStates();

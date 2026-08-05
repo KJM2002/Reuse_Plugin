@@ -43,7 +43,6 @@ void UInventoryDuckovWidgetBase::NativePreConstruct()
 	Super::NativePreConstruct();
 	EnsureExternalContainerWidgets();
 	PrepareInventoryLayout();
-	ApplyDuckovPanelLayout();
 	BuildPanelBlurIfNeeded();
 	BuildSortButtonIfNeeded();
 	ApplyDuckovPanelStyle();
@@ -389,32 +388,16 @@ void UInventoryDuckovWidgetBase::BuildPanelBlurIfNeeded()
 	PlayerPanelBackgroundBlur->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	if (UCanvasPanelSlot* BlurSlot = ParentCanvas->AddChildToCanvas(PlayerPanelBackgroundBlur))
 	{
-		BlurSlot->SetAnchors(FAnchors(0.0f, 1.0f));
-		BlurSlot->SetAlignment(FVector2D(0.0f, 1.0f));
-		BlurSlot->SetPosition(FVector2D(48.0f, -48.0f));
-		BlurSlot->SetSize(FVector2D(480.0f, 560.0f));
-		BlurSlot->SetAutoSize(false);
-		BlurSlot->SetZOrder(19);
+		if (const UCanvasPanelSlot* PlayerCanvasSlot = Cast<UCanvasPanelSlot>(Panel_PlayerInventory->Slot))
+		{
+			BlurSlot->SetAnchors(PlayerCanvasSlot->GetAnchors());
+			BlurSlot->SetAlignment(PlayerCanvasSlot->GetAlignment());
+			BlurSlot->SetPosition(PlayerCanvasSlot->GetPosition());
+			BlurSlot->SetSize(PlayerCanvasSlot->GetSize());
+			BlurSlot->SetAutoSize(PlayerCanvasSlot->GetAutoSize());
+			BlurSlot->SetZOrder(PlayerCanvasSlot->GetZOrder() - 1);
+		}
 	}
-}
-
-void UInventoryDuckovWidgetBase::ApplyDuckovPanelLayout()
-{
-	if (USizeBox* PlayerSizeBox = Cast<USizeBox>(Panel_PlayerInventory))
-	{
-		PlayerSizeBox->SetWidthOverride(480.0f);
-		PlayerSizeBox->SetHeightOverride(560.0f);
-	}
-	if (UCanvasPanelSlot* PlayerCanvasSlot = Cast<UCanvasPanelSlot>(Panel_PlayerInventory ? Panel_PlayerInventory->Slot : nullptr))
-	{
-		PlayerCanvasSlot->SetAnchors(FAnchors(0.0f, 1.0f));
-		PlayerCanvasSlot->SetAlignment(FVector2D(0.0f, 1.0f));
-		PlayerCanvasSlot->SetPosition(FVector2D(48.0f, -48.0f));
-		PlayerCanvasSlot->SetSize(FVector2D(480.0f, 560.0f));
-		PlayerCanvasSlot->SetAutoSize(false);
-		PlayerCanvasSlot->SetZOrder(20);
-	}
-
 }
 
 void UInventoryDuckovWidgetBase::ApplyDuckovPanelStyle()
