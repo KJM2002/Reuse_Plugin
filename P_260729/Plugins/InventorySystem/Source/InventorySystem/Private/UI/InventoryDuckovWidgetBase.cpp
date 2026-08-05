@@ -17,6 +17,7 @@
 #include "Components/TextBlock.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
 #include "Components/Widget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Brushes/SlateColorBrush.h"
@@ -56,26 +57,54 @@ void UInventoryDuckovWidgetBase::EnsureExternalContainerWidgets()
 		return;
 	}
 
+	RuntimeExternalContainerBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("Border_ExternalContainerRuntime"));
+	RuntimeExternalContainerBorder->SetBrush(FSlateRoundedBoxBrush(
+		FLinearColor(0.025f, 0.075f, 0.125f, 0.82f),
+		14.0f,
+		FLinearColor(0.33f, 0.48f, 0.58f, 0.88f),
+		1.5f));
+	RuntimeExternalContainerBorder->SetBrushColor(FLinearColor::White);
+	RuntimeExternalContainerBorder->SetPadding(FMargin(16.0f));
+
 	UVerticalBox* ContainerLayout = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("VerticalBox_ExternalContainerRuntime"));
 	Text_ContainerName = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_ContainerName"));
 	Text_ContainerName->SetText(ExternalContainer ? ExternalContainer->ContainerName : NSLOCTEXT("InventorySystem", "LootContainerTitle", "Loot"));
-	ContainerLayout->AddChildToVerticalBox(Text_ContainerName);
+	FSlateFontInfo HeaderFont = Text_ContainerName->GetFont();
+	HeaderFont.Size = 21;
+	HeaderFont.OutlineSettings.OutlineSize = 1;
+	HeaderFont.OutlineSettings.OutlineColor = FLinearColor(0.01f, 0.025f, 0.04f, 0.92f);
+	Text_ContainerName->SetFont(HeaderFont);
+	Text_ContainerName->SetColorAndOpacity(FSlateColor(FLinearColor(0.93f, 0.97f, 0.98f, 1.0f)));
+	Text_ContainerName->SetShadowOffset(FVector2D(1.0f, 1.0f));
+	Text_ContainerName->SetShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.72f));
+	if (UVerticalBoxSlot* HeaderSlot = ContainerLayout->AddChildToVerticalBox(Text_ContainerName))
+	{
+		HeaderSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 10.0f));
+		HeaderSlot->SetHorizontalAlignment(HAlign_Left);
+	}
 
 	UScrollBox* ScrollBox = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("ScrollBox_ExternalContainerRuntime"));
 	UniformGridPanel_ContainerItems = WidgetTree->ConstructWidget<UUniformGridPanel>(UUniformGridPanel::StaticClass(), TEXT("UniformGridPanel_ContainerItems"));
 	UniformGridPanel_ContainerItems->SetMinDesiredSlotWidth(80.0f);
 	UniformGridPanel_ContainerItems->SetMinDesiredSlotHeight(80.0f);
 	UniformGridPanel_ContainerItems->SetSlotPadding(FMargin(4.0f));
+	ScrollBox->SetScrollBarVisibility(ESlateVisibility::Collapsed);
 	ScrollBox->AddChild(UniformGridPanel_ContainerItems);
-	ContainerLayout->AddChildToVerticalBox(ScrollBox);
+	if (UVerticalBoxSlot* ScrollSlot = ContainerLayout->AddChildToVerticalBox(ScrollBox))
+	{
+		ScrollSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		ScrollSlot->SetHorizontalAlignment(HAlign_Fill);
+		ScrollSlot->SetVerticalAlignment(VAlign_Fill);
+	}
+	RuntimeExternalContainerBorder->SetContent(ContainerLayout);
 
 	if (UContentWidget* ContentHost = Cast<UContentWidget>(Panel_ExternalContainer))
 	{
-		ContentHost->SetContent(ContainerLayout);
+		ContentHost->SetContent(RuntimeExternalContainerBorder);
 	}
 	else if (UPanelWidget* PanelHost = Cast<UPanelWidget>(Panel_ExternalContainer))
 	{
-		PanelHost->AddChild(ContainerLayout);
+		PanelHost->AddChild(RuntimeExternalContainerBorder);
 	}
 }
 
@@ -384,6 +413,21 @@ void UInventoryDuckovWidgetBase::ApplyDuckovPanelLayout()
 		PlayerCanvasSlot->SetSize(FVector2D(480.0f, 560.0f));
 		PlayerCanvasSlot->SetAutoSize(false);
 		PlayerCanvasSlot->SetZOrder(20);
+	}
+
+	if (USizeBox* ExternalSizeBox = Cast<USizeBox>(Panel_ExternalContainer))
+	{
+		ExternalSizeBox->SetWidthOverride(FMath::Max(1.0f, ExternalContainerSize.X));
+		ExternalSizeBox->SetHeightOverride(FMath::Max(1.0f, ExternalContainerSize.Y));
+	}
+	if (UCanvasPanelSlot* ExternalCanvasSlot = Cast<UCanvasPanelSlot>(Panel_ExternalContainer ? Panel_ExternalContainer->Slot : nullptr))
+	{
+		ExternalCanvasSlot->SetAnchors(FAnchors(ExternalContainerAnchor.X, ExternalContainerAnchor.Y));
+		ExternalCanvasSlot->SetAlignment(ExternalContainerAlignment);
+		ExternalCanvasSlot->SetPosition(ExternalContainerPosition);
+		ExternalCanvasSlot->SetSize(ExternalContainerSize);
+		ExternalCanvasSlot->SetAutoSize(false);
+		ExternalCanvasSlot->SetZOrder(20);
 	}
 }
 

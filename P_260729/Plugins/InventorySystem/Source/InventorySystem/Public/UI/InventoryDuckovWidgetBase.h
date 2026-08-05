@@ -83,6 +83,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|UI")
 	TSubclassOf<UInventoryContextActionWidgetBase> ContextActionWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|UI|External Container")
+	FVector2D ExternalContainerAnchor = FVector2D(1.0f, 0.5f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|UI|External Container")
+	FVector2D ExternalContainerAlignment = FVector2D(1.0f, 0.5f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|UI|External Container")
+	FVector2D ExternalContainerPosition = FVector2D(-48.0f, 0.0f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|UI|External Container", meta = (ClampMin = "1.0"))
+	FVector2D ExternalContainerSize = FVector2D(480.0f, 400.0f);
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "Inventory|UI")
 	TObjectPtr<UWidget> Panel_PlayerInventory = nullptr;
 
@@ -121,6 +133,9 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UBackgroundBlur> PlayerPanelBackgroundBlur = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBorder> RuntimeExternalContainerBorder = nullptr;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Inventory|UI")
 	TObjectPtr<UInventoryContainerComponent> ExternalContainer = nullptr;
