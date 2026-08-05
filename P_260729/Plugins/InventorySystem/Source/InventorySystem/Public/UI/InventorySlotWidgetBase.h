@@ -8,6 +8,7 @@ class UBorder;
 class UButton;
 class UImage;
 class UInventoryItemDefinition;
+class UInventoryComponent;
 class UInventoryWidgetBase;
 class UOverlay;
 class UScaleBox;
@@ -30,11 +31,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void InitializeSlot(UInventoryWidgetBase* InOwnerInventoryWidget, int32 InSlotIndex, UInventoryItemDefinition* InItemDefinition, int32 InQuantity);
 
-	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
-	void RefreshSlot();
+	void InitializeSlotForInventory(UInventoryWidgetBase* InOwnerInventoryWidget, UInventoryComponent* InSourceInventory, int32 InSlotIndex, UInventoryItemDefinition* InItemDefinition, int32 InQuantity);
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
-	void SetSelected(bool bInSelected);
+	virtual void RefreshSlot();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
+	virtual void SetSelected(bool bInSelected);
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	int32 GetSlotIndex() const { return SlotIndex; }
@@ -44,6 +47,8 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	int32 GetQuantity() const { return Quantity; }
+
+	UInventoryComponent* GetSourceInventory() const { return SourceInventory; }
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void FocusSlot();
@@ -127,6 +132,9 @@ protected:
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Inventory|UI")
 	TObjectPtr<UInventoryWidgetBase> OwnerInventoryWidget = nullptr;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Inventory|UI")
+	TObjectPtr<UInventoryComponent> SourceInventory = nullptr;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Inventory|UI")
 	TObjectPtr<UInventoryItemDefinition> ItemDefinition = nullptr;

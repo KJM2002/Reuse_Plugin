@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/DataTable.h"
 #include "InventoryTypes.generated.h"
 
 class UInventoryItemDefinition;
@@ -11,6 +12,7 @@ enum class EInventoryAddResult : uint8
 	Success,
 	PartialSuccess,
 	InventoryFull,
+	OverWeight,
 	InvalidItem,
 	InvalidQuantity
 };
@@ -19,13 +21,52 @@ UENUM(BlueprintType)
 enum class EInventoryOperationResult : uint8
 {
 	Success,
+	PartialSuccess,
 	InvalidSlot,
 	InvalidItem,
 	InvalidQuantity,
+	InventoryFull,
+	OverWeight,
 	NotAllowed,
 	CannotUse,
 	EffectFailed,
 	SpawnFailed
+};
+
+USTRUCT(BlueprintType)
+struct INVENTORYSYSTEM_API FInventoryInitialItem
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory")
+	TObjectPtr<UInventoryItemDefinition> ItemDefinition = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory", meta = (ClampMin = "1"))
+	int32 MinQuantity = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory", meta = (ClampMin = "1"))
+	int32 MaxQuantity = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float SpawnChance = 1.0f;
+};
+
+USTRUCT(BlueprintType)
+struct INVENTORYSYSTEM_API FInventoryLootTableRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Loot")
+	TObjectPtr<UInventoryItemDefinition> ItemDefinition = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Loot", meta = (ClampMin = "1"))
+	int32 MinQuantity = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Loot", meta = (ClampMin = "1"))
+	int32 MaxQuantity = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Loot", meta = (ClampMin = "0.0"))
+	float Weight = 1.0f;
 };
 
 USTRUCT(BlueprintType)

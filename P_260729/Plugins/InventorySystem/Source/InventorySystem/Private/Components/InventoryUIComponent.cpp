@@ -1,6 +1,7 @@
 #include "Components/InventoryUIComponent.h"
 
 #include "Components/InventoryComponent.h"
+#include "Components/InventoryContainerComponent.h"
 #include "Engine/World.h"
 #include "Engine/GameInstance.h"
 #include "EnhancedActionKeyMapping.h"
@@ -22,6 +23,7 @@
 #include "TimerManager.h"
 #include "UI/InventoryPickupNotificationWidget.h"
 #include "UI/InventoryWidgetBase.h"
+#include "UI/InventoryDuckovWidgetBase.h"
 
 UInventoryUIComponent::UInventoryUIComponent()
 {
@@ -163,6 +165,10 @@ bool UInventoryUIComponent::OpenInventory()
 	}
 
 	InventoryWidget->InitializeInventory(InventoryComponent, this);
+	if (UInventoryDuckovWidgetBase* DuckovWidget = Cast<UInventoryDuckovWidgetBase>(InventoryWidget))
+	{
+		DuckovWidget->SetExternalContainer(CurrentContainer);
+	}
 	InventoryWidget->OnCloseRequested.AddUniqueDynamic(this, &UInventoryUIComponent::HandleWidgetCloseRequested);
 	InventoryWidget->OnCloseTransitionFinished.AddUniqueDynamic(this, &UInventoryUIComponent::HandleWidgetCloseTransitionFinished);
 	InventoryWidget->OnInspectTransitionFinished.AddUniqueDynamic(this, &UInventoryUIComponent::HandleWidgetInspectTransitionFinished);
@@ -177,6 +183,29 @@ bool UInventoryUIComponent::OpenInventory()
 	PublishPresentationEvent(true);
 	OnInventoryOpened.Broadcast();
 	return true;
+}
+
+bool UInventoryUIComponent::OpenContainer(UInventoryContainerComponent* Container)
+{
+	if (!IsValid(Container))
+	{
+		return false;
+	}
+	SetCurrentContainer(Container);
+	if (IsInventoryOpen())
+	{
+		return true;
+	}
+	return OpenInventory();
+}
+
+void UInventoryUIComponent::SetCurrentContainer(UInventoryContainerComponent* Container)
+{
+	CurrentContainer = Container;
+	if (UInventoryDuckovWidgetBase* DuckovWidget = Cast<UInventoryDuckovWidgetBase>(InventoryWidget))
+	{
+		DuckovWidget->SetExternalContainer(CurrentContainer);
+	}
 }
 
 void UInventoryUIComponent::CloseInventory()
@@ -347,6 +376,7 @@ void UInventoryUIComponent::FinalizeCloseInventory()
 	InventoryWidget->OnInspectTransitionFinished.RemoveDynamic(this, &UInventoryUIComponent::HandleWidgetInspectTransitionFinished);
 	InventoryWidget->RemoveFromParent();
 	InventoryWidget = nullptr;
+	CurrentContainer = nullptr;
 	PendingInspectorItem = nullptr;
 	bClosePending = false;
 	RestoreInputMode();

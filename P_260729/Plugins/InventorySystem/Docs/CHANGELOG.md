@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- Added persistent external inventory containers, weighted DataTable loot generation,
+  atomic cross-inventory move/split/swap operations, weight limits, reusable loot
+  actors, and two-panel Duckov UI transfer gestures.
+- Added an opt-in Duckov-style C++ presentation layer with compact named slots,
+  hover tooltip, InstanceId-safe Use/Drop/Inspect context actions, popup cleanup,
+  pure presentation helpers, tests, and an Editor authoring guide. Existing WBP
+  assets and the native fallback remain unchanged.
+- Added five opt-in Duckov Widget Blueprints under `/Game/UI/Inventory` with a
+  translucent navy panel, blue-gray outlines, teal hover/selection feedback,
+  compact 96 px slots, a lower name band, and a top-right quantity badge.
+- Added Duckov Backpack occupied/max labeling, quantity-descending sorting,
+  explicit left-click selection, and transactional whole-stack drag movement
+  into empty player inventory slots. Hotbar data remains intentionally out of scope.
+- Fixed Duckov Blueprint slot alignment so empty-cell backgrounds and pointer hit
+  areas fill the entire 96 px cell, increased empty-grid contrast, and anchored
+  the Backpack panel to the lower-left presentation area.
+- Fixed stale hover styling after pointer exit and drag traversal. Dragging now
+  shows a translucent copy of the complete slot under the pointer, dims the
+  source slot, and restores all visual state when a drop is cancelled outside.
+- Refined the Duckov presentation to a five-column 80 px Backpack grid with
+  panel-only background blur, 14 px rounded panel framing, compact spacing,
+  styled name/quantity bands, hover/selection scaling, and consistent
+  Normal/Hovered/Pressed treatments for Sort, Close, and context actions.
 - Empty pickup/inspect interaction text is now respected, allowing designers to hide a prompt intentionally.
 - Inventory-to-Inspector transitions now keep the full-screen dim backdrop opaque while only the inventory window animates, preventing a bright world-frame flash.
 - Inventory inspection now fades the Inventory out before opening Item Inspector and fades it back in after the Inspector closes.

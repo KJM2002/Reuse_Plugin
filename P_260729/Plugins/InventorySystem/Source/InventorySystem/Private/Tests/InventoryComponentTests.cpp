@@ -65,4 +65,60 @@ bool FInventorySelectionRecoveryTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventoryLayoutOperationsTest,
+	"InventorySystem.Component.LayoutOperations",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryLayoutOperationsTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->MaxInventorySlots = 4;
+	UInventoryItemDefinition* Two = NewObject<UInventoryItemDefinition>();
+	UInventoryItemDefinition* Five = NewObject<UInventoryItemDefinition>();
+	UInventoryItemDefinition* Three = NewObject<UInventoryItemDefinition>();
+	Two->ItemId = TEXT("Automation.QuantityTwo");
+	Five->ItemId = TEXT("Automation.QuantityFive");
+	Three->ItemId = TEXT("Automation.QuantityThree");
+	Two->MaxStackSize = Five->MaxStackSize = Three->MaxStackSize = 99;
+	Two->bStackable = Five->bStackable = Three->bStackable = true;
+	TestTrue(TEXT("Quantity-two stack added"), Inventory->AddItem(Two, 2));
+	TestTrue(TEXT("Quantity-five stack added"), Inventory->AddItem(Five, 5));
+	TestTrue(TEXT("Quantity-three stack added"), Inventory->AddItem(Three, 3));
+
+	Inventory->SortItemsByQuantityDescending();
+	FInventorySlot Slot;
+	TestTrue(TEXT("Sorted first slot is occupied"), Inventory->GetSlot(0, Slot));
+	TestEqual(TEXT("Largest stack sorts first"), Slot.Quantity, 5);
+	TestTrue(TEXT("Sorted second slot is occupied"), Inventory->GetSlot(1, Slot));
+	TestEqual(TEXT("Middle stack sorts second"), Slot.Quantity, 3);
+	TestTrue(TEXT("Sorted third slot is occupied"), Inventory->GetSlot(2, Slot));
+	TestEqual(TEXT("Smallest stack sorts third"), Slot.Quantity, 2);
+
+	const FGuid MovedInstanceId = Inventory->GetSlotsNative()[0].InstanceId;
+	TestEqual(
+		TEXT("Stack moves into an empty grid cell"),
+		Inventory->MoveItemToEmptySlot(0, 3),
+		EInventoryOperationResult::Success);
+	TestFalse(TEXT("Source slot becomes empty"), Inventory->GetSlot(0, Slot));
+	TestTrue(TEXT("Destination slot becomes occupied"), Inventory->GetSlot(3, Slot));
+	TestEqual(TEXT("Move preserves stack identity"), Slot.InstanceId, MovedInstanceId);
+	TestEqual(TEXT("Move preserves quantity"), Slot.Quantity, 5);
+
+	const FInventorySlot DestinationBeforeFailure = Inventory->GetSlotsNative()[2];
+	TestEqual(
+		TEXT("Occupied destination rejects a move"),
+		Inventory->MoveItemToEmptySlot(3, 2),
+		EInventoryOperationResult::NotAllowed);
+	TestEqual(
+		TEXT("Rejected move preserves destination identity"),
+		Inventory->GetSlotsNative()[2].InstanceId,
+		DestinationBeforeFailure.InstanceId);
+	TestEqual(
+		TEXT("Rejected move preserves source identity"),
+		Inventory->GetSlotsNative()[3].InstanceId,
+		MovedInstanceId);
+	return true;
+}
+
 #endif

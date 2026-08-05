@@ -113,6 +113,13 @@ void UInventorySlotWidgetBase::NativePreConstruct()
 			return Overlay_Slot->AddChildToOverlay(Widget);
 		};
 
+		if (UOverlaySlot* BackgroundSlot = Cast<UOverlaySlot>(Border_Background ? Border_Background->Slot : nullptr))
+		{
+			BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
+			BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
+			BackgroundSlot->SetPadding(FMargin(0.0f));
+		}
+
 		if (UOverlaySlot* UnavailableSlot = MoveToOverlayFront(Border_Unavailable))
 		{
 			UnavailableSlot->SetHorizontalAlignment(HAlign_Fill);
@@ -129,6 +136,25 @@ void UInventorySlotWidgetBase::NativePreConstruct()
 			QuantitySlot->SetVerticalAlignment(VAlign_Bottom);
 			QuantitySlot->SetPadding(QuantityPadding);
 		}
+		if (UOverlaySlot* SelectSlot = MoveToOverlayFront(Button_Select))
+		{
+			SelectSlot->SetHorizontalAlignment(HAlign_Fill);
+			SelectSlot->SetVerticalAlignment(VAlign_Fill);
+			SelectSlot->SetPadding(FMargin(0.0f));
+		}
+	}
+
+	if (Button_Select)
+	{
+		FButtonStyle ButtonStyle = Button_Select->GetStyle();
+		const FSlateBrush TransparentBrush = FSlateColorBrush(FLinearColor::Transparent);
+		ButtonStyle.SetNormal(TransparentBrush);
+		ButtonStyle.SetHovered(TransparentBrush);
+		ButtonStyle.SetPressed(TransparentBrush);
+		ButtonStyle.SetDisabled(TransparentBrush);
+		Button_Select->SetStyle(ButtonStyle);
+		Button_Select->SetClickMethod(EButtonClickMethod::MouseDown);
+		Button_Select->SetVisibility(ESlateVisibility::Visible);
 	}
 
 	const FString BackgroundTexturePath = SlotBackgroundTexture.ToSoftObjectPath().ToString();
@@ -243,6 +269,12 @@ void UInventorySlotWidgetBase::NativeDestruct()
 }
 
 void UInventorySlotWidgetBase::InitializeSlot(UInventoryWidgetBase* InOwnerInventoryWidget, int32 InSlotIndex, UInventoryItemDefinition* InItemDefinition, int32 InQuantity)
+
+{
+	InitializeSlotForInventory(InOwnerInventoryWidget, InOwnerInventoryWidget ? InOwnerInventoryWidget->GetInventoryComponent() : nullptr, InSlotIndex, InItemDefinition, InQuantity);
+}
+
+void UInventorySlotWidgetBase::InitializeSlotForInventory(UInventoryWidgetBase* InOwnerInventoryWidget, UInventoryComponent* InSourceInventory, int32 InSlotIndex, UInventoryItemDefinition* InItemDefinition, int32 InQuantity)
 {
 	if (OwnerInventoryWidget && OwnerInventoryWidget != InOwnerInventoryWidget)
 	{
@@ -250,6 +282,7 @@ void UInventorySlotWidgetBase::InitializeSlot(UInventoryWidgetBase* InOwnerInven
 	}
 
 	OwnerInventoryWidget = InOwnerInventoryWidget;
+	SourceInventory = InSourceInventory;
 	SlotIndex = InSlotIndex;
 	ItemDefinition = InItemDefinition;
 	Quantity = FMath::Max(0, InQuantity);

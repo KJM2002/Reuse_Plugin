@@ -9,6 +9,7 @@ class UEnhancedInputComponent;
 class UInputAction;
 class UInputMappingContext;
 class UInventoryComponent;
+class UInventoryContainerComponent;
 class UInventoryItemDefinition;
 class UInventoryItemInspectorBridge;
 class UInventoryPickupNotificationWidget;
@@ -69,6 +70,15 @@ public:
 	bool OpenInventory();
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
+	bool OpenContainer(UInventoryContainerComponent* Container);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
+	void SetCurrentContainer(UInventoryContainerComponent* Container);
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
+	UInventoryContainerComponent* GetCurrentContainer() const { return CurrentContainer; }
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void CloseInventory();
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
@@ -119,6 +129,9 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInventoryWidgetBase> InventoryWidget = nullptr;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Inventory|UI", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInventoryContainerComponent> CurrentContainer = nullptr;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInventoryPickupNotificationWidget> PickupNotificationWidget = nullptr;

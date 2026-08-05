@@ -1,5 +1,6 @@
 #include "Components/InventoryComponent.h"
 
+#include "Algo/StableSort.h"
 #include "Engine/World.h"
 #include "Engine/GameInstance.h"
 #include "InventoryEventTags.h"
@@ -86,8 +87,16 @@ FInventoryAddOutcome UInventoryComponent::AddItemDetailed(UInventoryItemDefiniti
 		return Outcome;
 	}
 
+	const int32 WeightAcceptedQuantity = GetAcceptableQuantity(ItemDefinition, Quantity);
+	if (WeightAcceptedQuantity <= 0)
+	{
+		Outcome.Result = EInventoryAddResult::OverWeight;
+		OnInventoryFull.Broadcast(ItemDefinition, Quantity);
+		return Outcome;
+	}
+
 	EnsureSlotCapacity();
-	int32 Remaining = Quantity;
+	int32 Remaining = WeightAcceptedQuantity;
 	const int32 StackLimit = ItemDefinition->GetEffectiveMaxStackSize();
 
 	if (ItemDefinition->bStackable)
@@ -123,8 +132,8 @@ FInventoryAddOutcome UInventoryComponent::AddItemDetailed(UInventoryItemDefiniti
 		OnItemAdded.Broadcast(ItemDefinition, Added, SlotIndex);
 	}
 
-	Outcome.AddedQuantity = Quantity - Remaining;
-	Outcome.RemainingQuantity = Remaining;
+	Outcome.AddedQuantity = WeightAcceptedQuantity - Remaining;
+	Outcome.RemainingQuantity = Quantity - Outcome.AddedQuantity;
 	if (Outcome.AddedQuantity == Quantity)
 	{
 		Outcome.Result = EInventoryAddResult::Success;
@@ -151,9 +160,9 @@ FInventoryAddOutcome UInventoryComponent::AddItemDetailed(UInventoryItemDefiniti
 		OnItemsReceived.Broadcast(ItemDefinition, Outcome.AddedQuantity);
 		PublishInventoryEvent(this, JMInventoryEventTags::Acquired, ItemDefinition, Outcome.AddedQuantity, INDEX_NONE);
 	}
-	if (Remaining > 0)
+	if (Outcome.RemainingQuantity > 0)
 	{
-		OnInventoryFull.Broadcast(ItemDefinition, Remaining);
+		OnInventoryFull.Broadcast(ItemDefinition, Outcome.RemainingQuantity);
 	}
 
 	return Outcome;
@@ -327,6 +336,297 @@ EInventoryOperationResult UInventoryComponent::DropItemAtSlot(int32 SlotIndex, i
 	OnItemDropped.Broadcast(ItemDefinition, Quantity, SlotIndex);
 	PublishInventoryEvent(this, JMInventoryEventTags::Dropped, ItemDefinition, Quantity, SlotIndex, EffectiveDropper);
 	return EInventoryOperationResult::Success;
+}
+
+EInventoryOperationResult UInventoryComponent::MoveItemToEmptySlot(
+	int32 SourceSlotIndex,
+	int32 DestinationSlotIndex)
+{
+	EnsureSlotCapacity();
+	if (!IsValidSlotIndex(SourceSlotIndex) || !Slots.IsValidIndex(DestinationSlotIndex))
+	{
+		return EInventoryOperationResult::InvalidSlot;
+	}
+	if (SourceSlotIndex == DestinationSlotIndex)
+	{
+		return EInventoryOperationResult::Success;
+	}
+	if (Slots[DestinationSlotIndex].IsValid())
+	{
+		return EInventoryOperationResult::NotAllowed;
+	}
+
+	// Validate everything before mutation so a failed move preserves both slots.
+	const FInventorySlot SourceSnapshot = Slots[SourceSlotIndex];
+	Slots[DestinationSlotIndex] = SourceSnapshot;
+	Slots[SourceSlotIndex] = FInventorySlot();
+	OnInventoryChanged.Broadcast();
+	return EInventoryOperationResult::Success;
+}
+
+float UInventoryComponent::GetCurrentWeight() const
+{
+	float TotalWeight = 0.0f;
+	for (const FInventorySlot& Slot : Slots)
+	{
+		if (Slot.IsValid())
+		{
+			TotalWeight += FMath::Max(0.0f, Slot.ItemDefinition->Weight) * Slot.Quantity;
+		}
+	}
+	return TotalWeight;
+}
+
+int32 UInventoryComponent::GetAcceptableQuantity(UInventoryItemDefinition* ItemDefinition, int32 Quantity) const
+{
+	if (!IsValid(ItemDefinition) || Quantity <= 0)
+	{
+		return 0;
+	}
+	if (MaxInventoryWeight <= 0.0f || ItemDefinition->Weight <= 0.0f)
+	{
+		return Quantity;
+	}
+	const float RemainingWeight = FMath::Max(0.0f, MaxInventoryWeight - GetCurrentWeight());
+	return FMath::Clamp(FMath::FloorToInt((RemainingWeight + KINDA_SMALL_NUMBER) / ItemDefinition->Weight), 0, Quantity);
+}
+
+bool UInventoryComponent::CanAccept(UInventoryItemDefinition* ItemDefinition, int32 Quantity) const
+{
+	if (GetAcceptableQuantity(ItemDefinition, Quantity) < Quantity)
+	{
+		return false;
+	}
+
+	int32 Remaining = Quantity;
+	const int32 StackLimit = ItemDefinition->GetEffectiveMaxStackSize();
+	for (const FInventorySlot& Slot : Slots)
+	{
+		if (Slot.ItemDefinition == ItemDefinition && ItemDefinition->bStackable)
+		{
+			Remaining -= FMath::Max(0, StackLimit - Slot.Quantity);
+		}
+		else if (!Slot.IsValid())
+		{
+			Remaining -= StackLimit;
+		}
+		if (Remaining <= 0)
+		{
+			return true;
+		}
+	}
+	const int32 UnmaterializedSlots = FMath::Max(0, MaxInventorySlots - Slots.Num());
+	Remaining -= UnmaterializedSlots * StackLimit;
+	if (Remaining <= 0)
+	{
+		return true;
+	}
+	return false;
+}
+
+bool UInventoryComponent::CanMove(UInventoryComponent* Destination, int32 SourceSlotIndex, int32 Quantity, int32 DestinationSlotIndex) const
+{
+	if (!IsValid(Destination) || !IsValidSlotIndex(SourceSlotIndex))
+	{
+		return false;
+	}
+	const FInventorySlot& SourceSlot = Slots[SourceSlotIndex];
+	const int32 Requested = Quantity < 0 ? SourceSlot.Quantity : Quantity;
+	if (Requested <= 0 || Requested > SourceSlot.Quantity)
+	{
+		return false;
+	}
+	if (Destination == this && DestinationSlotIndex == SourceSlotIndex)
+	{
+		return true;
+	}
+	if (DestinationSlotIndex == INDEX_NONE)
+	{
+		return Destination->CanAccept(SourceSlot.ItemDefinition, Requested);
+	}
+	if (!Destination->Slots.IsValidIndex(DestinationSlotIndex))
+	{
+		return false;
+	}
+	const FInventorySlot& DestinationSlot = Destination->Slots[DestinationSlotIndex];
+	if (!DestinationSlot.IsValid())
+	{
+		return Destination->GetAcceptableQuantity(SourceSlot.ItemDefinition, Requested) >= Requested;
+	}
+	if (DestinationSlot.ItemDefinition == SourceSlot.ItemDefinition && SourceSlot.ItemDefinition->bStackable)
+	{
+		return DestinationSlot.Quantity + Requested <= SourceSlot.ItemDefinition->GetEffectiveMaxStackSize()
+			&& Destination->GetAcceptableQuantity(SourceSlot.ItemDefinition, Requested) >= Requested;
+	}
+	return Requested == SourceSlot.Quantity && Destination->GetAcceptableQuantity(SourceSlot.ItemDefinition, Requested) >= Requested;
+}
+
+void UInventoryComponent::NotifyTransferMutation(UInventoryItemDefinition* ItemDefinition, int32 Quantity, int32 SlotIndex, bool bAdded)
+{
+	if (bAdded)
+	{
+		OnItemAdded.Broadcast(ItemDefinition, Quantity, SlotIndex);
+	}
+	else
+	{
+		OnItemRemoved.Broadcast(ItemDefinition, Quantity, SlotIndex);
+	}
+	OnInventoryChanged.Broadcast();
+}
+
+EInventoryOperationResult UInventoryComponent::MoveItem(UInventoryComponent* Destination, int32 SourceSlotIndex, int32 DestinationSlotIndex, int32 Quantity)
+{
+	EnsureSlotCapacity();
+	if (Destination)
+	{
+		Destination->EnsureSlotCapacity();
+	}
+	if (!IsValid(Destination) || !IsValidSlotIndex(SourceSlotIndex))
+	{
+		return EInventoryOperationResult::InvalidSlot;
+	}
+
+	const FInventorySlot SourceSnapshot = Slots[SourceSlotIndex];
+	const int32 Requested = Quantity < 0 ? SourceSnapshot.Quantity : Quantity;
+	if (Requested <= 0 || Requested > SourceSnapshot.Quantity)
+	{
+		return EInventoryOperationResult::InvalidQuantity;
+	}
+	if (Destination == this && DestinationSlotIndex == SourceSlotIndex)
+	{
+		return EInventoryOperationResult::Success;
+	}
+
+	if (DestinationSlotIndex == INDEX_NONE)
+	{
+		if (!Destination->CanAccept(SourceSnapshot.ItemDefinition, Requested))
+		{
+			return Destination->GetAcceptableQuantity(SourceSnapshot.ItemDefinition, Requested) < Requested
+				? EInventoryOperationResult::OverWeight
+				: EInventoryOperationResult::InventoryFull;
+		}
+		const FInventoryAddOutcome Outcome = Destination->AddItemDetailed(SourceSnapshot.ItemDefinition, Requested);
+		if (Outcome.AddedQuantity != Requested)
+		{
+			if (Outcome.AddedQuantity > 0)
+			{
+				Destination->RemoveItem(SourceSnapshot.ItemDefinition, Outcome.AddedQuantity);
+			}
+			return EInventoryOperationResult::InventoryFull;
+		}
+		return RemoveItemAtSlot(SourceSlotIndex, Requested);
+	}
+
+	if (!Destination->Slots.IsValidIndex(DestinationSlotIndex))
+	{
+		return EInventoryOperationResult::InvalidSlot;
+	}
+	FInventorySlot& DestinationSlot = Destination->Slots[DestinationSlotIndex];
+	if (DestinationSlot.IsValid() && DestinationSlot.ItemDefinition != SourceSnapshot.ItemDefinition)
+	{
+		return Requested == SourceSnapshot.Quantity
+			? SwapItem(Destination, SourceSlotIndex, DestinationSlotIndex)
+			: EInventoryOperationResult::NotAllowed;
+	}
+	if (!CanMove(Destination, SourceSlotIndex, Requested, DestinationSlotIndex))
+	{
+		return Destination->GetAcceptableQuantity(SourceSnapshot.ItemDefinition, Requested) < Requested
+			? EInventoryOperationResult::OverWeight
+			: EInventoryOperationResult::InventoryFull;
+	}
+
+	if (DestinationSlot.IsValid())
+	{
+		DestinationSlot.Quantity += Requested;
+	}
+	else
+	{
+		DestinationSlot = SourceSnapshot;
+		DestinationSlot.Quantity = Requested;
+		if (Requested < SourceSnapshot.Quantity)
+		{
+			DestinationSlot.InstanceId = FGuid::NewGuid();
+		}
+	}
+	Slots[SourceSlotIndex].Quantity -= Requested;
+	if (Slots[SourceSlotIndex].Quantity <= 0)
+	{
+		Slots[SourceSlotIndex] = FInventorySlot();
+	}
+	NotifyTransferMutation(SourceSnapshot.ItemDefinition, Requested, SourceSlotIndex, false);
+	Destination->NotifyTransferMutation(SourceSnapshot.ItemDefinition, Requested, DestinationSlotIndex, true);
+	return EInventoryOperationResult::Success;
+}
+
+EInventoryOperationResult UInventoryComponent::MoveStack(UInventoryComponent* Destination, int32 SourceSlotIndex, int32 DestinationSlotIndex)
+{
+	return MoveItem(Destination, SourceSlotIndex, DestinationSlotIndex, -1);
+}
+
+EInventoryOperationResult UInventoryComponent::SplitStack(UInventoryComponent* Destination, int32 SourceSlotIndex, int32 Quantity, int32 DestinationSlotIndex)
+{
+	if (!IsValidSlotIndex(SourceSlotIndex) || Quantity >= Slots[SourceSlotIndex].Quantity)
+	{
+		return EInventoryOperationResult::InvalidQuantity;
+	}
+	return MoveItem(Destination, SourceSlotIndex, DestinationSlotIndex, Quantity);
+}
+
+EInventoryOperationResult UInventoryComponent::SwapItem(UInventoryComponent* OtherInventory, int32 ThisSlotIndex, int32 OtherSlotIndex)
+{
+	EnsureSlotCapacity();
+	if (OtherInventory)
+	{
+		OtherInventory->EnsureSlotCapacity();
+	}
+	if (!IsValid(OtherInventory) || !IsValidSlotIndex(ThisSlotIndex) || !OtherInventory->IsValidSlotIndex(OtherSlotIndex))
+	{
+		return EInventoryOperationResult::InvalidSlot;
+	}
+	if (OtherInventory == this && ThisSlotIndex == OtherSlotIndex)
+	{
+		return EInventoryOperationResult::Success;
+	}
+
+	const FInventorySlot ThisSnapshot = Slots[ThisSlotIndex];
+	const FInventorySlot OtherSnapshot = OtherInventory->Slots[OtherSlotIndex];
+	if (OtherInventory == this)
+	{
+		Swap(Slots[ThisSlotIndex], Slots[OtherSlotIndex]);
+		OnInventoryChanged.Broadcast();
+		return EInventoryOperationResult::Success;
+	}
+
+	const float ThisWeightAfter = GetCurrentWeight() - ThisSnapshot.ItemDefinition->Weight * ThisSnapshot.Quantity + OtherSnapshot.ItemDefinition->Weight * OtherSnapshot.Quantity;
+	const float OtherWeightAfter = OtherInventory->GetCurrentWeight() - OtherSnapshot.ItemDefinition->Weight * OtherSnapshot.Quantity + ThisSnapshot.ItemDefinition->Weight * ThisSnapshot.Quantity;
+	if ((MaxInventoryWeight > 0.0f && ThisWeightAfter > MaxInventoryWeight + KINDA_SMALL_NUMBER)
+		|| (OtherInventory->MaxInventoryWeight > 0.0f && OtherWeightAfter > OtherInventory->MaxInventoryWeight + KINDA_SMALL_NUMBER))
+	{
+		return EInventoryOperationResult::OverWeight;
+	}
+
+	Slots[ThisSlotIndex] = OtherSnapshot;
+	OtherInventory->Slots[OtherSlotIndex] = ThisSnapshot;
+	OnInventoryChanged.Broadcast();
+	if (OtherInventory != this)
+	{
+		OtherInventory->OnInventoryChanged.Broadcast();
+	}
+	return EInventoryOperationResult::Success;
+}
+
+void UInventoryComponent::SortItemsByQuantityDescending()
+{
+	EnsureSlotCapacity();
+	Algo::StableSort(Slots, [](const FInventorySlot& Left, const FInventorySlot& Right)
+	{
+		if (Left.IsValid() != Right.IsValid())
+		{
+			return Left.IsValid();
+		}
+		return Left.IsValid() && Left.Quantity > Right.Quantity;
+	});
+	OnInventoryChanged.Broadcast();
 }
 
 bool UInventoryComponent::HasItem(UInventoryItemDefinition* ItemDefinition, int32 Quantity) const

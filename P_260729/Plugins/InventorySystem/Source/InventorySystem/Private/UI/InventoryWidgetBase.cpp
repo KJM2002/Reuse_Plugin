@@ -250,6 +250,7 @@ void UInventoryWidgetBase::InitializeInventory(UInventoryComponent* InInventory,
 
 	InventoryComponent = InInventory;
 	Coordinator = InCoordinator;
+	PrepareInventoryLayout();
 	if (InventoryComponent)
 	{
 		InventoryComponent->OnInventoryChanged.AddUniqueDynamic(this, &UInventoryWidgetBase::HandleInventoryChanged);
@@ -530,6 +531,7 @@ void UInventoryWidgetBase::HandleCloseClicked()
 
 void UInventoryWidgetBase::RebuildSlotGrid()
 {
+	PrepareInventoryLayout();
 	RegisteredSlotWidgets.Reset();
 	if (!UniformGridPanel_Items)
 	{
@@ -569,6 +571,10 @@ void UInventoryWidgetBase::RebuildSlotGrid()
 		}
 		++DisplayIndex;
 	}
+}
+
+void UInventoryWidgetBase::PrepareInventoryLayout()
+{
 }
 
 void UInventoryWidgetBase::RefreshSelectedItemDetails()

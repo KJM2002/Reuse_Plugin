@@ -81,16 +81,16 @@ public:
 	void RequestClose();
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
-	void RefreshInventory();
+	virtual void RefreshInventory();
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void BeginOpenTransition();
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
-	void BeginCloseTransition();
+	virtual void BeginCloseTransition();
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
-	void BeginInspectTransition();
+	virtual void BeginInspectTransition();
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void BeginInspectorReturnTransition();
@@ -142,6 +142,8 @@ protected:
 	void HandleCloseClicked();
 
 	void RebuildSlotGrid();
+	/** Applies subclass-specific grid invariants before the first build and every refresh. */
+	virtual void PrepareInventoryLayout();
 	void RefreshSelectedItemDetails();
 	void ClearSelectedItemDetails();
 	void UpdateRegisteredSlotSelection();
@@ -157,16 +159,16 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_Capacity = nullptr;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> Image_SelectedIcon = nullptr;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_SelectedName = nullptr;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_SelectedQuantity = nullptr;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_SelectedDescription = nullptr;
 
 	UPROPERTY(meta = (BindWidgetOptional))
@@ -193,13 +195,13 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_DisabledReason = nullptr;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> Button_Use = nullptr;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> Button_Drop = nullptr;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> Button_Inspect = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
