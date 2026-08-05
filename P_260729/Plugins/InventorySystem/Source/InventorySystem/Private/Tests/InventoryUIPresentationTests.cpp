@@ -6,6 +6,7 @@
 #include "Items/InventoryItemDefinition.h"
 #include "UI/InventoryContextMenuWidgetBase.h"
 #include "UI/InventoryDuckovWidgetBase.h"
+#include "UI/InventoryQuantityDialogWidgetBase.h"
 #include "UI/InventoryTooltipWidgetBase.h"
 #include "UI/InventoryUIPresentationTypes.h"
 
@@ -65,6 +66,16 @@ bool FInventoryUIContextActionsTest::RunTest(const FString& Parameters)
 	Actions = FInventoryUIPresentationUtils::BuildContextActions(Data);
 	TestEqual(TEXT("Inspect appears only when both inspection references exist"), Actions.Num(), 3);
 	TestEqual(TEXT("Third action is Inspect"), Actions[2].ActionId, EInventoryContextActionId::Inspect);
+
+	UInventoryContextMenuWidgetBase* ContextMenu = NewObject<UInventoryContextMenuWidgetBase>();
+	ContextMenu->UseActionTextOverride = FText::FromString(TEXT("WBP Use"));
+	ContextMenu->DropActionTextOverride = FText::FromString(TEXT("WBP Drop"));
+	ContextMenu->InspectActionTextOverride = FText::FromString(TEXT("WBP Inspect"));
+	TestEqual(TEXT("WBP overrides Use text"), ContextMenu->ResolveActionDisplayText(Actions[0]).ToString(), FString(TEXT("WBP Use")));
+	TestEqual(TEXT("WBP overrides Drop text"), ContextMenu->ResolveActionDisplayText(Actions[1]).ToString(), FString(TEXT("WBP Drop")));
+	TestEqual(TEXT("WBP overrides Inspect text"), ContextMenu->ResolveActionDisplayText(Actions[2]).ToString(), FString(TEXT("WBP Inspect")));
+	ContextMenu->UseActionTextOverride = FText::GetEmpty();
+	TestEqual(TEXT("Empty WBP override preserves item text"), ContextMenu->ResolveActionDisplayText(Actions[0]).ToString(), Actions[0].DisplayText.ToString());
 	return true;
 }
 
@@ -99,6 +110,24 @@ bool FInventoryUIPresentationIdentityAndClampTest::RunTest(const FString& Parame
 		8.0f);
 	TestEqual(TEXT("Popup clamps on right edge"), Clamped.X, 792.0);
 	TestEqual(TEXT("Popup clamps on bottom edge"), Clamped.Y, 612.0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventoryUIQuantityClampTest,
+	"InventorySystem.UI.Quantity.Clamp",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryUIQuantityClampTest::RunTest(const FString& Parameters)
+{
+	UInventoryQuantityDialogWidgetBase* Dialog = NewObject<UInventoryQuantityDialogWidgetBase>();
+	Dialog->ShowQuantityPicker(12, 3);
+	TestEqual(TEXT("Initial quantity is preserved"), Dialog->GetQuantity(), 3);
+	TestEqual(TEXT("Maximum quantity is preserved"), Dialog->GetMaximumQuantity(), 12);
+	Dialog->SetQuantity(99);
+	TestEqual(TEXT("Quantity clamps to stack maximum"), Dialog->GetQuantity(), 12);
+	Dialog->SetQuantity(0);
+	TestEqual(TEXT("Quantity clamps to one"), Dialog->GetQuantity(), 1);
 	return true;
 }
 

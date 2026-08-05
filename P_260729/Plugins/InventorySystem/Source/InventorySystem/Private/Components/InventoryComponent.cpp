@@ -618,6 +618,39 @@ EInventoryOperationResult UInventoryComponent::SwapItem(UInventoryComponent* Oth
 void UInventoryComponent::SortItemsByQuantityDescending()
 {
 	EnsureSlotCapacity();
+
+	// Consolidate logically identical stackable items before changing their layout.
+	// ItemId is the stable gameplay identity, so separately loaded definitions with
+	// the same ID still share stacks.
+	for (int32 TargetIndex = 0; TargetIndex < Slots.Num(); ++TargetIndex)
+	{
+		FInventorySlot& Target = Slots[TargetIndex];
+		if (!Target.IsValid() || !Target.ItemDefinition->bStackable || Target.ItemDefinition->ItemId.IsNone())
+		{
+			continue;
+		}
+
+		const int32 StackLimit = Target.ItemDefinition->GetEffectiveMaxStackSize();
+		for (int32 SourceIndex = TargetIndex + 1; SourceIndex < Slots.Num() && Target.Quantity < StackLimit; ++SourceIndex)
+		{
+			FInventorySlot& Source = Slots[SourceIndex];
+			if (!Source.IsValid()
+				|| !Source.ItemDefinition->bStackable
+				|| Source.ItemDefinition->ItemId != Target.ItemDefinition->ItemId)
+			{
+				continue;
+			}
+
+			const int32 MovedQuantity = FMath::Min(StackLimit - Target.Quantity, Source.Quantity);
+			Target.Quantity += MovedQuantity;
+			Source.Quantity -= MovedQuantity;
+			if (Source.Quantity <= 0)
+			{
+				Source = FInventorySlot();
+			}
+		}
+	}
+
 	Algo::StableSort(Slots, [](const FInventorySlot& Left, const FInventorySlot& Right)
 	{
 		if (Left.IsValid() != Right.IsValid())

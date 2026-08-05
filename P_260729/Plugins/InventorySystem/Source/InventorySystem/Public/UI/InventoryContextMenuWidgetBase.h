@@ -27,11 +27,26 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|UI")
 	TSubclassOf<UInventoryContextActionWidgetBase> ActionWidgetClass;
 
+	/** Optional WBP override. Empty keeps the item definition's UseButtonText (for example, "Use key"). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText UseActionTextOverride;
+
+	/** Optional WBP override. Empty keeps the InventorySystem default text. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText DropActionTextOverride;
+
+	/** Optional WBP override. Empty keeps the InventorySystem default text. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText InspectActionTextOverride;
+
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	bool SetMenuData(const FInventorySlotViewData& InSlotData, const TArray<FInventoryContextAction>& InActions);
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void ClearMenu();
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|Text")
+	FText ResolveActionDisplayText(const FInventoryContextAction& Action) const;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	FGuid GetTargetInstanceId() const { return TargetInstanceId; }

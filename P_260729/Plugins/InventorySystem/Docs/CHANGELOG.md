@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added `UseActionTextOverride`, `DropActionTextOverride`, and
+  `InspectActionTextOverride` to the context-menu Widget Blueprint defaults.
+  Empty overrides preserve the existing item/system text.
+- Added click-to-loot while preserving drag-and-drop, ItemId-based stack
+  consolidation during sorting, and a bounded quantity picker for stack drops.
 - Added persistent external inventory containers, weighted DataTable loot generation,
   atomic cross-inventory move/split/swap operations, weight limits, reusable loot
   actors, and two-panel Duckov UI transfer gestures.

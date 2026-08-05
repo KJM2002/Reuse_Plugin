@@ -15,6 +15,7 @@ class UInventoryComponent;
 class UInventoryContainerComponent;
 class UInventoryContextMenuWidgetBase;
 class UInventoryDuckovSlotWidgetBase;
+class UInventoryQuantityDialogWidgetBase;
 class UInventoryTooltipWidgetBase;
 class UTextBlock;
 class UUniformGridPanel;
@@ -60,6 +61,12 @@ protected:
 	UFUNCTION()
 	void HandleSortClicked();
 
+	UFUNCTION()
+	void HandleDropQuantityConfirmed(int32 Quantity);
+
+	UFUNCTION()
+	void HandleDropQuantityCancelled();
+
 	void BuildSortButtonIfNeeded();
 	void BuildPanelBlurIfNeeded();
 	void ApplyDuckovPanelStyle();
@@ -68,6 +75,8 @@ protected:
 	void UpdateBackpackHeader();
 	bool EnsureTooltipWidget();
 	bool EnsureContextMenuWidget();
+	bool OpenDropQuantityDialog(UInventoryComponent* SourceInventory, int32 SlotIndex);
+	void CloseDropQuantityDialog();
 	void HideTooltip();
 	void HideContextMenu();
 	void PositionPopup(UWidget* Popup, UCanvasPanel* Layer, const FVector2D& ScreenPosition, const FVector2D& Offset);
@@ -81,6 +90,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|UI")
 	TSubclassOf<UInventoryContextActionWidgetBase> ContextActionWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|UI")
+	TSubclassOf<UInventoryQuantityDialogWidgetBase> QuantityDialogWidgetClass;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "Inventory|UI")
 	TObjectPtr<UWidget> Panel_PlayerInventory = nullptr;
@@ -118,8 +130,13 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<UInventoryContextMenuWidgetBase> ContextMenuWidget = nullptr;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UInventoryQuantityDialogWidgetBase> ActiveQuantityDialog = nullptr;
+
 	TWeakObjectPtr<UInventoryDuckovSlotWidgetBase> HoveredTooltipSlot;
 	TWeakObjectPtr<UInventoryComponent> ContextMenuSourceInventory;
+	TWeakObjectPtr<UInventoryComponent> PendingDropInventory;
+	FGuid PendingDropInstanceId;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UBackgroundBlur> PlayerPanelBackgroundBlur = nullptr;

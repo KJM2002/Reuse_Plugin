@@ -48,7 +48,9 @@ bool UInventoryContextMenuWidgetBase::SetMenuData(
 		{
 			continue;
 		}
-		ActionWidget->SetActionData(Action);
+		FInventoryContextAction DisplayAction = Action;
+		DisplayAction.DisplayText = ResolveActionDisplayText(Action);
+		ActionWidget->SetActionData(DisplayAction);
 		ActionWidget->OnActionRequested.AddUniqueDynamic(this, &UInventoryContextMenuWidgetBase::HandleActionRequested);
 		VerticalBox_Actions->AddChildToVerticalBox(ActionWidget);
 		ActionWidgets.Add(ActionWidget);
@@ -57,6 +59,27 @@ bool UInventoryContextMenuWidgetBase::SetMenuData(
 	const bool bHasActions = !ActionWidgets.IsEmpty();
 	SetVisibility(bHasActions ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	return bHasActions;
+}
+
+FText UInventoryContextMenuWidgetBase::ResolveActionDisplayText(const FInventoryContextAction& Action) const
+{
+	const FText* OverrideText = nullptr;
+	switch (Action.ActionId)
+	{
+	case EInventoryContextActionId::Use:
+		OverrideText = &UseActionTextOverride;
+		break;
+	case EInventoryContextActionId::Drop:
+		OverrideText = &DropActionTextOverride;
+		break;
+	case EInventoryContextActionId::Inspect:
+		OverrideText = &InspectActionTextOverride;
+		break;
+	default:
+		break;
+	}
+
+	return OverrideText && !OverrideText->IsEmpty() ? *OverrideText : Action.DisplayText;
 }
 
 void UInventoryContextMenuWidgetBase::ClearMenu()

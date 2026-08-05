@@ -28,6 +28,7 @@
 #include "UI/InventoryContextActionWidgetBase.h"
 #include "UI/InventoryContextMenuWidgetBase.h"
 #include "UI/InventoryDuckovSlotWidgetBase.h"
+#include "UI/InventoryQuantityDialogWidgetBase.h"
 #include "UI/InventoryTooltipWidgetBase.h"
 
 UInventoryDuckovWidgetBase::UInventoryDuckovWidgetBase(const FObjectInitializer& ObjectInitializer)
@@ -37,6 +38,7 @@ UInventoryDuckovWidgetBase::UInventoryDuckovWidgetBase(const FObjectInitializer&
 	TooltipWidgetClass = UInventoryTooltipWidgetBase::StaticClass();
 	ContextMenuWidgetClass = UInventoryContextMenuWidgetBase::StaticClass();
 	ContextActionWidgetClass = UInventoryContextActionWidgetBase::StaticClass();
+	QuantityDialogWidgetClass = UInventoryQuantityDialogWidgetBase::StaticClass();
 }
 
 void UInventoryDuckovWidgetBase::NativePreConstruct()
@@ -489,6 +491,13 @@ void UInventoryDuckovWidgetBase::BeginInspectTransition()
 FReply UInventoryDuckovWidgetBase::NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
 	if (InKeyEvent.GetKey() == EKeys::Escape
+		&& ActiveQuantityDialog
+		&& ActiveQuantityDialog->GetVisibility() != ESlateVisibility::Collapsed)
+	{
+		CloseDropQuantityDialog();
+		return FReply::Handled();
+	}
+	if (InKeyEvent.GetKey() == EKeys::Escape
 		&& ContextMenuWidget
 		&& ContextMenuWidget->GetVisibility() != ESlateVisibility::Collapsed)
 	{
@@ -621,13 +630,22 @@ void UInventoryDuckovWidgetBase::HandleContextActionRequested(
 		}
 		break;
 	case EInventoryContextActionId::Drop:
-		if (ActionInventory == InventoryComponent)
 		{
-			DropSelectedItem(1);
-		}
-		else
-		{
-			ActionInventory->DropItemAtSlot(CurrentSlotIndex, 1, GetOwningPlayerPawn());
+			FInventorySlot SlotData;
+			if (!ActionInventory->GetSlot(CurrentSlotIndex, SlotData))
+			{
+				break;
+			}
+			if (SlotData.Quantity > 1)
+			{
+				OpenDropQuantityDialog(ActionInventory, CurrentSlotIndex);
+				break;
+			}
+			const EInventoryOperationResult DropResult = ActionInventory->DropItemAtSlot(CurrentSlotIndex, 1, GetOwningPlayerPawn());
+			if (DropResult != EInventoryOperationResult::Success)
+			{
+				OnInventoryOperationFailed(DropResult);
+			}
 		}
 		break;
 	case EInventoryContextActionId::Inspect:
@@ -664,8 +682,17 @@ void UInventoryDuckovWidgetBase::CloseTransientWidgets()
 		ActiveTooltipWidget->RemoveFromParent();
 		ActiveTooltipWidget = nullptr;
 	}
+	if (ActiveQuantityDialog)
+	{
+		ActiveQuantityDialog->OnConfirmed.RemoveDynamic(this, &UInventoryDuckovWidgetBase::HandleDropQuantityConfirmed);
+		ActiveQuantityDialog->OnCancelled.RemoveDynamic(this, &UInventoryDuckovWidgetBase::HandleDropQuantityCancelled);
+		ActiveQuantityDialog->RemoveFromParent();
+		ActiveQuantityDialog = nullptr;
+	}
 	HoveredTooltipSlot.Reset();
 	ContextMenuSourceInventory.Reset();
+	PendingDropInventory.Reset();
+	PendingDropInstanceId.Invalidate();
 }
 
 bool UInventoryDuckovWidgetBase::EnsureTooltipWidget()
@@ -719,6 +746,82 @@ bool UInventoryDuckovWidgetBase::EnsureContextMenuWidget()
 	}
 	ContextMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
 	return true;
+}
+
+bool UInventoryDuckovWidgetBase::OpenDropQuantityDialog(UInventoryComponent* SourceInventory, int32 SlotIndex)
+{
+	FInventorySlot SlotData;
+	if (!SourceInventory || !SourceInventory->GetSlot(SlotIndex, SlotData) || SlotData.Quantity <= 1
+		|| !CanvasPanel_ContextMenuLayer || !QuantityDialogWidgetClass)
+	{
+		return false;
+	}
+
+	if (!ActiveQuantityDialog)
+	{
+		ActiveQuantityDialog = CreateWidget<UInventoryQuantityDialogWidgetBase>(GetOwningPlayer(), QuantityDialogWidgetClass);
+		if (!ActiveQuantityDialog)
+		{
+			return false;
+		}
+		ActiveQuantityDialog->OnConfirmed.AddUniqueDynamic(this, &UInventoryDuckovWidgetBase::HandleDropQuantityConfirmed);
+		ActiveQuantityDialog->OnCancelled.AddUniqueDynamic(this, &UInventoryDuckovWidgetBase::HandleDropQuantityCancelled);
+		if (UCanvasPanelSlot* DialogSlot = CanvasPanel_ContextMenuLayer->AddChildToCanvas(ActiveQuantityDialog))
+		{
+			DialogSlot->SetAnchors(FAnchors(0.5f, 0.5f));
+			DialogSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+			DialogSlot->SetPosition(FVector2D::ZeroVector);
+			DialogSlot->SetAutoSize(true);
+			DialogSlot->SetZOrder(120);
+		}
+	}
+
+	PendingDropInventory = SourceInventory;
+	PendingDropInstanceId = SlotData.InstanceId;
+	ActiveQuantityDialog->ShowQuantityPicker(SlotData.Quantity, 1);
+	return true;
+}
+
+void UInventoryDuckovWidgetBase::CloseDropQuantityDialog()
+{
+	PendingDropInventory.Reset();
+	PendingDropInstanceId.Invalidate();
+	if (ActiveQuantityDialog)
+	{
+		ActiveQuantityDialog->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void UInventoryDuckovWidgetBase::HandleDropQuantityConfirmed(int32 Quantity)
+{
+	UInventoryComponent* SourceInventory = PendingDropInventory.Get();
+	const FGuid InstanceId = PendingDropInstanceId;
+	CloseDropQuantityDialog();
+	if (!SourceInventory || !InstanceId.IsValid())
+	{
+		return;
+	}
+
+	const int32 SlotIndex = FInventoryUIPresentationUtils::FindSlotIndexByInstanceId(
+		SourceInventory->GetSlotsNative(),
+		InstanceId);
+	FInventorySlot SlotData;
+	if (SlotIndex == INDEX_NONE || !SourceInventory->GetSlot(SlotIndex, SlotData))
+	{
+		return;
+	}
+
+	const int32 DropQuantity = FMath::Clamp(Quantity, 1, SlotData.Quantity);
+	const EInventoryOperationResult Result = SourceInventory->DropItemAtSlot(SlotIndex, DropQuantity, GetOwningPlayerPawn());
+	if (Result != EInventoryOperationResult::Success)
+	{
+		OnInventoryOperationFailed(Result);
+	}
+}
+
+void UInventoryDuckovWidgetBase::HandleDropQuantityCancelled()
+{
+	CloseDropQuantityDialog();
 }
 
 void UInventoryDuckovWidgetBase::HideTooltip()

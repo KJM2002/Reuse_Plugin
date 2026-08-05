@@ -147,8 +147,14 @@ FReply UInventoryDuckovSlotWidgetBase::NativeOnPreviewMouseButtonDown(
 			: OwnerInventoryWidget->SelectSlot(SlotIndex);
 		if (bSelectedItem)
 		{
+			bPendingQuickTransfer = SourceInventory != OwnerInventoryWidget->GetInventoryComponent();
 			OwnerInventoryWidget->NotifySlotSelected();
-			return FReply::Handled().DetectDrag(TakeWidget(), EKeys::LeftMouseButton);
+			// The slot can contain a Button that consumes Mouse Up. Capture the mouse here so
+			// a short click is always completed by this widget while DetectDrag still keeps
+			// the existing drag-and-drop path available.
+			return FReply::Handled()
+				.CaptureMouse(TakeWidget())
+				.DetectDrag(TakeWidget(), EKeys::LeftMouseButton);
 		}
 		return FReply::Handled();
 	}
@@ -182,8 +188,11 @@ FReply UInventoryDuckovSlotWidgetBase::NativeOnMouseButtonDown(
 			: OwnerInventoryWidget->SelectSlot(SlotIndex);
 		if (bSelectedItem)
 		{
+			bPendingQuickTransfer = SourceInventory != OwnerInventoryWidget->GetInventoryComponent();
 			OwnerInventoryWidget->NotifySlotSelected();
-			return FReply::Handled().DetectDrag(TakeWidget(), EKeys::LeftMouseButton);
+			return FReply::Handled()
+				.CaptureMouse(TakeWidget())
+				.DetectDrag(TakeWidget(), EKeys::LeftMouseButton);
 		}
 		return FReply::Handled();
 	}
@@ -199,12 +208,34 @@ FReply UInventoryDuckovSlotWidgetBase::NativeOnMouseButtonDown(
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
+FReply UInventoryDuckovSlotWidgetBase::NativeOnMouseButtonUp(
+	const FGeometry& InGeometry,
+	const FPointerEvent& InMouseEvent)
+{
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+	{
+		const bool bShouldQuickTransfer = bPendingQuickTransfer;
+		bPendingQuickTransfer = false;
+		if (bShouldQuickTransfer)
+		{
+			if (UInventoryDuckovWidgetBase* DuckovOwner = Cast<UInventoryDuckovWidgetBase>(OwnerInventoryWidget))
+			{
+				DuckovOwner->TransferSlotToPairedInventory(SourceInventory, SlotIndex, false);
+			}
+		}
+		return FReply::Handled().ReleaseMouseCapture();
+	}
+	bPendingQuickTransfer = false;
+	return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+}
+
 void UInventoryDuckovSlotWidgetBase::NativeOnDragDetected(
 	const FGeometry& InGeometry,
 	const FPointerEvent& InMouseEvent,
 	UDragDropOperation*& OutOperation)
 {
 	Super::NativeOnDragDetected(InGeometry, InMouseEvent, OutOperation);
+	bPendingQuickTransfer = false;
 	if (!OwnerInventoryWidget || !IsValid(ItemDefinition) || Quantity <= 0)
 	{
 		return;
@@ -279,6 +310,7 @@ void UInventoryDuckovSlotWidgetBase::NativeOnDragCancelled(
 	const FDragDropEvent& InDragDropEvent,
 	UDragDropOperation* InOperation)
 {
+	bPendingQuickTransfer = false;
 	SetRenderOpacity(1.0f);
 	ResetHoverState();
 	if (UInventoryDuckovWidgetBase* DuckovOwner = Cast<UInventoryDuckovWidgetBase>(OwnerInventoryWidget))

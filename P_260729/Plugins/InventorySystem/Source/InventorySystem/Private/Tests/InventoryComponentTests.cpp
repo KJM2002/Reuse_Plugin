@@ -66,6 +66,34 @@ bool FInventorySelectionRecoveryTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventorySortConsolidationTest,
+	"InventorySystem.Component.SortConsolidatesMatchingItemIds",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FInventorySortConsolidationTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->MaxInventorySlots = 4;
+	UInventoryItemDefinition* FirstDefinition = NewObject<UInventoryItemDefinition>();
+	UInventoryItemDefinition* SecondDefinition = NewObject<UInventoryItemDefinition>();
+	FirstDefinition->ItemId = TEXT("Automation.SharedId");
+	SecondDefinition->ItemId = TEXT("Automation.SharedId");
+	FirstDefinition->bStackable = SecondDefinition->bStackable = true;
+	FirstDefinition->MaxStackSize = SecondDefinition->MaxStackSize = 10;
+
+	TestTrue(TEXT("First logical stack added"), Inventory->AddItem(FirstDefinition, 4));
+	TestTrue(TEXT("Second logical stack added"), Inventory->AddItem(SecondDefinition, 3));
+	TestEqual(TEXT("Definitions initially occupy separate slots"), Inventory->GetOccupiedSlotCount(), 2);
+
+	Inventory->SortItemsByQuantityDescending();
+	FInventorySlot Slot;
+	TestTrue(TEXT("Consolidated slot remains valid"), Inventory->GetSlot(0, Slot));
+	TestEqual(TEXT("Matching ItemId quantities merge"), Slot.Quantity, 7);
+	TestEqual(TEXT("Only one slot remains occupied"), Inventory->GetOccupiedSlotCount(), 1);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FInventoryLayoutOperationsTest,
 	"InventorySystem.Component.LayoutOperations",
 	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
