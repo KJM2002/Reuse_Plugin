@@ -415,20 +415,6 @@ void UInventoryDuckovWidgetBase::ApplyDuckovPanelLayout()
 		PlayerCanvasSlot->SetZOrder(20);
 	}
 
-	if (USizeBox* ExternalSizeBox = Cast<USizeBox>(Panel_ExternalContainer))
-	{
-		ExternalSizeBox->SetWidthOverride(FMath::Max(1.0f, ExternalContainerSize.X));
-		ExternalSizeBox->SetHeightOverride(FMath::Max(1.0f, ExternalContainerSize.Y));
-	}
-	if (UCanvasPanelSlot* ExternalCanvasSlot = Cast<UCanvasPanelSlot>(Panel_ExternalContainer ? Panel_ExternalContainer->Slot : nullptr))
-	{
-		ExternalCanvasSlot->SetAnchors(FAnchors(ExternalContainerAnchor.X, ExternalContainerAnchor.Y));
-		ExternalCanvasSlot->SetAlignment(ExternalContainerAlignment);
-		ExternalCanvasSlot->SetPosition(ExternalContainerPosition);
-		ExternalCanvasSlot->SetSize(ExternalContainerSize);
-		ExternalCanvasSlot->SetAutoSize(false);
-		ExternalCanvasSlot->SetZOrder(20);
-	}
 }
 
 void UInventoryDuckovWidgetBase::ApplyDuckovPanelStyle()
