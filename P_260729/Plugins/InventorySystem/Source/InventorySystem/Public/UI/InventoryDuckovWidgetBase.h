@@ -71,7 +71,7 @@ protected:
 	void HideTooltip();
 	void HideContextMenu();
 	void PositionPopup(UWidget* Popup, UCanvasPanel* Layer, const FVector2D& ScreenPosition, const FVector2D& Offset);
-	bool MakeSlotViewData(int32 SlotIndex, FInventorySlotViewData& OutData) const;
+	bool MakeSlotViewData(UInventoryComponent* SourceInventory, int32 SlotIndex, FInventorySlotViewData& OutData) const;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|UI")
 	TSubclassOf<UInventoryTooltipWidgetBase> TooltipWidgetClass;
@@ -117,6 +117,9 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInventoryContextMenuWidgetBase> ContextMenuWidget = nullptr;
+
+	TWeakObjectPtr<UInventoryDuckovSlotWidgetBase> HoveredTooltipSlot;
+	TWeakObjectPtr<UInventoryComponent> ContextMenuSourceInventory;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UBackgroundBlur> PlayerPanelBackgroundBlur = nullptr;

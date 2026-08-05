@@ -11,6 +11,7 @@
 #include "Components/ContentWidget.h"
 #include "Components/InventoryComponent.h"
 #include "Components/InventoryContainerComponent.h"
+#include "Components/InventoryUIComponent.h"
 #include "Components/PanelWidget.h"
 #include "Components/ScrollBox.h"
 #include "Components/SizeBox.h"
@@ -209,6 +210,8 @@ void UInventoryDuckovWidgetBase::SetExternalContainer(UInventoryContainerCompone
 
 void UInventoryDuckovWidgetBase::HandleExternalContainerChanged()
 {
+	HideTooltip();
+	HideContextMenu();
 	RebuildExternalContainerGrid();
 }
 
@@ -519,12 +522,13 @@ void UInventoryDuckovWidgetBase::HandleSlotHovered(
 	}
 
 	FInventorySlotViewData Data;
-	if (!MakeSlotViewData(SlotWidget->GetSlotIndex(), Data) || !EnsureTooltipWidget())
+	if (!MakeSlotViewData(SlotWidget->GetSourceInventory(), SlotWidget->GetSlotIndex(), Data) || !EnsureTooltipWidget())
 	{
 		HideTooltip();
 		return;
 	}
 
+	HoveredTooltipSlot = SlotWidget;
 	ActiveTooltipWidget->SetTooltipData(Data);
 	PositionPopup(ActiveTooltipWidget, CanvasPanel_TooltipLayer, ScreenPosition, FVector2D(22.0f, 18.0f));
 }
@@ -535,7 +539,7 @@ void UInventoryDuckovWidgetBase::HandleSlotUnhovered(UInventoryDuckovSlotWidgetB
 	{
 		return;
 	}
-	if (ActiveTooltipWidget->GetTooltipData().SlotIndex == SlotWidget->GetSlotIndex())
+	if (HoveredTooltipSlot.Get() == SlotWidget)
 	{
 		HideTooltip();
 	}
@@ -551,7 +555,8 @@ bool UInventoryDuckovWidgetBase::HandleSlotContextRequested(
 	}
 
 	FInventorySlotViewData Data;
-	if (!MakeSlotViewData(SlotWidget->GetSlotIndex(), Data))
+	UInventoryComponent* SourceInventory = SlotWidget->GetSourceInventory();
+	if (!MakeSlotViewData(SourceInventory, SlotWidget->GetSlotIndex(), Data))
 	{
 		return false;
 	}
@@ -562,10 +567,15 @@ bool UInventoryDuckovWidgetBase::HandleSlotContextRequested(
 		return false;
 	}
 
-	SelectSlot(Data.SlotIndex);
+	if (SourceInventory == InventoryComponent)
+	{
+		SelectSlot(Data.SlotIndex);
+	}
+	ContextMenuSourceInventory = SourceInventory;
 	HideTooltip();
 	if (!ContextMenuWidget->SetMenuData(Data, Actions))
 	{
+		HideContextMenu();
 		return false;
 	}
 	PositionPopup(ContextMenuWidget, CanvasPanel_ContextMenuLayer, ScreenPosition, FVector2D(8.0f, 8.0f));
@@ -576,16 +586,22 @@ void UInventoryDuckovWidgetBase::HandleContextActionRequested(
 	EInventoryContextActionId ActionId,
 	FGuid InstanceId)
 {
-	if (!InventoryComponent)
+	UInventoryComponent* ActionInventory = ContextMenuSourceInventory.Get();
+	if (!ActionInventory)
 	{
 		HideContextMenu();
 		return;
 	}
 
 	const int32 CurrentSlotIndex = FInventoryUIPresentationUtils::FindSlotIndexByInstanceId(
-		InventoryComponent->GetSlotsNative(),
+		ActionInventory->GetSlotsNative(),
 		InstanceId);
-	if (CurrentSlotIndex == INDEX_NONE || !SelectSlot(CurrentSlotIndex))
+	if (CurrentSlotIndex == INDEX_NONE)
+	{
+		HideContextMenu();
+		return;
+	}
+	if (ActionInventory == InventoryComponent && !SelectSlot(CurrentSlotIndex))
 	{
 		HideContextMenu();
 		return;
@@ -595,13 +611,38 @@ void UInventoryDuckovWidgetBase::HandleContextActionRequested(
 	switch (ActionId)
 	{
 	case EInventoryContextActionId::Use:
-		UseSelectedItem();
+		if (ActionInventory == InventoryComponent)
+		{
+			UseSelectedItem();
+		}
+		else
+		{
+			ActionInventory->UseItemAtSlot(CurrentSlotIndex, GetOwningPlayerPawn());
+		}
 		break;
 	case EInventoryContextActionId::Drop:
-		DropSelectedItem(1);
+		if (ActionInventory == InventoryComponent)
+		{
+			DropSelectedItem(1);
+		}
+		else
+		{
+			ActionInventory->DropItemAtSlot(CurrentSlotIndex, 1, GetOwningPlayerPawn());
+		}
 		break;
 	case EInventoryContextActionId::Inspect:
-		InspectSelectedItem();
+		if (ActionInventory == InventoryComponent)
+		{
+			InspectSelectedItem();
+		}
+		else
+		{
+			FInventorySlot SlotData;
+			if (ActionInventory->GetSlot(CurrentSlotIndex, SlotData) && Coordinator)
+			{
+				Coordinator->InspectItem(SlotData.ItemDefinition);
+			}
+		}
 		break;
 	default:
 		break;
@@ -623,6 +664,8 @@ void UInventoryDuckovWidgetBase::CloseTransientWidgets()
 		ActiveTooltipWidget->RemoveFromParent();
 		ActiveTooltipWidget = nullptr;
 	}
+	HoveredTooltipSlot.Reset();
+	ContextMenuSourceInventory.Reset();
 }
 
 bool UInventoryDuckovWidgetBase::EnsureTooltipWidget()
@@ -680,6 +723,7 @@ bool UInventoryDuckovWidgetBase::EnsureContextMenuWidget()
 
 void UInventoryDuckovWidgetBase::HideTooltip()
 {
+	HoveredTooltipSlot.Reset();
 	if (ActiveTooltipWidget)
 	{
 		ActiveTooltipWidget->ClearTooltipData();
@@ -692,6 +736,7 @@ void UInventoryDuckovWidgetBase::HideContextMenu()
 	{
 		ContextMenuWidget->ClearMenu();
 	}
+	ContextMenuSourceInventory.Reset();
 }
 
 void UInventoryDuckovWidgetBase::PositionPopup(
@@ -720,10 +765,10 @@ void UInventoryDuckovWidgetBase::PositionPopup(
 	CanvasSlot->SetPosition(ClampedPosition);
 }
 
-bool UInventoryDuckovWidgetBase::MakeSlotViewData(int32 SlotIndex, FInventorySlotViewData& OutData) const
+bool UInventoryDuckovWidgetBase::MakeSlotViewData(UInventoryComponent* SourceInventory, int32 SlotIndex, FInventorySlotViewData& OutData) const
 {
 	FInventorySlot InventorySlot;
-	if (!InventoryComponent || !InventoryComponent->GetSlot(SlotIndex, InventorySlot))
+	if (!SourceInventory || !SourceInventory->GetSlot(SlotIndex, InventorySlot))
 	{
 		OutData = FInventorySlotViewData();
 		return false;
