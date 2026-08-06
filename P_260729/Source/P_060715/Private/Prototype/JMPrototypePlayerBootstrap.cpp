@@ -63,7 +63,13 @@ void AJMPrototypePlayerBootstrap::SetupPlayer()
 	Interaction->bOverrideProjectSettings = true;
 	Interaction->TraceDistance = 700.0f;
 	Interaction->TraceRadius = 65.0f;
-	Interaction->TraceMode = EJMInteractionTraceMode::OnInput;
+	Interaction->TraceMode = EJMInteractionTraceMode::Timer;
+	Interaction->TraceInterval = 0.05f;
+	// A pre-existing component may already have started with another trace mode.
+	// Restart detection after applying the prototype settings so prompts appear
+	// while looking at an object, before the interaction key is pressed.
+	Interaction->SetInteractionEnabled(false);
+	Interaction->SetInteractionEnabled(true);
 	UJMPrototypeRunResetComponent* Reset = FindOrAddRuntimeComponent<UJMPrototypeRunResetComponent>(Pawn, TEXT("PrototypeRunReset"));
 	InventoryUI->InventoryComponent = Inventory;
 	InventoryUI->ToggleInventoryAction = InventoryAction;

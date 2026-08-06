@@ -30,6 +30,10 @@ bool FJMPrototypeFullEconomyLoopTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Initial inventory has four slots"), Inventory->GetMaxInventorySlots(), 4);
 	TestTrue(TEXT("Quest can be accepted"), Progression->AcceptQuest().bSucceeded);
 	TestTrue(TEXT("Dungeon can be entered"), Progression->EnterDungeon().bSucceeded);
+	TestFalse(TEXT("Travel marker starts clear"), Progression->ConsumeLevelTravelPending());
+	Progression->MarkLevelTravelPending();
+	TestTrue(TEXT("Intentional travel marker is consumed once"), Progression->ConsumeLevelTravelPending());
+	TestFalse(TEXT("Travel marker does not leak into a restart"), Progression->ConsumeLevelTravelPending());
 	TestFalse(TEXT("Quest cannot be submitted while exploring"), Progression->SubmitQuest(Inventory, QuestItem, 3).bSucceeded);
 
 	TestTrue(TEXT("Quest samples are collected"), Inventory->AddItem(QuestItem, 3));

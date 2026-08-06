@@ -61,6 +61,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Base Upgrade Prototype|Travel")
 	bool RestoreTravelInventory(UInventoryComponent* Inventory);
 
+	/** Marks an intentional OpenLevel so the next map keeps the current run. */
+	void MarkLevelTravelPending();
+
+	/** Consumes the one-shot travel marker on arrival. */
+	bool ConsumeLevelTravelPending();
+
 	UFUNCTION(BlueprintPure, Category = "Base Upgrade Prototype")
 	bool IsConfigured() const { return bConfigured; }
 
@@ -103,4 +109,6 @@ private:
 
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UInventoryItemDefinition>, int32> TravelInventory;
+
+	bool bLevelTravelPending = false;
 };

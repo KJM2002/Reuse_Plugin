@@ -210,6 +210,18 @@ bool UJMPrototypeProgressionSubsystem::RestoreTravelInventory(UInventoryComponen
 	return bRestoredAll;
 }
 
+void UJMPrototypeProgressionSubsystem::MarkLevelTravelPending()
+{
+	bLevelTravelPending = true;
+}
+
+bool UJMPrototypeProgressionSubsystem::ConsumeLevelTravelPending()
+{
+	const bool bWasPending = bLevelTravelPending;
+	bLevelTravelPending = false;
+	return bWasPending;
+}
+
 void UJMPrototypeProgressionSubsystem::SetRunState(EJMPrototypeRunState NewState)
 {
 	if (RunState == NewState)

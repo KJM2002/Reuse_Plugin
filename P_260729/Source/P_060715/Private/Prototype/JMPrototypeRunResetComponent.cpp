@@ -40,12 +40,17 @@ FJMPrototypeOperationResult UJMPrototypeRunResetComponent::FailCurrentRun()
 	}
 
 	UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
-	if (UJMPrototypeProgressionSubsystem* Progression = GameInstance ? GameInstance->GetSubsystem<UJMPrototypeProgressionSubsystem>() : nullptr)
+	UJMPrototypeProgressionSubsystem* Progression = GameInstance ? GameInstance->GetSubsystem<UJMPrototypeProgressionSubsystem>() : nullptr;
+	if (Progression)
 	{
 		Progression->ResetCurrentRun();
 	}
 	if (!FailureLevelName.IsNone())
 	{
+		if (Progression)
+		{
+			Progression->MarkLevelTravelPending();
+		}
 		UGameplayStatics::OpenLevel(this, FailureLevelName);
 		const FJMPrototypeOperationResult Result = FJMPrototypeOperationResult::Success(LOCTEXT("RunResetTravel", "The run was reset and the player returned to base."));
 		OnRunResetCompleted(Result);

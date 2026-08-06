@@ -25,6 +25,13 @@ AJMPrototypeLevelPortal::AJMPrototypeLevelPortal()
 	PortalEffect->SetAutoActivate(true);
 }
 
+void AJMPrototypeLevelPortal::BeginPlay()
+{
+	Super::BeginPlay();
+	bTravelStarted = false;
+	OverlapArea->SetGenerateOverlapEvents(true);
+}
+
 void AJMPrototypeLevelPortal::NotifyActorBeginOverlap(AActor* OtherActor)
 {
 	Super::NotifyActorBeginOverlap(OtherActor);
@@ -55,6 +62,7 @@ void AJMPrototypeLevelPortal::NotifyActorBeginOverlap(AActor* OtherActor)
 		RawTravelItems.Add(Item);
 	}
 	Progression->CaptureTravelInventory(JMPrototypeInventory::Resolve(Pawn), RawTravelItems);
+	Progression->MarkLevelTravelPending();
 	bTravelStarted = true;
 	OverlapArea->SetGenerateOverlapEvents(false);
 	UGameplayStatics::OpenLevel(this, DestinationLevel);

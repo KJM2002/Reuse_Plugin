@@ -126,7 +126,9 @@ bool UInventoryUIComponent::BindEnhancedInput(UEnhancedInputComponent* EnhancedI
 		return false;
 	}
 
-	EnhancedInputComponent->BindAction(Action, ETriggerEvent::Started, this, &UInventoryUIComponent::HandleToggleInput);
+	// Open on release so the key-down that initiated opening cannot also reach the
+	// newly focused inventory widget and immediately request a close.
+	EnhancedInputComponent->BindAction(Action, ETriggerEvent::Completed, this, &UInventoryUIComponent::HandleToggleInput);
 	BoundEnhancedInputComponent = EnhancedInputComponent;
 	return true;
 }
