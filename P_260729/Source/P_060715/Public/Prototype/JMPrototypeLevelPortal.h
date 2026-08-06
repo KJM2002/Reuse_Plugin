@@ -6,9 +6,11 @@
 #include "JMPrototypeLevelPortal.generated.h"
 
 class UNiagaraComponent;
+class UPrimitiveComponent;
 class USphereComponent;
 class UInventoryItemDefinition;
 class UWorld;
+struct FHitResult;
 
 /** Niagara-backed overlap portal. It deliberately does not participate in the interaction UI. */
 UCLASS(Blueprintable)
@@ -39,13 +41,20 @@ public:
 	TArray<TObjectPtr<UInventoryItemDefinition>> TravelItems;
 
 	virtual void BeginPlay() override;
-	virtual void NotifyActorBeginOverlap(AActor* OtherActor) override;
 
 private:
+	UFUNCTION()
+	void HandleOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+		UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep,
+		const FHitResult& SweepResult);
+
+	void TryTravel(AActor* OtherActor);
+	void RecheckPlayerInsidePortal();
 	void HandleTravelWatchdog();
 	bool ResolveDestinationPackage(FName& OutPackageName) const;
 
 	bool bTravelStarted = false;
 	EJMPrototypeRunState StateBeforeTravel = EJMPrototypeRunState::AwaitingQuest;
+	FTimerHandle OverlapRecheckHandle;
 	FTimerHandle TravelWatchdogHandle;
 };

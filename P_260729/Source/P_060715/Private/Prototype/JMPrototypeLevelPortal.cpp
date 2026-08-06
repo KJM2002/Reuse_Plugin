@@ -24,6 +24,7 @@ AJMPrototypeLevelPortal::AJMPrototypeLevelPortal()
 	OverlapArea->SetCollisionResponseToAllChannels(ECR_Ignore);
 	OverlapArea->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	OverlapArea->SetGenerateOverlapEvents(true);
+	OverlapArea->OnComponentBeginOverlap.AddDynamic(this, &AJMPrototypeLevelPortal::HandleOverlapBegin);
 
 	PortalEffect = CreateDefaultSubobject<UNiagaraComponent>(TEXT("NS_Portal"));
 	PortalEffect->SetupAttachment(OverlapArea);
@@ -35,6 +36,11 @@ void AJMPrototypeLevelPortal::BeginPlay()
 	Super::BeginPlay();
 	bTravelStarted = false;
 	OverlapArea->SetGenerateOverlapEvents(true);
+	// An overlap can happen while a newly spawned pawn is not possessed yet.
+	// Recheck spatial containment after possession so that early overlap is not
+	// permanently lost merely because IsPlayerControlled() was initially false.
+	GetWorldTimerManager().SetTimer(OverlapRecheckHandle, this,
+		&AJMPrototypeLevelPortal::RecheckPlayerInsidePortal, 0.1f, true);
 }
 
 bool AJMPrototypeLevelPortal::ResolveDestinationPackage(FName& OutPackageName) const
@@ -64,9 +70,14 @@ bool AJMPrototypeLevelPortal::ResolveDestinationPackage(FName& OutPackageName) c
 	return true;
 }
 
-void AJMPrototypeLevelPortal::NotifyActorBeginOverlap(AActor* OtherActor)
+void AJMPrototypeLevelPortal::HandleOverlapBegin(UPrimitiveComponent*, AActor* OtherActor,
+	UPrimitiveComponent*, int32, bool, const FHitResult&)
 {
-	Super::NotifyActorBeginOverlap(OtherActor);
+	TryTravel(OtherActor);
+}
+
+void AJMPrototypeLevelPortal::TryTravel(AActor* OtherActor)
+{
 	APawn* Pawn = Cast<APawn>(OtherActor);
 	if (bTravelStarted || !Pawn || !Pawn->IsPlayerControlled())
 	{
@@ -81,30 +92,28 @@ void AJMPrototypeLevelPortal::NotifyActorBeginOverlap(AActor* OtherActor)
 
 	UJMPrototypeProgressionSubsystem* Progression = GetGameInstance()
 		? GetGameInstance()->GetSubsystem<UJMPrototypeProgressionSubsystem>() : nullptr;
-	if (!Progression)
+	if (Progression)
 	{
-		return;
-	}
-	const FJMPrototypeOperationResult StateResult = Direction == EJMPrototypePortalDirection::EnterDungeon
-		? Progression->EnterDungeon()
-		: Progression->ReturnToBase();
-	if (!StateResult.bSucceeded)
-	{
-		UE_LOG(LogJMPrototypePortal, Warning, TEXT("Portal %s rejected travel: %s"), *GetName(), *StateResult.Message.ToString());
-		return;
-	}
-	StateBeforeTravel = Direction == EJMPrototypePortalDirection::EnterDungeon
-		? EJMPrototypeRunState::QuestAccepted
-		: EJMPrototypeRunState::Exploring;
+		StateBeforeTravel = Progression->GetRunState();
+		const FJMPrototypeOperationResult StateResult = Direction == EJMPrototypePortalDirection::EnterDungeon
+			? Progression->EnterDungeon()
+			: Progression->ReturnToBase();
+		if (!StateResult.bSucceeded)
+		{
+			// Prototype travel is intentionally unconditional. Progression state can
+			// enrich an accepted quest, but it must never prevent map traversal.
+			UE_LOG(LogJMPrototypePortal, Display, TEXT("Portal %s continues without a progression transition: %s"), *GetName(), *StateResult.Message.ToString());
+		}
 
-	TArray<UInventoryItemDefinition*> RawTravelItems;
-	RawTravelItems.Reserve(TravelItems.Num());
-	for (UInventoryItemDefinition* Item : TravelItems)
-	{
-		RawTravelItems.Add(Item);
+		TArray<UInventoryItemDefinition*> RawTravelItems;
+		RawTravelItems.Reserve(TravelItems.Num());
+		for (UInventoryItemDefinition* Item : TravelItems)
+		{
+			RawTravelItems.Add(Item);
+		}
+		Progression->CaptureTravelInventory(JMPrototypeInventory::Resolve(Pawn), RawTravelItems);
+		Progression->MarkLevelTravelPending();
 	}
-	Progression->CaptureTravelInventory(JMPrototypeInventory::Resolve(Pawn), RawTravelItems);
-	Progression->MarkLevelTravelPending();
 	bTravelStarted = true;
 	OverlapArea->SetGenerateOverlapEvents(false);
 	UE_LOG(LogJMPrototypePortal, Display, TEXT("Portal %s opening validated level %s."), *GetName(), *DestinationPackage.ToString());
@@ -112,6 +121,24 @@ void AJMPrototypeLevelPortal::NotifyActorBeginOverlap(AActor* OtherActor)
 	// Successful OpenLevel destroys this source actor. If it is still alive after
 	// the grace period, the browse failed and all one-shot state must be restored.
 	GetWorldTimerManager().SetTimer(TravelWatchdogHandle, this, &AJMPrototypeLevelPortal::HandleTravelWatchdog, 2.0f, false);
+}
+
+void AJMPrototypeLevelPortal::RecheckPlayerInsidePortal()
+{
+	if (bTravelStarted)
+	{
+		return;
+	}
+	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!PlayerPawn || !PlayerPawn->IsPlayerControlled())
+	{
+		return;
+	}
+	const float Radius = OverlapArea->GetScaledSphereRadius();
+	if (FVector::DistSquared(PlayerPawn->GetActorLocation(), OverlapArea->GetComponentLocation()) <= FMath::Square(Radius))
+	{
+		TryTravel(PlayerPawn);
+	}
 }
 
 void AJMPrototypeLevelPortal::HandleTravelWatchdog()
