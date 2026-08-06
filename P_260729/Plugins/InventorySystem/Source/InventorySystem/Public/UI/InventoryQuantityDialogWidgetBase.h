@@ -38,6 +38,22 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory|Quantity")
 	int32 GetMaximumQuantity() const { return MaximumQuantity; }
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText TitleText;
+
+	/** {0}=selected quantity, {1}=maximum quantity. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText QuantityTextFormat;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText AllButtonText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText ConfirmButtonText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText CancelButtonText;
+
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeOnInitialized() override;

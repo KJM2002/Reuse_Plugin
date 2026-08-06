@@ -3,7 +3,10 @@
 #include "Components/Border.h"
 #include "Components/Button.h"
 #include "Components/Image.h"
+#include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
+#include "Engine/Font.h"
+#include "Engine/Texture2D.h"
 #include "InputCoreTypes.h"
 #include "Items/InventoryItemDefinition.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
@@ -12,10 +15,12 @@
 
 void UInventoryDuckovSlotWidgetBase::NativePreConstruct()
 {
-	SlotDisplaySize = 80.0f;
-	IconDisplaySize = 62.0f;
-	QuantityPadding = FMargin(0.0f, 0.0f, 5.0f, 4.0f);
 	Super::NativePreConstruct();
+	if (SizeBox_Slot)
+	{
+		// Allow the glow frame to extend slightly beyond the slot bounds.
+		SizeBox_Slot->SetClipping(EWidgetClipping::Inherit);
+	}
 	if (Button_Select)
 	{
 		// The full-cell button remains a hit target for click fallback. The parent
@@ -38,27 +43,48 @@ void UInventoryDuckovSlotWidgetBase::NativePreConstruct()
 		Border_QuantityBadge->SetBrushColor(FLinearColor::White);
 		Border_QuantityBadge->SetPadding(FMargin(5.0f, 1.0f));
 	}
+	if (UTexture2D* FrameTexture = SlotFrameTexture.LoadSynchronous())
+	{
+		if (Border_Hover)
+		{
+			Border_Hover->SetBrushFromTexture(FrameTexture);
+			Border_Hover->SetPadding(FMargin(0.0f));
+		}
+		if (Image_Selection)
+		{
+			Image_Selection->SetBrushFromTexture(FrameTexture, false);
+		}
+	}
+	ApplyDuckovTypography();
+	ApplyDuckovVisualState();
+}
+
+void UInventoryDuckovSlotWidgetBase::ApplyDuckovTypography()
+{
+	UFont* LoadedRegularFont = RegularFont.LoadSynchronous();
+	UFont* LoadedSemiBoldFont = SemiBoldFont.LoadSynchronous();
 	if (Text_ItemName)
 	{
 		FSlateFontInfo NameFont = Text_ItemName->GetFont();
-		NameFont.Size = 10;
+		if (LoadedRegularFont) NameFont.FontObject = LoadedRegularFont;
+		NameFont.Size = 9;
 		NameFont.OutlineSettings.OutlineSize = 1;
-		NameFont.OutlineSettings.OutlineColor = FLinearColor(0.0f, 0.0f, 0.0f, 0.88f);
+		NameFont.OutlineSettings.OutlineColor = FLinearColor(0.0f, 0.0f, 0.0f, 0.92f);
 		Text_ItemName->SetFont(NameFont);
 		Text_ItemName->SetShadowOffset(FVector2D(1.0f, 1.0f));
-		Text_ItemName->SetShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.78f));
+		Text_ItemName->SetShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.82f));
 	}
 	if (Text_Quantity)
 	{
 		FSlateFontInfo QuantityFont = Text_Quantity->GetFont();
-		QuantityFont.Size = 12;
+		if (LoadedSemiBoldFont) QuantityFont.FontObject = LoadedSemiBoldFont;
+		QuantityFont.Size = 10;
 		QuantityFont.OutlineSettings.OutlineSize = 1;
-		QuantityFont.OutlineSettings.OutlineColor = FLinearColor(0.0f, 0.0f, 0.0f, 0.90f);
+		QuantityFont.OutlineSettings.OutlineColor = FLinearColor(0.0f, 0.0f, 0.0f, 0.95f);
 		Text_Quantity->SetFont(QuantityFont);
 		Text_Quantity->SetShadowOffset(FVector2D(1.0f, 1.0f));
-		Text_Quantity->SetShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.82f));
+		Text_Quantity->SetShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.88f));
 	}
-	ApplyDuckovVisualState();
 }
 
 void UInventoryDuckovSlotWidgetBase::RefreshSlot()
@@ -79,10 +105,6 @@ void UInventoryDuckovSlotWidgetBase::RefreshSlot()
 void UInventoryDuckovSlotWidgetBase::SetSelected(bool bInSelected)
 {
 	Super::SetSelected(bInSelected);
-	if (Image_Selection)
-	{
-		Image_Selection->SetColorAndOpacity(FLinearColor(0.08f, 0.82f, 0.76f, bInSelected ? 1.0f : 0.0f));
-	}
 	ApplyDuckovVisualState();
 }
 
@@ -90,10 +112,6 @@ void UInventoryDuckovSlotWidgetBase::ResetHoverState()
 {
 	bHovered = false;
 	bDragHovered = false;
-	if (Border_Hover)
-	{
-		Border_Hover->SetVisibility(ESlateVisibility::Collapsed);
-	}
 	ApplyDuckovVisualState();
 }
 
@@ -103,10 +121,6 @@ void UInventoryDuckovSlotWidgetBase::NativeOnMouseEnter(const FGeometry& InGeome
 	if (UInventoryDuckovWidgetBase* DuckovOwner = Cast<UInventoryDuckovWidgetBase>(OwnerInventoryWidget))
 	{
 		DuckovOwner->HandleSlotHovered(this, InMouseEvent.GetScreenSpacePosition());
-	}
-	if (Border_Hover)
-	{
-		Border_Hover->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
 	ApplyDuckovVisualState();
 }
@@ -119,10 +133,6 @@ void UInventoryDuckovSlotWidgetBase::NativeOnMouseLeave(const FPointerEvent& InM
 	}
 	Super::NativeOnMouseLeave(InMouseEvent);
 	bHovered = false;
-	if (Border_Hover)
-	{
-		Border_Hover->SetVisibility(ESlateVisibility::Collapsed);
-	}
 	bDragHovered = false;
 	ApplyDuckovVisualState();
 }
@@ -346,7 +356,29 @@ void UInventoryDuckovSlotWidgetBase::ApplyDuckovVisualState()
 		Border_Background->SetBrushColor(FLinearColor::White);
 		Border_Background->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
+	const bool bActiveGlow = bHovered || bDragHovered || (bSelected && bHasItem);
+	if (Border_Hover)
+	{
+		const FLinearColor FrameColor = bActiveGlow
+			? FLinearColor(SlotGlowColor.R * 0.62f, SlotGlowColor.G * 0.62f, SlotGlowColor.B * 0.62f, 0.68f)
+			: FLinearColor(0.50f, 0.63f, 0.70f, bHasItem ? 0.86f : 0.58f);
+		Border_Hover->SetBrushColor(FrameColor);
+		Border_Hover->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		Border_Hover->SetRenderTransformPivot(FVector2D(0.5f));
+		Border_Hover->SetRenderScale(FVector2D(bActiveGlow ? 1.075f : 1.0f));
+		Border_Hover->SetRenderOpacity(bActiveGlow ? 0.78f : 0.90f);
+	}
+	if (Image_Selection)
+	{
+		Image_Selection->SetColorAndOpacity(FLinearColor(
+			SlotGlowColor.R * 1.35f,
+			SlotGlowColor.G * 1.35f,
+			SlotGlowColor.B * 1.35f,
+			bSelected && bHasItem ? 1.0f : 0.0f));
+		Image_Selection->SetRenderTransformPivot(FVector2D(0.5f));
+		Image_Selection->SetRenderScale(FVector2D(1.025f));
+	}
 	SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
-	const float SlotScale = (bHovered || bDragHovered) ? 1.03f : (bSelected && bHasItem ? 1.015f : 1.0f);
+	const float SlotScale = (bHovered || bDragHovered) ? 1.025f : (bSelected && bHasItem ? 1.01f : 1.0f);
 	SetRenderScale(FVector2D(SlotScale));
 }

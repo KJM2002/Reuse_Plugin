@@ -53,6 +53,40 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|UI")
 	bool bShowEmptySlots = true;
 
+	/** The following labels/formats are editable from Widget Blueprint Class Defaults. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText InventoryTitleText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText CapacityTextFormat;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText SelectedQuantityTextFormat;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText EmptyInventoryHintText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText SelectItemHintText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText UseButtonText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText DropButtonText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText InspectButtonText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText CloseButtonText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText InputHintText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText CloseHintText;
+
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void InitializeInventory(UInventoryComponent* InInventory, UInventoryUIComponent* InCoordinator);
 

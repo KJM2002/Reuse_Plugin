@@ -31,6 +31,26 @@ FInventorySlotViewData FInventoryUIPresentationUtils::MakeSlotViewData(const FIn
 	return Result;
 }
 
+int32 FInventoryUIPresentationUtils::ResolveSlotIndexForPresentation(
+	const TArray<FInventorySlot>& Slots,
+	int32 PreferredSlotIndex,
+	const FGuid& ExpectedInstanceId)
+{
+	if (!ExpectedInstanceId.IsValid())
+	{
+		return INDEX_NONE;
+	}
+
+	if (Slots.IsValidIndex(PreferredSlotIndex)
+		&& Slots[PreferredSlotIndex].IsValid()
+		&& Slots[PreferredSlotIndex].InstanceId == ExpectedInstanceId)
+	{
+		return PreferredSlotIndex;
+	}
+
+	return FindSlotIndexByInstanceId(Slots, ExpectedInstanceId);
+}
+
 TArray<FInventoryContextAction> FInventoryUIPresentationUtils::BuildContextActions(const FInventorySlotViewData& Data)
 {
 	TArray<FInventoryContextAction> Actions;
@@ -125,4 +145,31 @@ FVector2D FInventoryUIPresentationUtils::ClampPopupPosition(
 	return FVector2D(
 		FMath::Clamp(DesiredPosition.X, SafePadding, MaximumX),
 		FMath::Clamp(DesiredPosition.Y, SafePadding, MaximumY));
+}
+
+FVector2D FInventoryUIPresentationUtils::CalculateGridPanelSize(
+	int32 SlotCount,
+	int32 ColumnCount,
+	float SlotSize,
+	float SlotPadding,
+	float PanelWidth,
+	float ChromeHeight,
+	int32 MinimumVisibleRows,
+	int32 MaximumVisibleRows,
+	float MinimumPanelHeight,
+	float MaximumPanelHeight)
+{
+	const int32 SafeColumns = FMath::Max(1, ColumnCount);
+	const int32 SafeMinimumRows = FMath::Max(1, MinimumVisibleRows);
+	const int32 SafeMaximumRows = FMath::Max(SafeMinimumRows, MaximumVisibleRows);
+	const int32 RequiredRows = FMath::Max(1, FMath::DivideAndRoundUp(FMath::Max(0, SlotCount), SafeColumns));
+	const int32 VisibleRows = FMath::Clamp(RequiredRows, SafeMinimumRows, SafeMaximumRows);
+	const float RowHeight = FMath::Max(1.0f, SlotSize) + FMath::Max(0.0f, SlotPadding) * 2.0f;
+	const float SafeMinimumHeight = FMath::Max(0.0f, MinimumPanelHeight);
+	const float SafeMaximumHeight = FMath::Max(SafeMinimumHeight, MaximumPanelHeight);
+	const float Height = FMath::Clamp(
+		FMath::Max(0.0f, ChromeHeight) + VisibleRows * RowHeight,
+		SafeMinimumHeight,
+		SafeMaximumHeight);
+	return FVector2D(FMath::Max(1.0f, PanelWidth), Height);
 }

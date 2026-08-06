@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Exposed Player/Loot header font size, local position offset, and layout padding
+  in `WBP_InventoryDuckov` Class Defaults, including the runtime-generated Loot title.
+- Changed Duckov panel sizing to preserve one fixed 60 px, five-column grid and
+  derive panel width from that grid, eliminating uneven side whitespace. Player
+  keeps its Designer height as capacity-upgrade space while Loot alone snaps its
+  height to MaxSlot rows; large Loot containers cap and scroll.
+- Removed runtime text overrides that prevented `WBP_InventoryDuckov` Designer edits
+  from surviving Compile. Player container name now remains WBP-authored, capacity
+  uses its own field, and all remaining UI labels/formats are exposed under
+  `Inventory | Text` in Widget Blueprint Class Defaults.
+- Fixed intermittent cross-inventory hover tooltips after loot transfer or sorting.
+  Slot widgets now retain the rendered stack InstanceId and resolve tooltip data
+  only inside the slot's original SourceInventory.
+- Applied the project Pretendard fonts and `UI_Grid` frame to the Duckov WBP set,
+  added editable appearance defaults, compact 60 px grid density, layered cyan
+  hover/selection glow, and luminous Sort/Close/context button treatments.
 - Expanded the Korean Loot Box guide with Blueprint creation, fixed and weighted
   loot authoring, runtime persistence scope, controls, testing, and troubleshooting.
 - Added `UseActionTextOverride`, `DropActionTextOverride`, and

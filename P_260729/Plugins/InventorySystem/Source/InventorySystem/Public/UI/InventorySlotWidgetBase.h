@@ -31,7 +31,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void InitializeSlot(UInventoryWidgetBase* InOwnerInventoryWidget, int32 InSlotIndex, UInventoryItemDefinition* InItemDefinition, int32 InQuantity);
 
-	void InitializeSlotForInventory(UInventoryWidgetBase* InOwnerInventoryWidget, UInventoryComponent* InSourceInventory, int32 InSlotIndex, UInventoryItemDefinition* InItemDefinition, int32 InQuantity);
+	void InitializeSlotForInventory(UInventoryWidgetBase* InOwnerInventoryWidget, UInventoryComponent* InSourceInventory, int32 InSlotIndex, UInventoryItemDefinition* InItemDefinition, int32 InQuantity, const FGuid& InInstanceId = FGuid());
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	virtual void RefreshSlot();
@@ -49,6 +49,7 @@ public:
 	int32 GetQuantity() const { return Quantity; }
 
 	UInventoryComponent* GetSourceInventory() const { return SourceInventory; }
+	const FGuid& GetDisplayedInstanceId() const { return DisplayedInstanceId; }
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void FocusSlot();
@@ -122,6 +123,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|UI")
 	FMargin QuantityPadding = FMargin(0.0f, 0.0f, 8.0f, 6.0f);
 
+	/** Editable in the slot Widget Blueprint Class Defaults. {0}=stack quantity. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText QuantityTextFormat;
+
 	/** 선택 표시가 필요할 때 같은 이름의 Image를 선택적으로 배치한다. */
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> Image_Selection = nullptr;
@@ -144,6 +149,10 @@ protected:
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Inventory|UI")
 	int32 Quantity = 0;
+
+	/** 화면에 그려진 스택의 식별자. 배열 갱신 뒤 도착한 지연 Hover 이벤트를 검증한다. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Inventory|UI")
+	FGuid DisplayedInstanceId;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Inventory|UI")
 	bool bSelected = false;

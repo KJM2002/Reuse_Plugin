@@ -22,6 +22,19 @@ bool FInventoryUIPresentationFormattingTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Quantity one text is empty"), FInventoryUIPresentationUtils::FormatQuantityText(1).IsEmpty());
 	TestEqual(TEXT("Quantity text uses x prefix"), FInventoryUIPresentationUtils::FormatQuantityText(12).ToString(), FString(TEXT("x12")));
 	TestEqual(TEXT("Capacity text is stable"), FInventoryUIPresentationUtils::FormatCapacityText(9, 20).ToString(), FString(TEXT("9 / 20")));
+
+	UInventoryDuckovWidgetBase* DuckovWidget = NewObject<UInventoryDuckovWidgetBase>();
+	DuckovWidget->CapacityTextFormat = FText::FromString(TEXT("Bag {0}/{1}"));
+	DuckovWidget->ContainerHeaderTextFormat = FText::FromString(TEXT("Loot - {0}"));
+	TestEqual(
+		TEXT("WBP capacity format accepts runtime values"),
+		FText::Format(DuckovWidget->CapacityTextFormat, FText::AsNumber(3), FText::AsNumber(8)).ToString(),
+		FString(TEXT("Bag 3/8")));
+	TestEqual(
+		TEXT("WBP container format accepts the container name"),
+		FText::Format(DuckovWidget->ContainerHeaderTextFormat, FText::FromString(TEXT("Safe"))).ToString(),
+		FString(TEXT("Loot - Safe")));
+
 	return true;
 }
 
@@ -102,6 +115,18 @@ bool FInventoryUIPresentationIdentityAndClampTest::RunTest(const FString& Parame
 
 	TestEqual(TEXT("Instance lookup finds moved stack"), FInventoryUIPresentationUtils::FindSlotIndexByInstanceId(Slots, SecondId), 2);
 	TestEqual(TEXT("Invalid instance is rejected"), FInventoryUIPresentationUtils::FindSlotIndexByInstanceId(Slots, FGuid()), INDEX_NONE);
+	TestEqual(
+		TEXT("Presentation resolves the rendered stack after sorting"),
+		FInventoryUIPresentationUtils::ResolveSlotIndexForPresentation(Slots, 0, SecondId),
+		2);
+	TestEqual(
+		TEXT("Presentation rejects an identity no longer owned by this inventory"),
+		FInventoryUIPresentationUtils::ResolveSlotIndexForPresentation(Slots, 0, FGuid::NewGuid()),
+		INDEX_NONE);
+	TestEqual(
+		TEXT("Presentation never accepts an anonymous stale slot"),
+		FInventoryUIPresentationUtils::ResolveSlotIndexForPresentation(Slots, 0, FGuid()),
+		INDEX_NONE);
 
 	const FVector2D Clamped = FInventoryUIPresentationUtils::ClampPopupPosition(
 		FVector2D(950.0f, 760.0f),
@@ -110,6 +135,17 @@ bool FInventoryUIPresentationIdentityAndClampTest::RunTest(const FString& Parame
 		8.0f);
 	TestEqual(TEXT("Popup clamps on right edge"), Clamped.X, 792.0);
 	TestEqual(TEXT("Popup clamps on bottom edge"), Clamped.Y, 612.0);
+
+	const FVector2D PlayerPanelSize = FInventoryUIPresentationUtils::CalculateGridPanelSize(
+		20, 5, 60.0f, 2.0f, 340.0f, 72.0f, 1, 6, 170.0f, 520.0f);
+	const FVector2D LootPanelSize = FInventoryUIPresentationUtils::CalculateGridPanelSize(
+		10, 5, 60.0f, 2.0f, 340.0f, 72.0f, 1, 6, 170.0f, 520.0f);
+	TestEqual(TEXT("Player and loot keep the same fixed panel width"), PlayerPanelSize.X, LootPanelSize.X);
+	TestEqual(TEXT("Twenty slots snap to four rows"), PlayerPanelSize.Y, 328.0);
+	TestEqual(TEXT("Ten slots snap to two rows"), LootPanelSize.Y, 200.0);
+	const FVector2D CappedPanelSize = FInventoryUIPresentationUtils::CalculateGridPanelSize(
+		100, 5, 60.0f, 2.0f, 340.0f, 72.0f, 1, 6, 170.0f, 520.0f);
+	TestEqual(TEXT("Large containers stop at the maximum visible row count"), CappedPanelSize.Y, 456.0);
 	return true;
 }
 

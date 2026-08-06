@@ -15,6 +15,11 @@ UInventoryQuantityDialogWidgetBase::UInventoryQuantityDialogWidgetBase(const FOb
 	: Super(ObjectInitializer)
 {
 	SetIsFocusable(true);
+	TitleText = NSLOCTEXT("InventorySystem", "DropQuantityTitle", "버릴 수량");
+	QuantityTextFormat = NSLOCTEXT("InventorySystem", "QuantityFormat", "{0} / {1}");
+	AllButtonText = NSLOCTEXT("InventorySystem", "QuantityAll", "전부");
+	ConfirmButtonText = NSLOCTEXT("InventorySystem", "QuantityConfirm", "확인");
+	CancelButtonText = NSLOCTEXT("InventorySystem", "QuantityCancel", "취소");
 }
 
 void UInventoryQuantityDialogWidgetBase::BuildDefaultWidgetTreeIfNeeded()
@@ -37,7 +42,7 @@ void UInventoryQuantityDialogWidgetBase::BuildDefaultWidgetTreeIfNeeded()
 	Border_Dialog->SetContent(Layout);
 
 	UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_Title"));
-	Title->SetText(NSLOCTEXT("InventorySystem", "DropQuantityTitle", "버릴 수량"));
+	Title->SetText(TitleText);
 	FSlateFontInfo TitleFont = Title->GetFont();
 	TitleFont.Size = 18;
 	Title->SetFont(TitleFont);
@@ -85,15 +90,15 @@ void UInventoryQuantityDialogWidgetBase::BuildDefaultWidgetTreeIfNeeded()
 	}
 
 	UButton* All = nullptr;
-	MakeButton(TEXT("Button_All"), NSLOCTEXT("InventorySystem", "QuantityAll", "전부"), All);
+	MakeButton(TEXT("Button_All"), AllButtonText, All);
 	Button_All = All;
 	ActionRow->AddChildToHorizontalBox(Button_All);
 	UButton* Confirm = nullptr;
-	MakeButton(TEXT("Button_Confirm"), NSLOCTEXT("InventorySystem", "QuantityConfirm", "확인"), Confirm);
+	MakeButton(TEXT("Button_Confirm"), ConfirmButtonText, Confirm);
 	Button_Confirm = Confirm;
 	ActionRow->AddChildToHorizontalBox(Button_Confirm);
 	UButton* Cancel = nullptr;
-	MakeButton(TEXT("Button_Cancel"), NSLOCTEXT("InventorySystem", "QuantityCancel", "취소"), Cancel);
+	MakeButton(TEXT("Button_Cancel"), CancelButtonText, Cancel);
 	Button_Cancel = Cancel;
 	ActionRow->AddChildToHorizontalBox(Button_Cancel);
 
@@ -154,7 +159,7 @@ void UInventoryQuantityDialogWidgetBase::RefreshQuantityText()
 	if (Text_Quantity)
 	{
 		Text_Quantity->SetText(FText::Format(
-			NSLOCTEXT("InventorySystem", "QuantityFormat", "{0} / {1}"),
+			QuantityTextFormat,
 			FText::AsNumber(CurrentQuantity),
 			FText::AsNumber(MaximumQuantity)));
 	}

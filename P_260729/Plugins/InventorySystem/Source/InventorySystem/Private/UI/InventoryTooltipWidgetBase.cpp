@@ -5,6 +5,7 @@
 #include "Components/TextBlock.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "Engine/Texture2D.h"
+#include "Engine/Font.h"
 #include "Items/InventoryItemDefinition.h"
 
 namespace
@@ -18,6 +19,12 @@ namespace
 		TextBlock->SetText(Text);
 		TextBlock->SetVisibility(Text.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
+}
+
+UInventoryTooltipWidgetBase::UInventoryTooltipWidgetBase(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	QuantityTextFormat = NSLOCTEXT("InventorySystem", "TooltipQuantityFormat", "x{0}");
 }
 
 void UInventoryTooltipWidgetBase::NativePreConstruct()
@@ -36,11 +43,22 @@ void UInventoryTooltipWidgetBase::NativePreConstruct()
 	if (Text_TooltipName)
 	{
 		FSlateFontInfo NameFont = Text_TooltipName->GetFont();
+		if (UFont* LoadedFont = SemiBoldFont.LoadSynchronous()) NameFont.FontObject = LoadedFont;
 		NameFont.OutlineSettings.OutlineSize = 1;
 		NameFont.OutlineSettings.OutlineColor = FLinearColor(0.0f, 0.0f, 0.0f, 0.9f);
 		Text_TooltipName->SetFont(NameFont);
 		Text_TooltipName->SetShadowOffset(FVector2D(1.0f, 1.0f));
 		Text_TooltipName->SetShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.72f));
+	}
+	if (UFont* LoadedFont = RegularFont.LoadSynchronous())
+	{
+		for (UTextBlock* TextBlock : { Text_TooltipQuantity.Get(), Text_TooltipDescription.Get(), Text_TooltipCategory.Get(), Text_TooltipFlavor.Get(), Text_TooltipDisabledReason.Get() })
+		{
+			if (!TextBlock) continue;
+			FSlateFontInfo FontInfo = TextBlock->GetFont();
+			FontInfo.FontObject = LoadedFont;
+			TextBlock->SetFont(FontInfo);
+		}
 	}
 }
 
@@ -54,7 +72,11 @@ void UInventoryTooltipWidgetBase::SetTooltipData(const FInventorySlotViewData& I
 	}
 
 	SetOptionalText(Text_TooltipName, TooltipData.DisplayName);
-	SetOptionalText(Text_TooltipQuantity, FInventoryUIPresentationUtils::FormatQuantityText(TooltipData.Quantity));
+	SetOptionalText(
+		Text_TooltipQuantity,
+		FInventoryUIPresentationUtils::ShouldShowQuantity(TooltipData.Quantity)
+			? FText::Format(QuantityTextFormat, FText::AsNumber(TooltipData.Quantity))
+			: FText::GetEmpty());
 	SetOptionalText(Text_TooltipDescription, TooltipData.Description);
 	SetOptionalText(Text_TooltipCategory, TooltipData.CategoryText);
 	SetOptionalText(Text_TooltipFlavor, TooltipData.FlavorText);

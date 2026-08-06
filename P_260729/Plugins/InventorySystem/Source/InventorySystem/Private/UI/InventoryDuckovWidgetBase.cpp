@@ -20,6 +20,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Components/Widget.h"
+#include "Engine/Font.h"
 #include "Blueprint/WidgetTree.h"
 #include "Brushes/SlateColorBrush.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
@@ -39,6 +40,9 @@ UInventoryDuckovWidgetBase::UInventoryDuckovWidgetBase(const FObjectInitializer&
 	ContextMenuWidgetClass = UInventoryContextMenuWidgetBase::StaticClass();
 	ContextActionWidgetClass = UInventoryContextActionWidgetBase::StaticClass();
 	QuantityDialogWidgetClass = UInventoryQuantityDialogWidgetBase::StaticClass();
+	ContainerHeaderTextFormat = NSLOCTEXT("InventorySystem", "ContainerHeaderFormat", "{0}");
+	DefaultLootContainerText = NSLOCTEXT("InventorySystem", "LootContainerTitle", "Loot");
+	SortButtonText = NSLOCTEXT("InventorySystem", "SortByQuantity", "Sort");
 }
 
 void UInventoryDuckovWidgetBase::NativePreConstruct()
@@ -50,6 +54,9 @@ void UInventoryDuckovWidgetBase::NativePreConstruct()
 	BuildSortButtonIfNeeded();
 	ApplyDuckovPanelStyle();
 	ApplySortButtonStyle();
+	ApplyDuckovTypography();
+	ApplyHeaderLayout();
+	ApplyReferencePanelSizing();
 }
 
 void UInventoryDuckovWidgetBase::EnsureExternalContainerWidgets()
@@ -61,18 +68,19 @@ void UInventoryDuckovWidgetBase::EnsureExternalContainerWidgets()
 
 	RuntimeExternalContainerBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("Border_ExternalContainerRuntime"));
 	RuntimeExternalContainerBorder->SetBrush(FSlateRoundedBoxBrush(
-		FLinearColor(0.025f, 0.075f, 0.125f, 0.82f),
-		14.0f,
-		FLinearColor(0.33f, 0.48f, 0.58f, 0.88f),
-		1.5f));
+		FLinearColor(0.012f, 0.036f, 0.068f, 0.94f),
+		8.0f,
+		FLinearColor(0.34f, 0.56f, 0.68f, 0.92f),
+		1.25f));
 	RuntimeExternalContainerBorder->SetBrushColor(FLinearColor::White);
-	RuntimeExternalContainerBorder->SetPadding(FMargin(16.0f));
+	RuntimeExternalContainerBorder->SetPadding(FMargin(10.0f));
 
 	UVerticalBox* ContainerLayout = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("VerticalBox_ExternalContainerRuntime"));
 	Text_ContainerName = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_ContainerName"));
-	Text_ContainerName->SetText(ExternalContainer ? ExternalContainer->ContainerName : NSLOCTEXT("InventorySystem", "LootContainerTitle", "Loot"));
+	UpdateContainerHeader();
 	FSlateFontInfo HeaderFont = Text_ContainerName->GetFont();
-	HeaderFont.Size = 21;
+	if (UFont* LoadedSemiBoldFont = SemiBoldFont.LoadSynchronous()) HeaderFont.FontObject = LoadedSemiBoldFont;
+	HeaderFont.Size = FMath::Max(1, LootHeaderFontSize);
 	HeaderFont.OutlineSettings.OutlineSize = 1;
 	HeaderFont.OutlineSettings.OutlineColor = FLinearColor(0.01f, 0.025f, 0.04f, 0.92f);
 	Text_ContainerName->SetFont(HeaderFont);
@@ -81,15 +89,16 @@ void UInventoryDuckovWidgetBase::EnsureExternalContainerWidgets()
 	Text_ContainerName->SetShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.72f));
 	if (UVerticalBoxSlot* HeaderSlot = ContainerLayout->AddChildToVerticalBox(Text_ContainerName))
 	{
-		HeaderSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 10.0f));
+		HeaderSlot->SetPadding(LootHeaderPadding);
 		HeaderSlot->SetHorizontalAlignment(HAlign_Left);
 	}
+	Text_ContainerName->SetRenderTranslation(LootHeaderPositionOffset);
 
 	UScrollBox* ScrollBox = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("ScrollBox_ExternalContainerRuntime"));
 	UniformGridPanel_ContainerItems = WidgetTree->ConstructWidget<UUniformGridPanel>(UUniformGridPanel::StaticClass(), TEXT("UniformGridPanel_ContainerItems"));
-	UniformGridPanel_ContainerItems->SetMinDesiredSlotWidth(80.0f);
-	UniformGridPanel_ContainerItems->SetMinDesiredSlotHeight(80.0f);
-	UniformGridPanel_ContainerItems->SetSlotPadding(FMargin(4.0f));
+	UniformGridPanel_ContainerItems->SetMinDesiredSlotWidth(CompactGridSlotSize);
+	UniformGridPanel_ContainerItems->SetMinDesiredSlotHeight(CompactGridSlotSize);
+	UniformGridPanel_ContainerItems->SetSlotPadding(FMargin(CompactGridPadding));
 	ScrollBox->SetScrollBarVisibility(ESlateVisibility::Collapsed);
 	ScrollBox->AddChild(UniformGridPanel_ContainerItems);
 	if (UVerticalBoxSlot* ScrollSlot = ContainerLayout->AddChildToVerticalBox(ScrollBox))
@@ -117,9 +126,15 @@ void UInventoryDuckovWidgetBase::PrepareInventoryLayout()
 	bShowEmptySlots = true;
 	if (UniformGridPanel_Items)
 	{
-		UniformGridPanel_Items->SetMinDesiredSlotWidth(88.0f);
-		UniformGridPanel_Items->SetMinDesiredSlotHeight(88.0f);
-		UniformGridPanel_Items->SetSlotPadding(FMargin(4.0f));
+		UniformGridPanel_Items->SetMinDesiredSlotWidth(CompactGridSlotSize);
+		UniformGridPanel_Items->SetMinDesiredSlotHeight(CompactGridSlotSize);
+		UniformGridPanel_Items->SetSlotPadding(FMargin(CompactGridPadding));
+	}
+	if (UniformGridPanel_ContainerItems)
+	{
+		UniformGridPanel_ContainerItems->SetMinDesiredSlotWidth(CompactGridSlotSize);
+		UniformGridPanel_ContainerItems->SetMinDesiredSlotHeight(CompactGridSlotSize);
+		UniformGridPanel_ContainerItems->SetSlotPadding(FMargin(CompactGridPadding));
 	}
 }
 
@@ -138,10 +153,6 @@ void UInventoryDuckovWidgetBase::NativeConstruct()
 	{
 		Panel_ExternalContainer->SetVisibility(ExternalContainer ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
-	if (Text_PlayerContainerName && Text_PlayerContainerName->GetText().IsEmpty())
-	{
-		Text_PlayerContainerName->SetText(NSLOCTEXT("InventorySystem", "PlayerInventoryName", "인벤토리"));
-	}
 	if (CanvasPanel_TooltipLayer)
 	{
 		CanvasPanel_TooltipLayer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
@@ -152,8 +163,10 @@ void UInventoryDuckovWidgetBase::NativeConstruct()
 		CanvasPanel_ContextMenuLayer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
 	UpdateBackpackHeader();
+	UpdateContainerHeader();
 	CloseTransientWidgets();
 	RebuildExternalContainerGrid();
+	ApplyReferencePanelSizing();
 }
 
 void UInventoryDuckovWidgetBase::NativeDestruct()
@@ -181,6 +194,7 @@ void UInventoryDuckovWidgetBase::RefreshInventory()
 		Panel_ExternalContainer->SetVisibility(ExternalContainer ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
 	RebuildExternalContainerGrid();
+	ApplyReferencePanelSizing();
 }
 
 void UInventoryDuckovWidgetBase::SetExternalContainer(UInventoryContainerComponent* InContainer)
@@ -188,6 +202,7 @@ void UInventoryDuckovWidgetBase::SetExternalContainer(UInventoryContainerCompone
 	if (ExternalContainer == InContainer)
 	{
 		RebuildExternalContainerGrid();
+		ApplyReferencePanelSizing();
 		return;
 	}
 	if (ExternalContainer)
@@ -203,18 +218,18 @@ void UInventoryDuckovWidgetBase::SetExternalContainer(UInventoryContainerCompone
 	{
 		Panel_ExternalContainer->SetVisibility(ExternalContainer ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
-	if (Text_ContainerName)
-	{
-		Text_ContainerName->SetText(ExternalContainer ? ExternalContainer->ContainerName : FText::GetEmpty());
-	}
+	UpdateContainerHeader();
 	RebuildExternalContainerGrid();
+	ApplyReferencePanelSizing();
 }
 
 void UInventoryDuckovWidgetBase::HandleExternalContainerChanged()
 {
 	HideTooltip();
 	HideContextMenu();
+	UpdateContainerHeader();
 	RebuildExternalContainerGrid();
+	ApplyReferencePanelSizing();
 }
 
 void UInventoryDuckovWidgetBase::RebuildExternalContainerGrid()
@@ -238,7 +253,13 @@ void UInventoryDuckovWidgetBase::RebuildExternalContainerGrid()
 		{
 			continue;
 		}
-		SlotWidget->InitializeSlotForInventory(this, ExternalContainer, SlotIndex, SlotData.ItemDefinition, SlotData.Quantity);
+		SlotWidget->InitializeSlotForInventory(
+			this,
+			ExternalContainer,
+			SlotIndex,
+			SlotData.ItemDefinition,
+			SlotData.Quantity,
+			SlotData.InstanceId);
 		UniformGridPanel_ContainerItems->AddChildToUniformGrid(SlotWidget, SlotIndex / GridColumnCount, SlotIndex % GridColumnCount);
 	}
 }
@@ -341,7 +362,7 @@ void UInventoryDuckovWidgetBase::BuildSortButtonIfNeeded()
 
 	Button_Sort = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_Sort"));
 	UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_SortLabel"));
-	Label->SetText(NSLOCTEXT("InventorySystem", "SortByQuantity", "Sort"));
+	Label->SetText(SortButtonText);
 	Label->SetJustification(ETextJustify::Center);
 	Label->SetColorAndOpacity(FSlateColor(FLinearColor(0.04f, 0.13f, 0.17f, 1.0f)));
 	Button_Sort->SetBackgroundColor(FLinearColor(0.76f, 0.91f, 0.94f, 1.0f));
@@ -410,23 +431,169 @@ void UInventoryDuckovWidgetBase::ApplyDuckovPanelStyle()
 	if (Border_PlayerPanel)
 	{
 		Border_PlayerPanel->SetBrush(FSlateRoundedBoxBrush(
-			FLinearColor(0.025f, 0.075f, 0.125f, 0.74f),
-			14.0f,
-			FLinearColor(0.33f, 0.48f, 0.58f, 0.82f),
-			1.5f));
+			FLinearColor(0.012f, 0.036f, 0.068f, 0.92f),
+			8.0f,
+			FLinearColor(0.34f, 0.56f, 0.68f, 0.92f),
+			1.25f));
 		Border_PlayerPanel->SetBrushColor(FLinearColor::White);
-		Border_PlayerPanel->SetPadding(FMargin(16.0f));
+		Border_PlayerPanel->SetPadding(FMargin(10.0f));
 	}
+	if (RuntimeExternalContainerBorder)
+	{
+		RuntimeExternalContainerBorder->SetBrush(FSlateRoundedBoxBrush(
+			FLinearColor(0.012f, 0.036f, 0.068f, 0.94f),
+			8.0f,
+			FLinearColor(0.34f, 0.56f, 0.68f, 0.92f),
+			1.25f));
+		RuntimeExternalContainerBorder->SetPadding(FMargin(10.0f));
+	}
+}
+
+void UInventoryDuckovWidgetBase::ApplyDuckovTypography()
+{
+	UFont* LoadedSemiBoldFont = SemiBoldFont.LoadSynchronous();
+	auto ApplyHeaderFont = [LoadedSemiBoldFont](UTextBlock* TextBlock, int32 FontSize)
+	{
+		if (!TextBlock) return;
+		FSlateFontInfo HeaderFont = TextBlock->GetFont();
+		if (LoadedSemiBoldFont) HeaderFont.FontObject = LoadedSemiBoldFont;
+		HeaderFont.Size = FMath::Max(1, FontSize);
+		HeaderFont.OutlineSettings.OutlineSize = 1;
+		HeaderFont.OutlineSettings.OutlineColor = FLinearColor(0.005f, 0.018f, 0.032f, 0.96f);
+		TextBlock->SetFont(HeaderFont);
+		TextBlock->SetColorAndOpacity(FSlateColor(FLinearColor(0.94f, 0.98f, 1.0f, 1.0f)));
+		TextBlock->SetShadowOffset(FVector2D(1.0f, 1.0f));
+		TextBlock->SetShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.82f));
+	};
+	ApplyHeaderFont(Text_PlayerContainerName, PlayerHeaderFontSize);
+	ApplyHeaderFont(Text_ContainerName, LootHeaderFontSize);
+
+	if (Button_Sort)
+	{
+		if (UTextBlock* SortLabel = Cast<UTextBlock>(Button_Sort->GetContent()))
+		{
+			FSlateFontInfo FontInfo = SortLabel->GetFont();
+			if (LoadedSemiBoldFont) FontInfo.FontObject = LoadedSemiBoldFont;
+			FontInfo.Size = 12;
+			SortLabel->SetFont(FontInfo);
+			SortLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.025f, 0.11f, 0.16f, 1.0f)));
+		}
+	}
+}
+
+void UInventoryDuckovWidgetBase::ApplyHeaderLayout()
+{
 	if (Text_PlayerContainerName)
 	{
-		FSlateFontInfo HeaderFont = Text_PlayerContainerName->GetFont();
-		HeaderFont.Size = 21;
-		HeaderFont.OutlineSettings.OutlineSize = 1;
-		HeaderFont.OutlineSettings.OutlineColor = FLinearColor(0.01f, 0.025f, 0.04f, 0.92f);
-		Text_PlayerContainerName->SetFont(HeaderFont);
-		Text_PlayerContainerName->SetColorAndOpacity(FSlateColor(FLinearColor(0.93f, 0.97f, 0.98f, 1.0f)));
-		Text_PlayerContainerName->SetShadowOffset(FVector2D(1.0f, 1.0f));
-		Text_PlayerContainerName->SetShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.72f));
+		Text_PlayerContainerName->SetRenderTranslation(PlayerHeaderPositionOffset);
+		if (UHorizontalBoxSlot* HeaderSlot = Cast<UHorizontalBoxSlot>(Text_PlayerContainerName->Slot))
+		{
+			HeaderSlot->SetPadding(PlayerHeaderPadding);
+		}
+	}
+	if (Text_ContainerName)
+	{
+		Text_ContainerName->SetRenderTranslation(LootHeaderPositionOffset);
+		if (UVerticalBoxSlot* HeaderSlot = Cast<UVerticalBoxSlot>(Text_ContainerName->Slot))
+		{
+			HeaderSlot->SetPadding(LootHeaderPadding);
+		}
+	}
+}
+
+void UInventoryDuckovWidgetBase::ApplyReferencePanelSizing()
+{
+	if (!bAutoSizePanelsToContent)
+	{
+		return;
+	}
+
+	const int32 PlayerSlotCount = InventoryComponent ? InventoryComponent->GetMaxInventorySlots() : 20;
+	const int32 ContainerSlotCount = ExternalContainer ? ExternalContainer->GetMaxInventorySlots() : 1;
+	const int32 SafeColumns = FMath::Max(1, GridColumnCount);
+	const float CellStride = FMath::Max(1.0f, CompactGridSlotSize) + FMath::Max(0.0f, CompactGridPadding) * 2.0f;
+	const float ResolvedPanelWidth = bFitPanelWidthToGrid
+		? SafeColumns * CellStride + FMath::Max(0.0f, CompactPanelHorizontalPadding) * 2.0f
+		: CompactPanelWidth;
+	FVector2D PlayerSize = FInventoryUIPresentationUtils::CalculateGridPanelSize(
+		PlayerSlotCount,
+		GridColumnCount,
+		CompactGridSlotSize,
+		CompactGridPadding,
+		ResolvedPanelWidth,
+		CompactPanelChromeHeight,
+		CompactPanelMinVisibleRows,
+		CompactPanelMaxVisibleRows,
+		CompactPanelMinHeight,
+		CompactPanelMaxHeight);
+	FVector2D ContainerSize = FInventoryUIPresentationUtils::CalculateGridPanelSize(
+		ContainerSlotCount,
+		GridColumnCount,
+		CompactGridSlotSize,
+		CompactGridPadding,
+		ResolvedPanelWidth,
+		CompactPanelChromeHeight,
+		CompactPanelMinVisibleRows,
+		CompactPanelMaxVisibleRows,
+		CompactPanelMinHeight,
+		CompactPanelMaxHeight);
+	auto GetCurrentPanelHeight = [this](UWidget* Panel) -> float
+	{
+		if (Panel)
+		{
+			if (const UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Panel->Slot))
+			{
+				if (CanvasSlot->GetSize().Y > 0.0f)
+				{
+					return static_cast<float>(CanvasSlot->GetSize().Y);
+				}
+			}
+		}
+		return CompactPanelMaxHeight;
+	};
+	if (!bAutoSizePlayerPanelHeight)
+	{
+		PlayerSize.Y = GetCurrentPanelHeight(Panel_PlayerInventory);
+	}
+	if (!bAutoSizeContainerPanelHeight)
+	{
+		ContainerSize.Y = GetCurrentPanelHeight(Panel_ExternalContainer);
+	}
+	if (bMatchPlayerAndContainerPanelHeight)
+	{
+		const float SharedHeight = FMath::Max(PlayerSize.Y, ContainerSize.Y);
+		PlayerSize.Y = SharedHeight;
+		ContainerSize.Y = SharedHeight;
+	}
+
+	auto SizePanel = [](UWidget* Panel, const FVector2D& DesiredSize, bool bApplyHeightOverride)
+	{
+		if (!Panel)
+		{
+			return;
+		}
+		if (USizeBox* SizeBox = Cast<USizeBox>(Panel))
+		{
+			SizeBox->SetWidthOverride(DesiredSize.X);
+			if (bApplyHeightOverride)
+			{
+				SizeBox->SetHeightOverride(DesiredSize.Y);
+			}
+		}
+		// A fixed Canvas slot overrides the child's DesiredSize, which was the source
+		// of the large empty region in WBP_InventoryDuckov. Keep both layers in sync.
+		if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Panel->Slot))
+		{
+			CanvasSlot->SetAutoSize(false);
+			CanvasSlot->SetSize(DesiredSize);
+		}
+	};
+
+	SizePanel(Panel_PlayerInventory, PlayerSize, bAutoSizePlayerPanelHeight || bMatchPlayerAndContainerPanelHeight);
+	SizePanel(Panel_ExternalContainer, ContainerSize, bAutoSizeContainerPanelHeight || bMatchPlayerAndContainerPanelHeight);
+	if (PlayerPanelBackgroundBlur)
+	{
+		SizePanel(PlayerPanelBackgroundBlur, PlayerSize, true);
 	}
 }
 
@@ -435,25 +602,33 @@ void UInventoryDuckovWidgetBase::ApplySortButtonStyle()
 	if (Button_Sort)
 	{
 		FButtonStyle Style = Button_Sort->GetStyle();
-		Style.SetNormal(FSlateRoundedBoxBrush(FLinearColor(0.70f, 0.84f, 0.87f, 0.96f), 7.0f));
+		Style.SetNormal(FSlateRoundedBoxBrush(
+			FLinearColor(0.70f, 0.88f, 0.94f, 0.98f),
+			6.0f,
+			FLinearColor(0.18f, 0.72f, 0.90f, 0.96f),
+			1.25f));
 		Style.SetHovered(FSlateRoundedBoxBrush(
-			FLinearColor(0.82f, 0.96f, 0.96f, 1.0f),
-			7.0f,
-			FLinearColor(0.08f, 0.82f, 0.76f, 1.0f),
-			1.5f));
-		Style.SetPressed(FSlateRoundedBoxBrush(FLinearColor(0.32f, 0.70f, 0.70f, 1.0f), 7.0f));
-		Style.SetDisabled(FSlateRoundedBoxBrush(FLinearColor(0.22f, 0.31f, 0.34f, 0.55f), 7.0f));
-		Style.SetNormalPadding(FMargin(14.0f, 7.0f));
-		Style.SetPressedPadding(FMargin(14.0f, 8.0f, 14.0f, 6.0f));
+			FLinearColor(0.90f, 1.10f, 1.20f, 1.0f),
+			6.0f,
+			FLinearColor(0.10f, 1.10f, 1.35f, 1.0f),
+			2.5f));
+		Style.SetPressed(FSlateRoundedBoxBrush(FLinearColor(0.32f, 0.78f, 0.88f, 1.0f), 6.0f));
+		Style.SetDisabled(FSlateRoundedBoxBrush(FLinearColor(0.22f, 0.31f, 0.34f, 0.55f), 6.0f));
+		Style.SetNormalPadding(FMargin(10.0f, 4.0f));
+		Style.SetPressedPadding(FMargin(10.0f, 5.0f, 10.0f, 3.0f));
 		Button_Sort->SetStyle(Style);
 		Button_Sort->SetBackgroundColor(FLinearColor::White);
 	}
 	if (Button_Close)
 	{
 		FButtonStyle CloseStyle = Button_Close->GetStyle();
-		CloseStyle.SetNormal(FSlateRoundedBoxBrush(FLinearColor(0.32f, 0.40f, 0.44f, 0.86f), 6.0f));
-		CloseStyle.SetHovered(FSlateRoundedBoxBrush(FLinearColor(0.18f, 0.66f, 0.65f, 0.95f), 6.0f));
-		CloseStyle.SetPressed(FSlateRoundedBoxBrush(FLinearColor(0.10f, 0.45f, 0.46f, 1.0f), 6.0f));
+		CloseStyle.SetNormal(FSlateRoundedBoxBrush(FLinearColor(0.08f, 0.16f, 0.21f, 0.94f), 5.0f));
+		CloseStyle.SetHovered(FSlateRoundedBoxBrush(
+			FLinearColor(0.16f, 0.56f, 0.68f, 1.0f),
+			5.0f,
+			FLinearColor(0.10f, 1.10f, 1.35f, 1.0f),
+			2.0f));
+		CloseStyle.SetPressed(FSlateRoundedBoxBrush(FLinearColor(0.08f, 0.38f, 0.48f, 1.0f), 5.0f));
 		Button_Close->SetStyle(CloseStyle);
 		Button_Close->SetBackgroundColor(FLinearColor::White);
 	}
@@ -461,19 +636,25 @@ void UInventoryDuckovWidgetBase::ApplySortButtonStyle()
 
 void UInventoryDuckovWidgetBase::UpdateBackpackHeader()
 {
-	const int32 Occupied = InventoryComponent ? InventoryComponent->GetOccupiedSlotCount() : 0;
-	const int32 Capacity = InventoryComponent ? InventoryComponent->GetMaxInventorySlots() : 0;
-	if (Text_PlayerContainerName)
-	{
-		Text_PlayerContainerName->SetText(FText::Format(
-			NSLOCTEXT("InventorySystem", "BackpackCapacity", "Backpack ({0}/{1})"),
-			FText::AsNumber(Occupied),
-			FText::AsNumber(Capacity)));
-	}
+	// Text_PlayerContainerName is authored by the Widget Blueprint and must never be
+	// overwritten here. Runtime capacity belongs to the dedicated Text_Capacity field.
 	if (Text_Capacity)
 	{
-		Text_Capacity->SetVisibility(ESlateVisibility::Collapsed);
+		UpdateCapacityText();
+		Text_Capacity->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
+}
+
+void UInventoryDuckovWidgetBase::UpdateContainerHeader()
+{
+	if (!Text_ContainerName)
+	{
+		return;
+	}
+	const FText ContainerName = ExternalContainer && !ExternalContainer->ContainerName.IsEmpty()
+		? ExternalContainer->ContainerName
+		: DefaultLootContainerText;
+	Text_ContainerName->SetText(FText::Format(ContainerHeaderTextFormat, ContainerName));
 }
 
 void UInventoryDuckovWidgetBase::BeginCloseTransition()
@@ -530,8 +711,23 @@ void UInventoryDuckovWidgetBase::HandleSlotHovered(
 		return;
 	}
 
+	UInventoryComponent* SourceInventory = SlotWidget->GetSourceInventory();
+	const FGuid& DisplayedInstanceId = SlotWidget->GetDisplayedInstanceId();
+	if (!SourceInventory || !DisplayedInstanceId.IsValid())
+	{
+		HideTooltip();
+		return;
+	}
+
+	// SlotIndex alone is not stable across transfer/sort rebuilds. A stale MouseEnter can
+	// arrive after the same index already contains another stack, so resolve the exact
+	// stack this widget rendered inside its original inventory.
+	const int32 CurrentSlotIndex = FInventoryUIPresentationUtils::ResolveSlotIndexForPresentation(
+		SourceInventory->GetSlotsNative(),
+		SlotWidget->GetSlotIndex(),
+		DisplayedInstanceId);
 	FInventorySlotViewData Data;
-	if (!MakeSlotViewData(SlotWidget->GetSourceInventory(), SlotWidget->GetSlotIndex(), Data) || !EnsureTooltipWidget())
+	if (CurrentSlotIndex == INDEX_NONE || !MakeSlotViewData(SourceInventory, CurrentSlotIndex, Data) || !EnsureTooltipWidget())
 	{
 		HideTooltip();
 		return;

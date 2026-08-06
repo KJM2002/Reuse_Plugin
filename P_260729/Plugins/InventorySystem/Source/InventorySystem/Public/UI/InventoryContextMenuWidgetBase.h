@@ -7,6 +7,7 @@
 
 class UInventoryContextActionWidgetBase;
 class UBorder;
+class UFont;
 class UTextBlock;
 class UVerticalBox;
 
@@ -26,6 +27,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|UI")
 	TSubclassOf<UInventoryContextActionWidgetBase> ActionWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Appearance")
+	TSoftObjectPtr<UFont> SemiBoldFont;
 
 	/** Optional WBP override. Empty keeps the item definition's UseButtonText (for example, "Use key"). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")

@@ -22,6 +22,7 @@ UInventorySlotWidgetBase::UInventorySlotWidgetBase(const FObjectInitializer& Obj
 	// margins collapse when displayed at the compact 96 px size. The portable
 	// default is now a resolution-independent rounded Slate brush.
 	SlotBackgroundTexture.Reset();
+	QuantityTextFormat = NSLOCTEXT("InventorySystem", "SlotQuantityFormat", "x{0}");
 }
 
 void UInventorySlotWidgetBase::BuildDefaultWidgetTreeIfNeeded()
@@ -274,7 +275,7 @@ void UInventorySlotWidgetBase::InitializeSlot(UInventoryWidgetBase* InOwnerInven
 	InitializeSlotForInventory(InOwnerInventoryWidget, InOwnerInventoryWidget ? InOwnerInventoryWidget->GetInventoryComponent() : nullptr, InSlotIndex, InItemDefinition, InQuantity);
 }
 
-void UInventorySlotWidgetBase::InitializeSlotForInventory(UInventoryWidgetBase* InOwnerInventoryWidget, UInventoryComponent* InSourceInventory, int32 InSlotIndex, UInventoryItemDefinition* InItemDefinition, int32 InQuantity)
+void UInventorySlotWidgetBase::InitializeSlotForInventory(UInventoryWidgetBase* InOwnerInventoryWidget, UInventoryComponent* InSourceInventory, int32 InSlotIndex, UInventoryItemDefinition* InItemDefinition, int32 InQuantity, const FGuid& InInstanceId)
 {
 	if (OwnerInventoryWidget && OwnerInventoryWidget != InOwnerInventoryWidget)
 	{
@@ -286,6 +287,7 @@ void UInventorySlotWidgetBase::InitializeSlotForInventory(UInventoryWidgetBase* 
 	SlotIndex = InSlotIndex;
 	ItemDefinition = InItemDefinition;
 	Quantity = FMath::Max(0, InQuantity);
+	DisplayedInstanceId = InInstanceId;
 	if (OwnerInventoryWidget)
 	{
 		OwnerInventoryWidget->RegisterSlotWidget(this);
@@ -315,9 +317,7 @@ void UInventorySlotWidgetBase::RefreshSlot()
 
 	if (Text_Quantity)
 	{
-		Text_Quantity->SetText(FText::Format(
-			NSLOCTEXT("InventorySystem", "SlotQuantityFormat", "x{0}"),
-			FText::AsNumber(Quantity)));
+		Text_Quantity->SetText(FText::Format(QuantityTextFormat, FText::AsNumber(Quantity)));
 		Text_Quantity->SetVisibility(bHasValidItem && Quantity > 1
 			? ESlateVisibility::SelfHitTestInvisible
 			: ESlateVisibility::Collapsed);

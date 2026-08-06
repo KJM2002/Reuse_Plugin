@@ -7,6 +7,7 @@
 
 class UImage;
 class UBorder;
+class UFont;
 class UTextBlock;
 
 UCLASS(BlueprintType, Blueprintable)
@@ -15,6 +16,8 @@ class INVENTORYSYSTEM_API UInventoryTooltipWidgetBase : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	UInventoryTooltipWidgetBase(const FObjectInitializer& ObjectInitializer);
+
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void SetTooltipData(const FInventorySlotViewData& InData);
 
@@ -23,6 +26,16 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	const FInventorySlotViewData& GetTooltipData() const { return TooltipData; }
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Appearance")
+	TSoftObjectPtr<UFont> RegularFont;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Appearance")
+	TSoftObjectPtr<UFont> SemiBoldFont;
+
+	/** Editable in the tooltip Widget Blueprint Class Defaults. {0}=stack quantity. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Text")
+	FText QuantityTextFormat;
 
 protected:
 	virtual void NativePreConstruct() override;

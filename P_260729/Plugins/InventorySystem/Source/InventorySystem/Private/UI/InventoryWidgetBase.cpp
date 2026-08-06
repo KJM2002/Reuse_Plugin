@@ -69,6 +69,17 @@ UInventoryWidgetBase::UInventoryWidgetBase(const FObjectInitializer& ObjectIniti
 	SlotWidgetClass = UInventorySlotWidgetBase::StaticClass();
 	GridColumnCount = 5;
 	bShowEmptySlots = true;
+	InventoryTitleText = NSLOCTEXT("InventorySystem", "InventoryTitle", "인벤토리");
+	CapacityTextFormat = NSLOCTEXT("InventorySystem", "CapacityFormat", "{0} / {1}");
+	SelectedQuantityTextFormat = NSLOCTEXT("InventorySystem", "SelectedQuantity", "수량: {0}");
+	EmptyInventoryHintText = NSLOCTEXT("InventorySystem", "InventoryEmptyHint", "보관 중인 아이템이 없습니다.");
+	SelectItemHintText = NSLOCTEXT("InventorySystem", "EmptyDetailHint", "아이템을 선택하면 상세 정보가 표시됩니다.");
+	UseButtonText = NSLOCTEXT("InventorySystem", "UseAction", "사용");
+	DropButtonText = NSLOCTEXT("InventorySystem", "DropAction", "버리기");
+	InspectButtonText = NSLOCTEXT("InventorySystem", "InspectAction", "조사");
+	CloseButtonText = NSLOCTEXT("InventorySystem", "CloseGlyph", "×");
+	InputHintText = NSLOCTEXT("InventorySystem", "InputHint", "ENTER 선택");
+	CloseHintText = NSLOCTEXT("InventorySystem", "CloseHint", "ESC 닫기");
 	SetIsFocusable(true);
 }
 
@@ -103,7 +114,7 @@ void UInventoryWidgetBase::BuildDefaultWidgetTreeIfNeeded()
 	UVerticalBoxSlot* HeaderSlot = Main->AddChildToVerticalBox(Header);
 	HeaderSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
 	HeaderSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 18.0f));
-	UTextBlock* Title = MakeText(WidgetTree, TEXT("Text_InventoryTitle"), NSLOCTEXT("InventorySystem", "InventoryTitle", "인벤토리"), 29, InventoryTextPrimary);
+	UTextBlock* Title = MakeText(WidgetTree, TEXT("Text_InventoryTitle"), InventoryTitleText, 29, InventoryTextPrimary);
 	Header->AddChildToHorizontalBox(Title)->SetVerticalAlignment(VAlign_Center);
 	USpacer* HeaderSpacer = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
 	Header->AddChildToHorizontalBox(HeaderSpacer)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
@@ -111,7 +122,7 @@ void UInventoryWidgetBase::BuildDefaultWidgetTreeIfNeeded()
 	UHorizontalBoxSlot* CapacitySlot = Header->AddChildToHorizontalBox(Text_Capacity);
 	CapacitySlot->SetVerticalAlignment(VAlign_Center);
 	CapacitySlot->SetPadding(FMargin(0.0f, 0.0f, 22.0f, 0.0f));
-	Button_Close = MakeActionButton(WidgetTree, TEXT("Button_Close"), NSLOCTEXT("InventorySystem", "CloseGlyph", "×"));
+	Button_Close = MakeActionButton(WidgetTree, TEXT("Button_Close"), CloseButtonText);
 	UHorizontalBoxSlot* CloseSlot = Header->AddChildToHorizontalBox(Button_Close);
 	CloseSlot->SetVerticalAlignment(VAlign_Center);
 
@@ -174,16 +185,16 @@ void UInventoryWidgetBase::BuildDefaultWidgetTreeIfNeeded()
 	UVerticalBoxSlot* DescriptionSlot = Detail->AddChildToVerticalBox(DescriptionScroll);
 	DescriptionSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 
-	Text_EmptyHint = MakeText(WidgetTree, TEXT("Text_EmptyHint"), NSLOCTEXT("InventorySystem", "EmptyDetailHint", "아이템을 선택하면 상세 정보가 표시됩니다."), 14, InventoryTextSecondary);
+	Text_EmptyHint = MakeText(WidgetTree, TEXT("Text_EmptyHint"), SelectItemHintText, 14, InventoryTextSecondary);
 	Text_EmptyHint->SetAutoWrapText(true);
 	Detail->AddChildToVerticalBox(Text_EmptyHint)->SetPadding(FMargin(0.0f, 12.0f));
 	Text_DisabledReason = MakeText(WidgetTree, TEXT("Text_DisabledReason"), FText::GetEmpty(), 13, FLinearColor(0.68f, 0.45f, 0.40f, 1.0f));
 	Detail->AddChildToVerticalBox(Text_DisabledReason)->SetPadding(FMargin(0.0f, 8.0f));
 
 	HorizontalBox_Actions = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("HorizontalBox_Actions"));
-	Button_Use = MakeActionButton(WidgetTree, TEXT("Button_Use"), NSLOCTEXT("InventorySystem", "UseAction", "사용"));
-	Button_Inspect = MakeActionButton(WidgetTree, TEXT("Button_Inspect"), NSLOCTEXT("InventorySystem", "InspectAction", "조사"));
-	Button_Drop = MakeActionButton(WidgetTree, TEXT("Button_Drop"), NSLOCTEXT("InventorySystem", "DropAction", "버리기"));
+	Button_Use = MakeActionButton(WidgetTree, TEXT("Button_Use"), UseButtonText);
+	Button_Inspect = MakeActionButton(WidgetTree, TEXT("Button_Inspect"), InspectButtonText);
+	Button_Drop = MakeActionButton(WidgetTree, TEXT("Button_Drop"), DropButtonText);
 	HorizontalBox_Actions->AddChildToHorizontalBox(Button_Use)->SetPadding(FMargin(0.0f, 0.0f, 8.0f, 0.0f));
 	HorizontalBox_Actions->AddChildToHorizontalBox(Button_Inspect)->SetPadding(FMargin(0.0f, 0.0f, 8.0f, 0.0f));
 	HorizontalBox_Actions->AddChildToHorizontalBox(Button_Drop);
@@ -192,9 +203,9 @@ void UInventoryWidgetBase::BuildDefaultWidgetTreeIfNeeded()
 	UHorizontalBox* Footer = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("Footer"));
 	UVerticalBoxSlot* FooterSlot = Main->AddChildToVerticalBox(Footer);
 	FooterSlot->SetPadding(FMargin(0.0f, 18.0f, 0.0f, 0.0f));
-	Footer->AddChildToHorizontalBox(MakeText(WidgetTree, TEXT("Text_InputHint"), NSLOCTEXT("InventorySystem", "InputHint", "ENTER 선택"), 13, InventoryTextSecondary));
+	Footer->AddChildToHorizontalBox(MakeText(WidgetTree, TEXT("Text_InputHint"), InputHintText, 13, InventoryTextSecondary));
 	Footer->AddChildToHorizontalBox(WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass()))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-	Footer->AddChildToHorizontalBox(MakeText(WidgetTree, TEXT("Text_CloseHint"), NSLOCTEXT("InventorySystem", "CloseHint", "ESC 닫기"), 13, InventoryTextSecondary));
+	Footer->AddChildToHorizontalBox(MakeText(WidgetTree, TEXT("Text_CloseHint"), CloseHintText, 13, InventoryTextSecondary));
 }
 
 void UInventoryWidgetBase::NativePreConstruct()
@@ -561,7 +572,13 @@ void UInventoryWidgetBase::RebuildSlotGrid()
 			continue;
 		}
 
-		SlotWidget->InitializeSlot(this, SlotIndex, InventorySlot.ItemDefinition, InventorySlot.Quantity);
+		SlotWidget->InitializeSlotForInventory(
+			this,
+			InventoryComponent,
+			SlotIndex,
+			InventorySlot.ItemDefinition,
+			InventorySlot.Quantity,
+			InventorySlot.InstanceId);
 		if (UUniformGridSlot* GridSlot = UniformGridPanel_Items->AddChildToUniformGrid(SlotWidget, DisplayIndex / ColumnCount, DisplayIndex % ColumnCount))
 		{
 			// UniformGrid의 남는 폭으로 슬롯 Widget을 늘리지 않는다.
@@ -611,7 +628,7 @@ void UInventoryWidgetBase::RefreshSelectedItemDetails()
 	}
 	if (Text_SelectedQuantity)
 	{
-		Text_SelectedQuantity->SetText(FText::Format(NSLOCTEXT("InventorySystem", "SelectedQuantity", "수량: {0}"), FText::AsNumber(InventorySlot.Quantity)));
+		Text_SelectedQuantity->SetText(FText::Format(SelectedQuantityTextFormat, FText::AsNumber(InventorySlot.Quantity)));
 	}
 	if (Image_SelectedIcon)
 	{
@@ -690,9 +707,7 @@ void UInventoryWidgetBase::ClearSelectedItemDetails()
 	if (Text_EmptyHint)
 	{
 		const bool bInventoryEmpty = !InventoryComponent || InventoryComponent->GetOccupiedSlotCount() == 0;
-		Text_EmptyHint->SetText(bInventoryEmpty
-			? NSLOCTEXT("InventorySystem", "InventoryEmptyHint", "보관 중인 아이템이 없습니다.")
-			: NSLOCTEXT("InventorySystem", "EmptyDetailHint", "아이템을 선택하면 상세 정보가 표시됩니다."));
+		Text_EmptyHint->SetText(bInventoryEmpty ? EmptyInventoryHintText : SelectItemHintText);
 		Text_EmptyHint->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
 	if (Text_DisabledReason)
@@ -830,7 +845,7 @@ void UInventoryWidgetBase::UpdateCapacityText()
 	const int32 Occupied = InventoryComponent ? InventoryComponent->GetOccupiedSlotCount() : 0;
 	const int32 Capacity = InventoryComponent ? InventoryComponent->GetMaxInventorySlots() : 0;
 	Text_Capacity->SetText(FText::Format(
-		NSLOCTEXT("InventorySystem", "CapacityFormat", "{0} / {1}"),
+		CapacityTextFormat,
 		FText::AsNumber(Occupied),
 		FText::AsNumber(Capacity)));
 }

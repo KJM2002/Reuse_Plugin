@@ -72,6 +72,7 @@ struct INVENTORYSYSTEM_API FInventoryUIPresentationUtils
 	static FInventorySlotViewData MakeSlotViewData(const FInventorySlot& Slot, int32 SlotIndex);
 	static TArray<FInventoryContextAction> BuildContextActions(const FInventorySlotViewData& Data);
 	static int32 FindSlotIndexByInstanceId(const TArray<FInventorySlot>& Slots, const FGuid& InstanceId);
+	static int32 ResolveSlotIndexForPresentation(const TArray<FInventorySlot>& Slots, int32 PreferredSlotIndex, const FGuid& ExpectedInstanceId);
 	static FText FormatCapacityText(int32 OccupiedSlots, int32 MaximumSlots);
 	static FText FormatQuantityText(int32 Quantity);
 	static bool ShouldShowQuantity(int32 Quantity);
@@ -81,4 +82,15 @@ struct INVENTORYSYSTEM_API FInventoryUIPresentationUtils
 		const FVector2D& PopupSize,
 		const FVector2D& AvailableSize,
 		float EdgePadding = 8.0f);
+	static FVector2D CalculateGridPanelSize(
+		int32 SlotCount,
+		int32 ColumnCount,
+		float SlotSize,
+		float SlotPadding,
+		float PanelWidth,
+		float ChromeHeight,
+		int32 MinimumVisibleRows,
+		int32 MaximumVisibleRows,
+		float MinimumPanelHeight,
+		float MaximumPanelHeight);
 };

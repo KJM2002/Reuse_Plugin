@@ -26,6 +26,23 @@ WBP_InventoryContextAction
 
 ## 2. 기존 WBP_Inventory를 수동으로 재제작할 때의 복제 및 Parent Class 변경
 
+### Reference-style appearance defaults
+
+The current project WBP assets use `/Game/UI/Grid/UI_Grid` as a layered slot frame and
+Pretendard Regular/SemiBold fonts. These values remain editable in each Widget
+Blueprint under `Class Defaults > Inventory > Appearance`.
+
+- `WBP_InventorySlotDuckov`: Slot Frame Texture, Regular Font, Semi Bold Font,
+  Slot Display Size, Icon Display Size, Slot Glow Color
+- `WBP_InventoryDuckov`: Regular Font, Semi Bold Font, Compact Grid Slot Size,
+  Compact Grid Padding
+- Tooltip, Context Menu and Context Action: Regular/Semi Bold Font where applicable
+
+Hover uses the frame as a larger translucent cyan layer. Selection adds a second,
+brighter frame on top to simulate an emissive UI glow without requiring a UI material.
+Button hover styles use the same cyan highlight language. Position and Canvas Panel
+size remain authored by the designer in `WBP_InventoryDuckov`.
+
 ### 2.1 기존 에셋을 안전하게 복제한다
 
 1. `/InventorySystem/Widget/WBP_Inventory`를 우클릭한다.
@@ -137,7 +154,7 @@ Tooltip/Context Menu Canvas 안에는 Designer에서 자식을 미리 넣지 않
 | `ScrollBox_PlayerItems` | Scroll Box | Fill/Fill | 남은 높이 Fill | 0 | 1 | Visible | Off | Visible |
 | `UniformGridPanel_Items` | Uniform Grid Panel | Left/Top, Auto | Min Cell `88 × 88` | Slot Padding 4 | 0 | Visible | On | Self Only |
 
-런타임에는 `Text_PlayerContainerName`이 `Backpack (점유 슬롯/최대 슬롯)`으로 갱신되고 기존 `Text_Capacity`는 중복 표시를 피하기 위해 숨겨진다. 현재 생성된 WBP에는 `Button_Sort`가 저장돼 있지 않아도 C++가 `HorizontalBox_Header`에 안전하게 생성한다. Designer에서 직접 `Button_Sort`를 추가해도 같은 Optional BindWidget을 사용하며 Blueprint `OnClicked`를 연결하지 않는다.
+런타임에도 `Text_PlayerContainerName`은 Designer에서 입력한 Text를 그대로 유지한다. 점유/최대 슬롯은 별도 `Text_Capacity`에 `Capacity Text Format` 형식으로 갱신된다. 현재 생성된 WBP에는 `Button_Sort`가 저장돼 있지 않아도 C++가 `HorizontalBox_Header`에 안전하게 생성한다. Designer에서 직접 `Button_Sort`를 추가해도 같은 Optional BindWidget을 사용하며 Blueprint `OnClicked`를 연결하지 않는다.
 
 ### 5.4 Class Defaults
 
@@ -156,6 +173,41 @@ Tooltip/Context Menu Canvas 안에는 Designer에서 자식을 미리 넣지 않
 | `Close Transition Duration` | `0.15` |
 
 Class 드롭다운에 새 WBP가 없으면 해당 WBP를 먼저 Compile/Save하고 이 WBP를 다시 연다.
+
+### 5.5 Widget Blueprint 텍스트 편집
+
+고정 문구와 런타임 숫자 형식은 각 Widget Blueprint의 `Class Defaults > Inventory > Text`에서 수정한다.
+`Text_PlayerContainerName`은 C++가 더 이상 덮어쓰지 않으므로 Designer의 Text 값이 그대로 유지된다.
+플레이어 용량은 별도 `Text_Capacity`에 표시된다.
+
+| Widget Blueprint | 편집 가능한 주요 속성 |
+|---|---|
+| `WBP_InventoryDuckov` | `Inventory Title Text`, `Capacity Text Format`, `Container Header Text Format`, `Default Loot Container Text`, `Sort Button Text`, 버튼/힌트 문구 |
+| `WBP_InventorySlotDuckov` | `Quantity Text Format` (`{0}` = 수량) |
+| `WBP_InventoryTooltip` | `Quantity Text Format` (`{0}` = 수량) |
+| `WBP_InventoryQuantityDialog` | `Title Text`, `Quantity Text Format`, `All/Confirm/Cancel Button Text` |
+| `WBP_InventoryContextMenu` | `Use/Drop/Inspect Action Text Override` |
+
+형식 문자열의 `{0}`, `{1}`은 런타임 값 자리다. 예를 들어 `Capacity Text Format`은
+`가방 {0}/{1}`, `Container Header Text Format`은 `Loot - {0}`처럼 작성할 수 있다.
+
+### 5.6 슬롯 행 기준 패널 크기
+
+Player와 Loot는 `Compact Grid Slot Size`, `Compact Grid Padding`, `Grid Column Count`를 공유한다.
+`bFitPanelWidthToGrid`가 켜지면 패널 폭은 `5열 셀 폭 + Compact Panel Horizontal Padding`으로
+계산되어 좌우 여백이 균등해진다. Player는 `bAutoSizePlayerPanelHeight` 기본값이 꺼져 있어
+Designer의 아래 여백을 업그레이드 공간으로 유지한다. Loot는 `bAutoSizeContainerPanelHeight`가
+켜져 있어 `MaxSlot` 행만큼만 높이를 사용하며 최대 행을 넘으면 내부 ScrollBox를 사용한다.
+
+`bAutoSizePanelsToContent`가 켜지면 C++는 SizeBox Override뿐 아니라 저장된 Canvas Panel Slot의
+Size도 함께 갱신한다. `bMatchPlayerAndContainerPanelHeight`를 켜면 두 패널을 큰 쪽 높이에 맞출 수
+있지만 Duckov 스타일 기본값은 꺼짐이다. 기본 상태에서는 Player가 Designer 높이를 유지하고
+Loot만 필요한 행만큼 차지한다.
+
+Player/Loot 제목의 글자 크기와 위치는 `Class Defaults > Inventory > Appearance`의
+`Player Header` 또는 `Loot Header`에서 수정한다. `Font Size`는 글자 크기,
+`Position Offset`은 X/Y 미세 이동, `Padding`은 제목이 차지하는 레이아웃 여백이다.
+Loot 제목이 C++에서 런타임 생성되는 WBP 구조에서도 같은 설정이 적용된다.
 
 ## 6. WBP_InventorySlotDuckov
 

@@ -6,6 +6,7 @@
 #include "InventoryContextActionWidgetBase.generated.h"
 
 class UButton;
+class UFont;
 class UTextBlock;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FInventoryContextActionRequestedSignature, EInventoryContextActionId, ActionId);
@@ -24,6 +25,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	const FInventoryContextAction& GetActionData() const { return ActionData; }
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Appearance")
+	TSoftObjectPtr<UFont> SemiBoldFont;
 
 protected:
 	virtual void NativePreConstruct() override;

@@ -4,6 +4,7 @@
 #include "Components/Border.h"
 #include "Components/VerticalBox.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
+#include "Engine/Font.h"
 #include "UI/InventoryContextActionWidgetBase.h"
 
 void UInventoryContextMenuWidgetBase::NativePreConstruct()
@@ -12,12 +13,21 @@ void UInventoryContextMenuWidgetBase::NativePreConstruct()
 	if (Border_ContextMenu)
 	{
 		Border_ContextMenu->SetBrush(FSlateRoundedBoxBrush(
-			FLinearColor(0.015f, 0.045f, 0.075f, 0.98f),
-			9.0f,
-			FLinearColor(0.20f, 0.58f, 0.62f, 0.94f),
-			1.5f));
+			FLinearColor(0.010f, 0.030f, 0.058f, 0.98f),
+			7.0f,
+			FLinearColor(0.24f, 0.62f, 0.76f, 0.96f),
+			1.25f));
 		Border_ContextMenu->SetBrushColor(FLinearColor::White);
 		Border_ContextMenu->SetPadding(FMargin(8.0f));
+	}
+	if (Text_ContextMenuTitle)
+	{
+		FSlateFontInfo FontInfo = Text_ContextMenuTitle->GetFont();
+		if (UFont* LoadedFont = SemiBoldFont.LoadSynchronous()) FontInfo.FontObject = LoadedFont;
+		FontInfo.Size = 13;
+		FontInfo.OutlineSettings.OutlineSize = 1;
+		FontInfo.OutlineSettings.OutlineColor = FLinearColor(0.0f, 0.0f, 0.0f, 0.92f);
+		Text_ContextMenuTitle->SetFont(FontInfo);
 	}
 }
 

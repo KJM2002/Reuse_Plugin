@@ -5,7 +5,9 @@
 #include "InventoryDuckovSlotWidgetBase.generated.h"
 
 class UBorder;
+class UFont;
 class UTextBlock;
+class UTexture2D;
 
 UCLASS(BlueprintType, Blueprintable)
 class INVENTORYSYSTEM_API UInventoryDuckovSlotWidgetBase : public UInventorySlotWidgetBase
@@ -16,6 +18,19 @@ public:
 	virtual void RefreshSlot() override;
 	virtual void SetSelected(bool bInSelected) override;
 	void ResetHoverState();
+
+	/** Optional designer frame used for normal, hover and selected glow layers. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Appearance")
+	TSoftObjectPtr<UTexture2D> SlotFrameTexture;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Appearance")
+	TSoftObjectPtr<UFont> RegularFont;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Appearance")
+	TSoftObjectPtr<UFont> SemiBoldFont;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Appearance")
+	FLinearColor SlotGlowColor = FLinearColor(0.08f, 0.82f, 0.94f, 1.0f);
 
 protected:
 	virtual void NativePreConstruct() override;
@@ -43,6 +58,7 @@ protected:
 		UDragDropOperation* InOperation) override;
 
 	void ApplyDuckovVisualState();
+	void ApplyDuckovTypography();
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "Inventory|UI")
 	TObjectPtr<UTextBlock> Text_ItemName = nullptr;
