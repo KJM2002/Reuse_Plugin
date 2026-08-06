@@ -24,5 +24,6 @@ Runtime 코드에서는 프로젝트 전용 Player, GameMode, HUD 또는 특정 
 에디터 설정 방법은 `INSTALLATION.md`, `DATA_AUTHORING.md`, `UI_SETUP.md`, `INSPECTOR_INTEGRATION.md`, `PICKUP_INTEGRATION.md`를 참고한다.
 이번 UI/UX 개편의 구조와 WBP 선택 작업은 `UI_UX_UPGRADE_KO.md`를 참고한다.
 Designer의 정확한 계층, 이름, 크기와 정렬값은 `WIDGET_LAYOUT_GUIDE_KO.md`에 있다.
+Loot Box 생성, 고정 아이템, 가중치 Loot Table, 조작과 테스트 방법은 [`LOOT_CONTAINERS_KO.md`](LOOT_CONTAINERS_KO.md)를 참고한다.
 
 지금까지 확인된 시행착오, 최종 Widget 구조, PlayerController/Character 설정과 전체 회귀 테스트 순서는 [`EDITOR_SETUP_AND_REGRESSION_TEST_KO.md`](EDITOR_SETUP_AND_REGRESSION_TEST_KO.md)를 기준으로 한다. 새 프로젝트 이식이나 UI 재제작 시에는 이 문서의 최종 완료 체크리스트까지 수행한다.

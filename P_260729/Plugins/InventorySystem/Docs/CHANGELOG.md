@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Expanded the Korean Loot Box guide with Blueprint creation, fixed and weighted
+  loot authoring, runtime persistence scope, controls, testing, and troubleshooting.
 - Added `UseActionTextOverride`, `DropActionTextOverride`, and
   `InspectActionTextOverride` to the context-menu Widget Blueprint defaults.
   Empty overrides preserve the existing item/system text.
