@@ -6,7 +6,7 @@
 - `/Game/Level/Level_Mapgenerate`: `JM Room Grid`가 실행마다 방과 콘텐츠를 배치하는 랜덤 던전입니다.
 - `/Game/Prototype/Blueprints/BP_PrototypeLevelPortal`: `NS_Portal`의 구형 오버랩 영역으로 두 레벨을 연결합니다.
 
-포탈은 Interaction 인터페이스를 구현하지 않습니다. 따라서 상호작용 프롬프트나 상호작용 UI를 만들지 않고, 플레이어 Pawn이 영역에 겹쳤을 때 상태를 검사한 뒤 `OpenLevel`을 한 번 호출합니다.
+포탈은 Interaction 인터페이스를 구현하지 않습니다. 플레이어 Pawn이 영역에 겹치면 의뢰, 인벤토리, 진행 상태를 검사하지 않고 지정된 `DestinationWorld`에 `OpenLevel`을 호출합니다.
 
 ## 주요 책임
 
