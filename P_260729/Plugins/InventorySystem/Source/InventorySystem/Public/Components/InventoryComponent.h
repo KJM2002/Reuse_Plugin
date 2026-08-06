@@ -112,6 +112,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	int32 GetMaxInventorySlots() const { return MaxInventorySlots; }
 
+	/**
+	 * Changes slot capacity without discarding items. Shrinking compacts occupied
+	 * slots first and is rejected when the requested capacity cannot hold them.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Capacity")
+	EInventoryCapacityChangeResult SetMaxInventorySlots(int32 NewMaxInventorySlots);
+
+	/** Adds a positive number of slots while preserving all existing contents. */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Capacity")
+	EInventoryCapacityChangeResult ExpandInventorySlots(int32 AdditionalSlots);
+
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	float GetCurrentWeight() const;
 

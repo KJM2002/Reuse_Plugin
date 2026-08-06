@@ -11,10 +11,17 @@ public class P_060715 : ModuleRules
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
 			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
-			"GameplayTags", "JMHideRuntime", "JMHideInteractionIntegration"
+			"GameplayTags", "JMHideRuntime", "JMHideInteractionIntegration",
+			"JMInteraction", "InventorySystem", "JMObjective", "AIModule",
+			"ReusableDialogueSystem", "Niagara", "UMG", "JMRoomGridRuntime"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] {  });
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"JMGameplayEvent",
+			"NavigationSystem",
+			"Slate", "SlateCore"
+		});
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

@@ -15,6 +15,9 @@
 - `UInventoryItemInspectorBridge`: 외부 아이템 조사 시스템을 연결하는 추상 연동 계층이다.
 - `UReuseInventoryInspectorBridge`: 현재 프로젝트의 ItemInspector를 연결하는 Adapter다.
 
+런타임 가방 확장은 `ExpandInventorySlots`, 절대 용량 지정은
+`SetMaxInventorySlots`를 사용한다. 두 API 모두 기존 아이템을 삭제하지 않는다.
+
 Runtime 코드에서는 프로젝트 전용 Player, GameMode, HUD 또는 특정 인벤토리 구현으로 Cast하지 않는다. UI 갱신을 위한 Tick도 사용하지 않는다.
 
 0.5부터 Project Settings의 Widget Class가 비어 있거나 기본값이면 상업용 공포 게임 톤의

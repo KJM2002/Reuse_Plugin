@@ -33,6 +33,14 @@ enum class EInventoryOperationResult : uint8
 	SpawnFailed
 };
 
+UENUM(BlueprintType)
+enum class EInventoryCapacityChangeResult : uint8
+{
+	Success,
+	InvalidCapacity,
+	OccupiedSlotsExceedCapacity
+};
+
 USTRUCT(BlueprintType)
 struct INVENTORYSYSTEM_API FInventoryInitialItem
 {

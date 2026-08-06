@@ -63,6 +63,48 @@ void UInventoryComponent::EnsureSlotCapacity()
 	}
 }
 
+EInventoryCapacityChangeResult UInventoryComponent::SetMaxInventorySlots(int32 NewMaxInventorySlots)
+{
+	if (NewMaxInventorySlots < 1)
+	{
+		return EInventoryCapacityChangeResult::InvalidCapacity;
+	}
+
+	EnsureSlotCapacity();
+	if (NewMaxInventorySlots == MaxInventorySlots)
+	{
+		return EInventoryCapacityChangeResult::Success;
+	}
+
+	if (GetOccupiedSlotCount() > NewMaxInventorySlots)
+	{
+		return EInventoryCapacityChangeResult::OccupiedSlotsExceedCapacity;
+	}
+
+	if (NewMaxInventorySlots < MaxInventorySlots)
+	{
+		Algo::StableSort(Slots, [](const FInventorySlot& Left, const FInventorySlot& Right)
+		{
+			return Left.IsValid() && !Right.IsValid();
+		});
+	}
+
+	MaxInventorySlots = NewMaxInventorySlots;
+	Slots.SetNum(MaxInventorySlots);
+	OnInventoryChanged.Broadcast();
+	return EInventoryCapacityChangeResult::Success;
+}
+
+EInventoryCapacityChangeResult UInventoryComponent::ExpandInventorySlots(int32 AdditionalSlots)
+{
+	if (AdditionalSlots <= 0 || MaxInventorySlots > MAX_int32 - AdditionalSlots)
+	{
+		return EInventoryCapacityChangeResult::InvalidCapacity;
+	}
+
+	return SetMaxInventorySlots(MaxInventorySlots + AdditionalSlots);
+}
+
 bool UInventoryComponent::IsValidSlotIndex(int32 SlotIndex) const
 {
 	return Slots.IsValidIndex(SlotIndex) && Slots[SlotIndex].IsValid();

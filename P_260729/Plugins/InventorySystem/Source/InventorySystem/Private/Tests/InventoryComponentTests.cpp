@@ -32,6 +32,50 @@ bool FInventoryStackingTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventoryRuntimeCapacityTest,
+	"InventorySystem.Component.RuntimeCapacityPreservesContents",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryRuntimeCapacityTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	UInventoryItemDefinition* First = NewObject<UInventoryItemDefinition>();
+	UInventoryItemDefinition* Second = NewObject<UInventoryItemDefinition>();
+	Inventory->MaxInventorySlots = 2;
+	First->ItemId = TEXT("Automation.Capacity.First");
+	Second->ItemId = TEXT("Automation.Capacity.Second");
+
+	TestTrue(TEXT("First item added"), Inventory->AddItem(First));
+	TestTrue(TEXT("Second item added"), Inventory->AddItem(Second));
+	TestEqual(
+		TEXT("Expansion succeeds"),
+		Inventory->ExpandInventorySlots(2),
+		EInventoryCapacityChangeResult::Success);
+	TestEqual(TEXT("Capacity expands to four"), Inventory->GetMaxInventorySlots(), 4);
+	TestTrue(TEXT("First item survives expansion"), Inventory->HasItem(First));
+	TestTrue(TEXT("Second item survives expansion"), Inventory->HasItem(Second));
+
+	TestEqual(
+		TEXT("Unsafe shrink is rejected"),
+		Inventory->SetMaxInventorySlots(1),
+		EInventoryCapacityChangeResult::OccupiedSlotsExceedCapacity);
+	TestEqual(TEXT("Rejected shrink preserves capacity"), Inventory->GetMaxInventorySlots(), 4);
+	TestEqual(
+		TEXT("Invalid expansion is rejected"),
+		Inventory->ExpandInventorySlots(0),
+		EInventoryCapacityChangeResult::InvalidCapacity);
+
+	TestTrue(TEXT("One item can be removed"), Inventory->RemoveItem(Second));
+	TestEqual(
+		TEXT("Safe shrink succeeds"),
+		Inventory->SetMaxInventorySlots(1),
+		EInventoryCapacityChangeResult::Success);
+	TestEqual(TEXT("Capacity shrinks to one"), Inventory->GetMaxInventorySlots(), 1);
+	TestTrue(TEXT("Remaining item survives shrink"), Inventory->HasItem(First));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FInventorySelectionRecoveryTest,
 	"InventorySystem.UI.SelectionRecovery",
 	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)

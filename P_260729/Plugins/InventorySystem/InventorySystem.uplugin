@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
-	"Version": 7,
-	"VersionName": "0.6.0",
+	"Version": 8,
+	"VersionName": "0.7.0",
 	"FriendlyName": "Reusable Inventory System",
 	"Description": "Reusable, data-driven inventory, pickup, UI and inspector bridge runtime plugin.",
 	"Category": "JM Plugins",

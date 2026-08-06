@@ -53,6 +53,22 @@
 		{
 			"Name": "JMThrowableGameplayIntegration",
 			"Enabled": true
+		},
+		{
+			"Name": "ReusableDialogueSystem",
+			"Enabled": true
+		},
+		{
+			"Name": "InventorySystem",
+			"Enabled": true
+		},
+		{
+			"Name": "JMObjective",
+			"Enabled": true
+		},
+		{
+			"Name": "JMRoomGrid",
+			"Enabled": true
 		}
 	]
 }

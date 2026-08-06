@@ -38,6 +38,13 @@ Inventory UI는 특정 HUD를 Cast하지 않는다. 열기/닫기 시 기존 `JM
 Objective UI와 Interaction Prompt는 공통 Modal 이벤트를 구독해 자동으로 숨김/복원한다.
 프로젝트 전용 Crosshair도 같은 이벤트를 구독하면 된다.
 
+## 런타임 용량 변경
+
+외부 성장 시스템은 `SetMaxInventorySlots` 또는 `ExpandInventorySlots`만 사용한다.
+축소 요청은 아이템을 버리지 않으며, 점유 슬롯 수보다 작으면 거부한다. 안전한 축소는
+점유 슬롯을 앞쪽으로 압축한 뒤 배열 크기를 변경하고 `OnInventoryChanged`를 한 번 발행한다.
+성장 비용, 업그레이드 소유권과 저장은 Inventory가 아니라 소비자 시스템이 담당한다.
+
 ## 에셋 참조
 
 아이콘, 조사 메쉬, Pickup Class, Widget, Input Action은 가능한 범위에서 Soft Reference를 사용한다. 해당 기능이 실행되는 시점에만 로드하며 C++에 프로젝트 콘텐츠 경로를 넣지 않는다.

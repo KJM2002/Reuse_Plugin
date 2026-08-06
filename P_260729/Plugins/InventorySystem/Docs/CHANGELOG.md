@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added safe runtime capacity APIs that preserve contents, reject destructive
+  shrink requests, refresh listeners, and support inventory-size upgrades.
+
 - Exposed Player/Loot header font size, local position offset, and layout padding
   in `WBP_InventoryDuckov` Class Defaults, including the runtime-generated Loot title.
 - Changed Duckov panel sizing to preserve one fixed 60 px, five-column grid and

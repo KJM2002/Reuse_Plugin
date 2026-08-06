@@ -20,7 +20,8 @@ public class P_060715Tests : ModuleRules
             "JMDoorReconIntegration",
             "P_060715",
             "JMHideRuntime",
-            "JMHideInteractionIntegration"
+			"JMHideInteractionIntegration",
+			"InventorySystem"
         });
     }
 }
