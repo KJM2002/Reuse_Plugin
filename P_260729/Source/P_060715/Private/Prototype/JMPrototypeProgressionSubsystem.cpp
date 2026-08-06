@@ -15,6 +15,8 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::ConfigurePrototype
 
 	Config = InConfig;
 	bConfigured = true;
+	bLevelTravelPending = false;
+	TravelInventory.Reset();
 	SetRunState(EJMPrototypeRunState::AwaitingQuest);
 	if (bResetPermanentProgress)
 	{
@@ -220,6 +222,18 @@ bool UJMPrototypeProgressionSubsystem::ConsumeLevelTravelPending()
 	const bool bWasPending = bLevelTravelPending;
 	bLevelTravelPending = false;
 	return bWasPending;
+}
+
+bool UJMPrototypeProgressionSubsystem::CancelPendingLevelTravel(EJMPrototypeRunState StateBeforeTravel)
+{
+	if (!bLevelTravelPending)
+	{
+		return false;
+	}
+	bLevelTravelPending = false;
+	TravelInventory.Reset();
+	SetRunState(StateBeforeTravel);
+	return true;
 }
 
 void UJMPrototypeProgressionSubsystem::SetRunState(EJMPrototypeRunState NewState)

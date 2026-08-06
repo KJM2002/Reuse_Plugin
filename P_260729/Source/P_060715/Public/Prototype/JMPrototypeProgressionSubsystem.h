@@ -67,6 +67,9 @@ public:
 	/** Consumes the one-shot travel marker on arrival. */
 	bool ConsumeLevelTravelPending();
 
+	/** Restores the source state when OpenLevel did not leave the source world. */
+	bool CancelPendingLevelTravel(EJMPrototypeRunState StateBeforeTravel);
+
 	UFUNCTION(BlueprintPure, Category = "Base Upgrade Prototype")
 	bool IsConfigured() const { return bConfigured; }
 

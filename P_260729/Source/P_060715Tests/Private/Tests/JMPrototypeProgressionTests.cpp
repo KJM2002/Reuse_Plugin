@@ -34,6 +34,11 @@ bool FJMPrototypeFullEconomyLoopTest::RunTest(const FString& Parameters)
 	Progression->MarkLevelTravelPending();
 	TestTrue(TEXT("Intentional travel marker is consumed once"), Progression->ConsumeLevelTravelPending());
 	TestFalse(TEXT("Travel marker does not leak into a restart"), Progression->ConsumeLevelTravelPending());
+	Progression->MarkLevelTravelPending();
+	TestTrue(TEXT("Failed travel can restore the pre-travel state"), Progression->CancelPendingLevelTravel(EJMPrototypeRunState::QuestAccepted));
+	TestEqual(TEXT("Failed travel restores quest accepted"), Progression->GetRunState(), EJMPrototypeRunState::QuestAccepted);
+	TestFalse(TEXT("Failed travel clears its marker"), Progression->ConsumeLevelTravelPending());
+	TestTrue(TEXT("Dungeon can be entered again after rollback"), Progression->EnterDungeon().bSucceeded);
 	TestFalse(TEXT("Quest cannot be submitted while exploring"), Progression->SubmitQuest(Inventory, QuestItem, 3).bSucceeded);
 
 	TestTrue(TEXT("Quest samples are collected"), Inventory->AddItem(QuestItem, 3));
