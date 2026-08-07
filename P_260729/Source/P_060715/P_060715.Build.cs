@@ -20,7 +20,7 @@ public class P_060715 : ModuleRules
 		{
 			"JMGameplayEvent",
 			"NavigationSystem",
-			"Slate", "SlateCore"
+			"Slate", "SlateCore", "MoviePlayer"
 		});
 
 		// Uncomment if you are using Slate UI
