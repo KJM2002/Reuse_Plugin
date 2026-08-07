@@ -23,6 +23,18 @@ void UJMPrototypeStationInteractionWidget::InitializeForStation(AJMPrototypeInte
 	Station = InStation;
 }
 
+TSharedRef<SWidget> UJMPrototypeStationInteractionWidget::RebuildWidget()
+{
+	// A native UUserWidget must own its WidgetTree before Super builds the Slate tree.
+	// Building it from NativeConstruct is too late and leaves an invisible SNullWidget
+	// in the viewport until another input/layout pass occurs.
+	if (WidgetTree && !WidgetTree->RootWidget)
+	{
+		BuildFallbackLayout();
+	}
+	return Super::RebuildWidget();
+}
+
 void UJMPrototypeStationInteractionWidget::NativeConstruct()
 {
 	Super::NativeConstruct();

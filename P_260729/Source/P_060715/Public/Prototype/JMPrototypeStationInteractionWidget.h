@@ -38,6 +38,7 @@ public:
 	FLinearColor FailureColor = FLinearColor(1.0f, 0.28f, 0.22f, 1.0f);
 
 protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 	virtual FReply NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
