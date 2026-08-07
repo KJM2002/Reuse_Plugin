@@ -13,6 +13,7 @@ class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UNiagaraComponent;
 class UPrimitiveComponent;
+class USceneComponent;
 class USphereComponent;
 class UWorld;
 struct FHitResult;
@@ -35,6 +36,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal")
 	TObjectPtr<UNiagaraComponent> PortalEffect;
 
+	/** Independent camera aim point. Move this component to the visible center of each portal. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal")
+	TObjectPtr<USceneComponent> TransitionFocus;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal")
 	TSoftObjectPtr<UWorld> DestinationWorld;
 
@@ -46,6 +51,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal|Transition", meta = (ClampMin = "1.0"))
 	float StopDistance = 70.0f;
 
+	/** Maximum real camera translation. Zero keeps the player's standing viewpoint fixed. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal|Transition", meta = (ClampMin = "0.0"))
+	float MaximumCameraTravelDistance = 0.0f;
+
 	/** Optional authored 0..1 curve. When unset, a cubic ease-in is used. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal|Transition")
 	TObjectPtr<UCurveFloat> SuctionCurve;
@@ -55,6 +64,14 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal|Transition", meta = (ClampMin = "1.0", ClampMax = "170.0"))
 	float FinalFOV = 55.0f;
+
+	/** Enables the old wide-FOV kick before zooming in. Off is more stable for side approaches. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal|Transition")
+	bool bUseWideFOVKick = false;
+
+	/** Controls how gently the camera turns from the entry view toward TransitionFocus. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal|Transition", meta = (ClampMin = "1.0", ClampMax = "8.0"))
+	float RotationEaseExponent = 2.0f;
 
 	/** Optional Post Process material with a scalar parameter named WarpStrength. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal|Transition")
@@ -96,6 +113,8 @@ private:
 	float InitialFOV = 80.0f;
 	FVector InitialCameraLocation = FVector::ZeroVector;
 	FVector TargetCameraLocation = FVector::ZeroVector;
+	FVector TransitionFocusLocation = FVector::ZeroVector;
+	FQuat InitialCameraRotation = FQuat::Identity;
 	TWeakObjectPtr<APlayerController> TransitionPlayerController;
 	TWeakObjectPtr<AActor> OriginalViewTarget;
 	TWeakObjectPtr<ACameraActor> TransitionCamera;

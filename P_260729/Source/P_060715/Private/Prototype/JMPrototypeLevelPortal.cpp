@@ -3,6 +3,7 @@
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Components/SceneComponent.h"
 #include "Components/SphereComponent.h"
 #include "Curves/CurveFloat.h"
 #include "Engine/GameInstance.h"
@@ -39,6 +40,9 @@ AJMPrototypeLevelPortal::AJMPrototypeLevelPortal()
 	PortalEffect = CreateDefaultSubobject<UNiagaraComponent>(TEXT("NS_Portal"));
 	PortalEffect->SetupAttachment(OverlapArea);
 	PortalEffect->SetAutoActivate(true);
+
+	TransitionFocus = CreateDefaultSubobject<USceneComponent>(TEXT("TransitionFocus"));
+	TransitionFocus->SetupAttachment(PortalEffect);
 
 	ArrivalMessages = {
 		NSLOCTEXT("JMPrototypeTravel", "Swallowed", "포탈이 나를 삼켰다."),
@@ -118,8 +122,14 @@ void AJMPrototypeLevelPortal::StartTransition(APawn* PlayerPawn)
 			? PC->PlayerCameraManager->GetCameraRotation() : PlayerPawn->GetActorRotation();
 		InitialFOV = PC->PlayerCameraManager ? PC->PlayerCameraManager->GetFOVAngle() : 80.0f;
 		InitialCameraLocation = ViewLocation;
-		const FVector ApproachDirection = (ViewLocation - GetActorLocation()).GetSafeNormal(SMALL_NUMBER, FVector::ForwardVector);
-		TargetCameraLocation = GetActorLocation() + ApproachDirection * StopDistance;
+		InitialCameraRotation = ViewRotation.Quaternion();
+		TransitionFocusLocation = TransitionFocus
+			? TransitionFocus->GetComponentLocation() : GetActorLocation();
+		const FVector ToFocus = TransitionFocusLocation - ViewLocation;
+		const float AvailableTravelDistance = FMath::Max(0.0f, ToFocus.Size() - StopDistance);
+		const float CameraTravelDistance = FMath::Min(MaximumCameraTravelDistance, AvailableTravelDistance);
+		TargetCameraLocation = ViewLocation
+			+ ToFocus.GetSafeNormal(SMALL_NUMBER, ViewRotation.Vector()) * CameraTravelDistance;
 
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -181,10 +191,24 @@ void AJMPrototypeLevelPortal::UpdateTransition(const float NormalizedTime)
 	{
 		const FVector NewLocation = FMath::Lerp(InitialCameraLocation, TargetCameraLocation, MoveAlpha);
 		Camera->SetActorLocation(NewLocation);
-		Camera->SetActorRotation(UKismetMathLibrary::FindLookAtRotation(NewLocation, GetActorLocation()));
-		const float NewFOV = NormalizedTime < 0.8f
-			? FMath::Lerp(InitialFOV, PeakFOV, NormalizedTime / 0.8f)
-			: FMath::Lerp(PeakFOV, FinalFOV, (NormalizedTime - 0.8f) / 0.2f);
+		const FQuat LookAtRotation = UKismetMathLibrary::FindLookAtRotation(
+			NewLocation, TransitionFocusLocation).Quaternion();
+		const float RotationAlpha = FMath::InterpEaseInOut(
+			0.0f, 1.0f, NormalizedTime, RotationEaseExponent);
+		Camera->SetActorRotation(FQuat::Slerp(InitialCameraRotation, LookAtRotation, RotationAlpha));
+
+		float NewFOV = 0.0f;
+		if (bUseWideFOVKick)
+		{
+			NewFOV = NormalizedTime < 0.8f
+				? FMath::Lerp(InitialFOV, PeakFOV, FMath::InterpEaseInOut(0.0f, 1.0f, NormalizedTime / 0.8f, 2.0f))
+				: FMath::Lerp(PeakFOV, FinalFOV, FMath::InterpEaseIn(0.0f, 1.0f, (NormalizedTime - 0.8f) / 0.2f, 2.0f));
+		}
+		else
+		{
+			NewFOV = FMath::Lerp(InitialFOV, FinalFOV,
+				FMath::InterpEaseIn(0.0f, 1.0f, NormalizedTime, 2.2f));
+		}
 		Camera->GetCameraComponent()->SetFieldOfView(NewFOV);
 	}
 	if (WarpMaterialInstance)
