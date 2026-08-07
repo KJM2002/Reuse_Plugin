@@ -48,10 +48,12 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::ConfigurePrototype
 	bHasTravelInventorySnapshot = false;
 	bDungeonRunStartedThisSession = false;
 	bCommitInventoryCheckpointOnBaseArrival = false;
+	ActiveQuestIndex = INDEX_NONE;
 	SetRunState(EJMPrototypeRunState::AwaitingQuest);
 	if (bResetPermanentProgress)
 	{
 		Currency = Config.InitialCurrency;
+		CompletedQuestCount = 0;
 		bInventoryUpgradePurchased = false;
 		OnCurrencyChanged.Broadcast(Currency);
 		OnInventoryUpgradeChanged.Broadcast(false);
@@ -61,13 +63,21 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::ConfigurePrototype
 
 FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::AcceptQuest()
 {
-	if (!bConfigured || (RunState != EJMPrototypeRunState::AwaitingQuest && RunState != EJMPrototypeRunState::QuestCompleted))
+	if (!bConfigured || ActiveQuestIndex != INDEX_NONE)
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState, LOCTEXT("CannotAccept", "A quest cannot be accepted in the current state."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState,
+			LOCTEXT("CannotAccept", "이미 진행 중인 의뢰가 있습니다."));
 	}
+	if (CompletedQuestCount >= 2)
+	{
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState,
+			LOCTEXT("NoMoreQuests", "현재 받을 수 있는 추가 의뢰가 없습니다."));
+	}
+	ActiveQuestIndex = CompletedQuestCount;
 	SetRunState(EJMPrototypeRunState::QuestAccepted);
 	SaveTrackedBaseInventoryCheckpoint();
-	return FJMPrototypeOperationResult::Success();
+	return FJMPrototypeOperationResult::Success(FText::Format(
+		LOCTEXT("QuestAcceptedMessage", "의뢰 {0}을(를) 수락했습니다."), FText::AsNumber(ActiveQuestIndex + 1)));
 }
 
 FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::EnterDungeon()
@@ -90,12 +100,18 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::ReturnToBase()
 	return FJMPrototypeOperationResult::Success();
 }
 
-FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::SubmitQuest(UInventoryComponent* Inventory, UInventoryItemDefinition* QuestItem, int32 RequiredQuantity)
+FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::SubmitQuest(UInventoryComponent* Inventory,
+	UInventoryItemDefinition* QuestItem, int32 RequiredQuantity, int32 Reward, int32 QuestIndex)
 {
-	if (!bConfigured || RunState != EJMPrototypeRunState::Returned)
+	if (!bConfigured || ActiveQuestIndex == INDEX_NONE)
 	{
 		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState,
-			LOCTEXT("CannotSubmit", "던전에서 기지로 정상 귀환한 뒤 제출할 수 있습니다."));
+			LOCTEXT("CannotSubmit", "[아직 의뢰가 없습니다] 의뢰인에게서 의뢰를 먼저 받아 주세요."));
+	}
+	if (QuestIndex != ActiveQuestIndex)
+	{
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidConfiguration,
+			LOCTEXT("WrongQuestConfiguration", "제출대의 의뢰 정보가 현재 의뢰와 일치하지 않습니다."));
 	}
 	if (!IsValid(Inventory))
 	{
@@ -110,21 +126,24 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::SubmitQuest(UInven
 	if (!Inventory->HasItem(QuestItem, RequiredQuantity))
 	{
 		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InsufficientItems,
-			FText::Format(LOCTEXT("NotEnoughQuestItems", "점액 샘플이 부족합니다. 필요 {0}개 / 보유 {1}개"),
+			FText::Format(LOCTEXT("NotEnoughQuestItems", "의뢰 물품이 부족합니다. 필요 {0}개 / 보유 {1}개"),
 				FText::AsNumber(RequiredQuantity), FText::AsNumber(Inventory->GetItemQuantity(QuestItem))));
 	}
 	if (!Inventory->RemoveItem(QuestItem, RequiredQuantity))
 	{
 		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InsufficientItems,
-			LOCTEXT("RemoveQuestItemsFailed", "점액 샘플 제출 처리에 실패했습니다. 인벤토리를 다시 확인해 주세요."));
+			LOCTEXT("RemoveQuestItemsFailed", "의뢰 물품 제출 처리에 실패했습니다. 인벤토리를 다시 확인해 주세요."));
 	}
 
-	AddCurrency(Config.QuestReward);
-	SetRunState(EJMPrototypeRunState::QuestCompleted);
+	const int32 GrantedReward = Reward >= 0 ? Reward : Config.QuestReward;
+	AddCurrency(GrantedReward);
+	++CompletedQuestCount;
+	ActiveQuestIndex = INDEX_NONE;
+	SetRunState(EJMPrototypeRunState::AwaitingQuest);
 	SaveTrackedBaseInventoryCheckpoint();
 	return FJMPrototypeOperationResult::Success(FText::Format(
-		LOCTEXT("QuestSubmitted", "점액 샘플 {0}개를 제출했습니다. 보상 +{1} 화폐"),
-		FText::AsNumber(RequiredQuantity), FText::AsNumber(Config.QuestReward)));
+		LOCTEXT("QuestSubmitted", "의뢰 물품 {0}개를 제출했습니다. 보상 +{1} 화폐\n[아직 의뢰가 없습니다]"),
+		FText::AsNumber(RequiredQuantity), FText::AsNumber(GrantedReward)));
 }
 
 FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::CookAndSell(UInventoryComponent* Inventory, UInventoryItemDefinition* Ingredient, int32 RequiredQuantity)
@@ -225,7 +244,9 @@ void UJMPrototypeProgressionSubsystem::ResetCurrentRun()
 {
 	if (bConfigured)
 	{
-		SetRunState(EJMPrototypeRunState::AwaitingQuest);
+		SetRunState(ActiveQuestIndex == INDEX_NONE
+			? EJMPrototypeRunState::AwaitingQuest
+			: EJMPrototypeRunState::QuestAccepted);
 	}
 }
 
@@ -352,10 +373,12 @@ bool UJMPrototypeProgressionSubsystem::SaveBaseInventoryCheckpoint(UInventoryCom
 		return false;
 	}
 	SaveObject->InventoryCapacity = Inventory->GetMaxInventorySlots();
-	SaveObject->SaveVersion = 1;
+	SaveObject->SaveVersion = 2;
 	SaveObject->Currency = Currency;
 	SaveObject->bInventoryUpgradePurchased = bInventoryUpgradePurchased;
 	SaveObject->RunState = RunState;
+	SaveObject->ActiveQuestIndex = ActiveQuestIndex;
+	SaveObject->CompletedQuestCount = CompletedQuestCount;
 	for (const FInventorySlot& Slot : Inventory->GetSlotsNative())
 	{
 		if (!Slot.IsValid())
@@ -400,6 +423,23 @@ bool UJMPrototypeProgressionSubsystem::RestoreBaseInventoryCheckpoint(UInventory
 		SetRunState(SaveObject->RunState);
 		OnCurrencyChanged.Broadcast(Currency);
 		OnInventoryUpgradeChanged.Broadcast(bInventoryUpgradePurchased);
+	}
+	if (SaveObject->SaveVersion >= 2)
+	{
+		ActiveQuestIndex = SaveObject->ActiveQuestIndex;
+		CompletedQuestCount = FMath::Clamp(SaveObject->CompletedQuestCount, 0, 2);
+	}
+	else
+	{
+		// Legacy saves had one quest and no explicit active slot.
+		ActiveQuestIndex = (SaveObject->RunState == EJMPrototypeRunState::QuestAccepted
+			|| SaveObject->RunState == EJMPrototypeRunState::Exploring
+			|| SaveObject->RunState == EJMPrototypeRunState::Returned) ? 0 : INDEX_NONE;
+		CompletedQuestCount = SaveObject->RunState == EJMPrototypeRunState::QuestCompleted ? 1 : 0;
+		if (SaveObject->RunState == EJMPrototypeRunState::QuestCompleted)
+		{
+			SetRunState(EJMPrototypeRunState::AwaitingQuest);
+		}
 	}
 	ClearInventoryContents(Inventory);
 	bool bRestoredAll = true;

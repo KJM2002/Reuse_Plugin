@@ -49,7 +49,7 @@ void UJMPrototypeDialogueQuestBridgeComponent::EndPlay(const EEndPlayReason::Typ
 
 void UJMPrototypeDialogueQuestBridgeComponent::HandleDialogueFinished(const FJMGameplayEventMessage& Message)
 {
-	if ((bDisableAfterAcceptance && bAcceptedQuest) || QuestOfferDialogueId.IsNone())
+	if (QuestOfferDialogueId.IsNone())
 	{
 		return;
 	}
@@ -60,6 +60,10 @@ void UJMPrototypeDialogueQuestBridgeComponent::HandleDialogueFinished(const FJMG
 	}
 	UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
 	UJMPrototypeProgressionSubsystem* Progression = GameInstance ? GameInstance->GetSubsystem<UJMPrototypeProgressionSubsystem>() : nullptr;
+	if (bDisableAfterAcceptance && Progression && Progression->HasActiveQuest())
+	{
+		return;
+	}
 	const FJMPrototypeOperationResult Result = Progression
 		? Progression->AcceptQuest()
 		: FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidConfiguration, FText::FromString(TEXT("Prototype progression subsystem is unavailable.")));

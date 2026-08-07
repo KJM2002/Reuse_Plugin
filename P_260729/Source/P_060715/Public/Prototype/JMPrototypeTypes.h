@@ -59,6 +59,9 @@ struct P_060715_API FJMPrototypeConfig
 	int32 QuestReward = 60;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Economy", meta = (ClampMin = "0"))
+	int32 SecondQuestReward = 90;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Economy", meta = (ClampMin = "0"))
 	int32 CookingReward = 20;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Upgrade", meta = (ClampMin = "0"))
@@ -72,7 +75,7 @@ struct P_060715_API FJMPrototypeConfig
 
 	bool IsValid() const
 	{
-		return InitialCurrency >= 0 && QuestReward >= 0 && CookingReward >= 0
+		return InitialCurrency >= 0 && QuestReward >= 0 && SecondQuestReward >= 0 && CookingReward >= 0
 			&& InventoryUpgradeCost >= 0 && BaseInventorySlots > 0
 			&& UpgradedInventorySlots > BaseInventorySlots;
 	}

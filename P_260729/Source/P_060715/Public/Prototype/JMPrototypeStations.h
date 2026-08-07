@@ -21,6 +21,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quest", meta = (ClampMin = "1"))
 	int32 RequiredQuantity = 3;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quest")
+	FText QuestItemName;
+
+	/** Second sequential prototype quest: collect slime byproducts. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quest|Second")
+	TObjectPtr<UInventoryItemDefinition> SecondQuestItem;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quest|Second", meta = (ClampMin = "1"))
+	int32 SecondRequiredQuantity = 2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quest|Second")
+	FText SecondQuestItemName;
+
 	/** Optional Objective step completed after atomic item submission and reward. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quest")
 	FGameplayTag SubmissionObjectiveId;

@@ -45,4 +45,10 @@ public:
 
 	UPROPERTY(SaveGame)
 	EJMPrototypeRunState RunState = EJMPrototypeRunState::AwaitingQuest;
+
+	UPROPERTY(SaveGame)
+	int32 ActiveQuestIndex = INDEX_NONE;
+
+	UPROPERTY(SaveGame)
+	int32 CompletedQuestCount = 0;
 };

@@ -96,13 +96,18 @@ void UJMPrototypeHUDWidget::ShowNotification(const FText& Message, bool bSucceed
 
 FText UJMPrototypeHUDWidget::GetObjectiveText(EJMPrototypeRunState State) const
 {
+	const UJMPrototypeProgressionSubsystem* System = Progression.Get();
+	const bool bSecondQuest = System && System->GetActiveQuestIndex() == 1;
 	switch (State)
 	{
-	case EJMPrototypeRunState::AwaitingQuest: return LOCTEXT("Awaiting", "목표: 의뢰인과 대화해 의뢰를 받으세요");
-	case EJMPrototypeRunState::QuestAccepted: return LOCTEXT("Accepted", "목표: 포탈로 던전에 진입하세요");
-	case EJMPrototypeRunState::Exploring: return LOCTEXT("Explore", "목표: 점액 샘플 3개와 부산물을 모아 귀환하세요");
-	case EJMPrototypeRunState::Returned: return LOCTEXT("Returned", "목표: 의뢰 제출대에 점액 샘플 3개를 제출하세요");
-	case EJMPrototypeRunState::QuestCompleted: return LOCTEXT("Completed", "목표: 요리 판매와 인벤토리 업그레이드 후 다음 의뢰");
+	case EJMPrototypeRunState::AwaitingQuest: return LOCTEXT("Awaiting", "[아직 의뢰가 없습니다]");
+	case EJMPrototypeRunState::QuestAccepted:
+	case EJMPrototypeRunState::Exploring:
+	case EJMPrototypeRunState::Returned:
+		return bSecondQuest
+			? LOCTEXT("SecondQuest", "의뢰 2: 점액 부산물 2개를 제출하세요")
+			: LOCTEXT("FirstQuest", "의뢰 1: 점액 샘플 3개를 제출하세요");
+	case EJMPrototypeRunState::QuestCompleted: return LOCTEXT("Completed", "[아직 의뢰가 없습니다]");
 	default: return FText::GetEmpty();
 	}
 }

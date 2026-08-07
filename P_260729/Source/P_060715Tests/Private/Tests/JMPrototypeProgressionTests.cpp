@@ -38,6 +38,9 @@ bool FJMPrototypeStationFeedbackContractTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Success feedback sound is configured"), !Station->SuccessSound.IsNull());
 		TestTrue(TEXT("Failure feedback sound is configured"), !Station->FailureSound.IsNull());
 	}
+	const AJMPrototypeQuestSubmitStation* QuestStation = GetDefault<AJMPrototypeQuestSubmitStation>();
+	TestNotNull(TEXT("Second quest item is configured"), QuestStation->SecondQuestItem.Get());
+	TestEqual(TEXT("Second quest requires two items"), QuestStation->SecondRequiredQuantity, 2);
 	TestNotNull(TEXT("Runtime-safe Engine feedback sound loads"),
 		LoadObject<USoundBase>(nullptr, TEXT("/Engine/EngineSounds/1kSineTonePing.1kSineTonePing")));
 	return true;
@@ -76,7 +79,7 @@ bool FJMPrototypeFullEconomyLoopTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Failed travel restores quest accepted"), Progression->GetRunState(), EJMPrototypeRunState::QuestAccepted);
 	TestFalse(TEXT("Failed travel clears its marker"), Progression->ConsumeLevelTravelPending());
 	TestTrue(TEXT("Dungeon can be entered again after rollback"), Progression->EnterDungeon().bSucceeded);
-	TestFalse(TEXT("Quest cannot be submitted while exploring"), Progression->SubmitQuest(Inventory, QuestItem, 3).bSucceeded);
+	TestFalse(TEXT("Quest cannot be submitted without its items"), Progression->SubmitQuest(Inventory, QuestItem, 3).bSucceeded);
 
 	TestTrue(TEXT("Quest samples are collected"), Inventory->AddItem(QuestItem, 3));
 	TestTrue(TEXT("Cooking ingredient is collected"), Inventory->AddItem(Ingredient));
@@ -99,6 +102,8 @@ bool FJMPrototypeFullEconomyLoopTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Quest submission provides visible feedback"), SubmitResult.Message.IsEmpty());
 	TestEqual(TEXT("Quest reward grants sixty currency"), Progression->GetCurrency(), 60);
 	TestEqual(TEXT("Quest items are consumed"), Inventory->GetItemQuantity(QuestItem), 0);
+	TestFalse(TEXT("Completed quest clears the active slot"), Progression->HasActiveQuest());
+	TestEqual(TEXT("Completed quest returns to empty quest state"), Progression->GetRunState(), EJMPrototypeRunState::AwaitingQuest);
 	TestFalse(TEXT("Quest cannot be submitted twice"), Progression->SubmitQuest(Inventory, QuestItem, 3).bSucceeded);
 
 	const FJMPrototypeOperationResult CookingResult = Progression->CookAndSell(Inventory, Ingredient);
@@ -112,7 +117,14 @@ bool FJMPrototypeFullEconomyLoopTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Upgrade expands inventory to six slots"), Inventory->GetMaxInventorySlots(), 6);
 	TestEqual(TEXT("Upgrade spends all prototype currency"), Progression->GetCurrency(), 0);
 	TestFalse(TEXT("Upgrade cannot be purchased twice"), Progression->PurchaseInventoryUpgrade(Inventory).bSucceeded);
-	TestTrue(TEXT("Next quest can be accepted"), Progression->AcceptQuest().bSucceeded);
+	TestTrue(TEXT("Second quest can be accepted"), Progression->AcceptQuest().bSucceeded);
+	TestEqual(TEXT("Second quest becomes active"), Progression->GetActiveQuestIndex(), 1);
+	TestTrue(TEXT("Second quest items can already be owned at the base"), Inventory->AddItem(Ingredient, 2));
+	const FJMPrototypeOperationResult SecondSubmit = Progression->SubmitQuest(Inventory, Ingredient, 2, 90, 1);
+	TestTrue(TEXT("Second quest succeeds without a dungeon return requirement"), SecondSubmit.bSucceeded);
+	TestEqual(TEXT("Second quest grants its reward"), Progression->GetCurrency(), 90);
+	TestFalse(TEXT("Second completion clears the active quest"), Progression->HasActiveQuest());
+	TestFalse(TEXT("No third prototype quest is offered"), Progression->AcceptQuest().bSucceeded);
 	return true;
 }
 
@@ -157,10 +169,12 @@ bool FJMPrototypeInventoryCheckpointSerializationTest::RunTest(const FString& Pa
 		return false;
 	}
 	SaveObject->InventoryCapacity = 6;
-	SaveObject->SaveVersion = 1;
+	SaveObject->SaveVersion = 2;
 	SaveObject->Currency = 80;
 	SaveObject->bInventoryUpgradePurchased = true;
 	SaveObject->RunState = EJMPrototypeRunState::QuestCompleted;
+	SaveObject->ActiveQuestIndex = 1;
+	SaveObject->CompletedQuestCount = 1;
 	FJMPrototypeSavedInventoryEntry& Entry = SaveObject->Items.AddDefaulted_GetRef();
 	Entry.ItemDefinition = TSoftObjectPtr<UInventoryItemDefinition>(
 		FSoftObjectPath(TEXT("/Game/Prototype/Data/Items/DA_Item_SlimeSample.DA_Item_SlimeSample")));
@@ -176,6 +190,8 @@ bool FJMPrototypeInventoryCheckpointSerializationTest::RunTest(const FString& Pa
 		TestEqual(TEXT("Saved currency survives serialization"), Loaded->Currency, 80);
 		TestTrue(TEXT("Saved upgrade ownership survives serialization"), Loaded->bInventoryUpgradePurchased);
 		TestEqual(TEXT("Saved run state survives serialization"), Loaded->RunState, EJMPrototypeRunState::QuestCompleted);
+		TestEqual(TEXT("Saved active quest survives serialization"), Loaded->ActiveQuestIndex, 1);
+		TestEqual(TEXT("Saved completed quest count survives serialization"), Loaded->CompletedQuestCount, 1);
 		TestEqual(TEXT("Saved entry count survives serialization"), Loaded->Items.Num(), 1);
 		if (Loaded->Items.Num() == 1)
 		{

@@ -44,7 +44,8 @@ public:
 	FJMPrototypeOperationResult ReturnToBase();
 
 	UFUNCTION(BlueprintCallable, Category = "Base Upgrade Prototype")
-	FJMPrototypeOperationResult SubmitQuest(UInventoryComponent* Inventory, UInventoryItemDefinition* QuestItem, int32 RequiredQuantity = 3);
+	FJMPrototypeOperationResult SubmitQuest(UInventoryComponent* Inventory, UInventoryItemDefinition* QuestItem,
+		int32 RequiredQuantity = 3, int32 Reward = -1, int32 QuestIndex = 0);
 
 	UFUNCTION(BlueprintCallable, Category = "Base Upgrade Prototype")
 	FJMPrototypeOperationResult CookAndSell(UInventoryComponent* Inventory, UInventoryItemDefinition* Ingredient, int32 RequiredQuantity = 1);
@@ -99,6 +100,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Base Upgrade Prototype")
 	int32 GetCurrency() const { return Currency; }
 
+	UFUNCTION(BlueprintPure, Category = "Base Upgrade Prototype|Quest")
+	bool HasActiveQuest() const { return ActiveQuestIndex != INDEX_NONE; }
+
+	UFUNCTION(BlueprintPure, Category = "Base Upgrade Prototype|Quest")
+	int32 GetActiveQuestIndex() const { return ActiveQuestIndex; }
+
+	UFUNCTION(BlueprintPure, Category = "Base Upgrade Prototype|Quest")
+	int32 GetCompletedQuestCount() const { return CompletedQuestCount; }
+
 	UFUNCTION(BlueprintPure, Category = "Base Upgrade Prototype")
 	bool HasInventoryUpgrade() const { return bInventoryUpgradePurchased; }
 
@@ -131,6 +141,12 @@ private:
 
 	UPROPERTY(Transient)
 	int32 Currency = 0;
+
+	UPROPERTY(Transient)
+	int32 ActiveQuestIndex = INDEX_NONE;
+
+	UPROPERTY(Transient)
+	int32 CompletedQuestCount = 0;
 
 	UPROPERTY(Transient)
 	bool bInventoryUpgradePurchased = false;
