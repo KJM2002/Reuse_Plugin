@@ -6,12 +6,16 @@
 #include "InventoryTypes.h"
 #include "Items/InventoryItemDefinition.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/PackageName.h"
 #include "Prototype/JMPrototypeInventoryResolver.h"
+#include "Prototype/JMPrototypeInventorySaveGame.h"
 #include "UObject/UObjectGlobals.h"
 
 #define LOCTEXT_NAMESPACE "JMPrototypeProgression"
 
 DEFINE_LOG_CATEGORY_STATIC(LogJMPrototypeInventoryTravel, Log, All);
+
+const FString UJMPrototypeProgressionSubsystem::InventoryCheckpointSlot = TEXT("BaseUpgrade_PrototypeInventoryCheckpoint");
 
 void UJMPrototypeProgressionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -21,6 +25,11 @@ void UJMPrototypeProgressionSubsystem::Initialize(FSubsystemCollectionBase& Coll
 
 void UJMPrototypeProgressionSubsystem::Deinitialize()
 {
+	if (TrackedBaseInventory.IsValid())
+	{
+		TrackedBaseInventory->OnInventoryChanged.RemoveDynamic(this, &ThisClass::HandleTrackedBaseInventoryChanged);
+	}
+	TrackedBaseInventory.Reset();
 	FCoreUObjectDelegates::PreLoadMap.RemoveAll(this);
 	Super::Deinitialize();
 }
@@ -36,6 +45,9 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::ConfigurePrototype
 	bConfigured = true;
 	bLevelTravelPending = false;
 	TravelInventory.Reset();
+	bHasTravelInventorySnapshot = false;
+	bDungeonRunStartedThisSession = false;
+	bCommitInventoryCheckpointOnBaseArrival = false;
 	SetRunState(EJMPrototypeRunState::AwaitingQuest);
 	if (bResetPermanentProgress)
 	{
@@ -189,6 +201,7 @@ void UJMPrototypeProgressionSubsystem::ResetCurrentRun()
 void UJMPrototypeProgressionSubsystem::CaptureTravelInventory(UInventoryComponent* Inventory, const TArray<UInventoryItemDefinition*>& ItemDefinitions)
 {
 	TravelInventory.Reset();
+	bHasTravelInventorySnapshot = IsValid(Inventory);
 	if (!IsValid(Inventory))
 	{
 		return;
@@ -208,10 +221,11 @@ void UJMPrototypeProgressionSubsystem::CaptureTravelInventory(UInventoryComponen
 
 bool UJMPrototypeProgressionSubsystem::RestoreTravelInventory(UInventoryComponent* Inventory)
 {
-	if (!IsValid(Inventory) || TravelInventory.IsEmpty())
+	if (!IsValid(Inventory) || !bHasTravelInventorySnapshot)
 	{
 		return false;
 	}
+	ClearInventoryContents(Inventory);
 	bool bRestoredAll = true;
 	for (const TPair<TObjectPtr<UInventoryItemDefinition>, int32>& Entry : TravelInventory)
 	{
@@ -220,14 +234,10 @@ bool UJMPrototypeProgressionSubsystem::RestoreTravelInventory(UInventoryComponen
 		{
 			continue;
 		}
-		const int32 ExistingQuantity = Inventory->GetItemQuantity(Item);
-		if (ExistingQuantity > 0)
-		{
-			Inventory->RemoveItem(Item, ExistingQuantity);
-		}
 		bRestoredAll &= Inventory->AddItem(Item, Entry.Value);
 	}
 	TravelInventory.Reset();
+	bHasTravelInventorySnapshot = false;
 	UE_LOG(LogJMPrototypeInventoryTravel, Display, TEXT("Restored inventory after map travel. Success=%s"), bRestoredAll ? TEXT("true") : TEXT("false"));
 	return bRestoredAll;
 }
@@ -235,6 +245,7 @@ bool UJMPrototypeProgressionSubsystem::RestoreTravelInventory(UInventoryComponen
 void UJMPrototypeProgressionSubsystem::CaptureEntireTravelInventory(UInventoryComponent* Inventory)
 {
 	TravelInventory.Reset();
+	bHasTravelInventorySnapshot = IsValid(Inventory);
 	if (!IsValid(Inventory))
 	{
 		return;
@@ -254,14 +265,192 @@ void UJMPrototypeProgressionSubsystem::CaptureEntireTravelInventory(UInventoryCo
 		TravelInventory.Num(), TotalQuantity);
 }
 
-void UJMPrototypeProgressionSubsystem::HandlePreLoadMap(const FString&)
+void UJMPrototypeProgressionSubsystem::ClearInventoryContents(UInventoryComponent* Inventory)
+{
+	if (!IsValid(Inventory))
+	{
+		return;
+	}
+	const TArray<FInventorySlot> ExistingSlots = Inventory->GetInventorySlots();
+	for (int32 SlotIndex = ExistingSlots.Num() - 1; SlotIndex >= 0; --SlotIndex)
+	{
+		if (ExistingSlots[SlotIndex].IsValid())
+		{
+			Inventory->RemoveItemAtSlot(SlotIndex, ExistingSlots[SlotIndex].Quantity);
+		}
+	}
+}
+
+bool UJMPrototypeProgressionSubsystem::IsExactLevelName(const FString& MapName, const TCHAR* ExpectedShortName)
+{
+	FString CleanName = MapName;
+	int32 OptionsIndex = INDEX_NONE;
+	if (CleanName.FindChar(TEXT('?'), OptionsIndex))
+	{
+		CleanName.LeftInline(OptionsIndex);
+	}
+	FString ShortName = FPackageName::GetShortName(CleanName);
+	if (ShortName.StartsWith(TEXT("UEDPIE_")))
+	{
+		const int32 InstanceSeparator = ShortName.Find(TEXT("_"), ESearchCase::CaseSensitive, ESearchDir::FromStart, 7);
+		if (InstanceSeparator != INDEX_NONE)
+		{
+			ShortName.RightChopInline(InstanceSeparator + 1);
+		}
+	}
+	return ShortName.Equals(ExpectedShortName, ESearchCase::CaseSensitive);
+}
+
+bool UJMPrototypeProgressionSubsystem::IsBaseReturnCheckpointTransition(
+	const FString& SourceMap, const FString& DestinationMap)
+{
+	return IsExactLevelName(SourceMap, TEXT("Level_Mapgenerate"))
+		&& IsExactLevelName(DestinationMap, TEXT("Level_Prototype"));
+}
+
+bool UJMPrototypeProgressionSubsystem::SaveBaseInventoryCheckpoint(UInventoryComponent* Inventory) const
+{
+	if (!IsValid(Inventory))
+	{
+		return false;
+	}
+	UJMPrototypeInventorySaveGame* SaveObject = Cast<UJMPrototypeInventorySaveGame>(
+		UGameplayStatics::CreateSaveGameObject(UJMPrototypeInventorySaveGame::StaticClass()));
+	if (!SaveObject)
+	{
+		return false;
+	}
+	SaveObject->InventoryCapacity = Inventory->GetMaxInventorySlots();
+	for (const FInventorySlot& Slot : Inventory->GetSlotsNative())
+	{
+		if (!Slot.IsValid())
+		{
+			continue;
+		}
+		FJMPrototypeSavedInventoryEntry& Entry = SaveObject->Items.AddDefaulted_GetRef();
+		Entry.ItemDefinition = Slot.ItemDefinition;
+		Entry.Quantity = Slot.Quantity;
+	}
+	const bool bSaved = UGameplayStatics::SaveGameToSlot(SaveObject, InventoryCheckpointSlot, 0);
+	UE_LOG(LogJMPrototypeInventoryTravel, Display,
+		TEXT("Base return inventory checkpoint saved. Success=%s Entries=%d"),
+		bSaved ? TEXT("true") : TEXT("false"), SaveObject->Items.Num());
+	return bSaved;
+}
+
+bool UJMPrototypeProgressionSubsystem::RestoreBaseInventoryCheckpoint(UInventoryComponent* Inventory)
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	UWorld* World = GameInstance ? GameInstance->GetWorld() : nullptr;
+	if (!IsValid(Inventory) || !World
+		|| !IsExactLevelName(World->GetOutermost()->GetName(), TEXT("Level_Prototype"))
+		|| !UGameplayStatics::DoesSaveGameExist(InventoryCheckpointSlot, 0))
+	{
+		return false;
+	}
+	UJMPrototypeInventorySaveGame* SaveObject = Cast<UJMPrototypeInventorySaveGame>(
+		UGameplayStatics::LoadGameFromSlot(InventoryCheckpointSlot, 0));
+	if (!SaveObject)
+	{
+		return false;
+	}
+	if (SaveObject->InventoryCapacity > 0)
+	{
+		Inventory->SetMaxInventorySlots(SaveObject->InventoryCapacity);
+	}
+	ClearInventoryContents(Inventory);
+	bool bRestoredAll = true;
+	for (const FJMPrototypeSavedInventoryEntry& Entry : SaveObject->Items)
+	{
+		UInventoryItemDefinition* Item = Entry.ItemDefinition.LoadSynchronous();
+		if (IsValid(Item) && Entry.Quantity > 0)
+		{
+			bRestoredAll &= Inventory->AddItem(Item, Entry.Quantity);
+		}
+	}
+	UE_LOG(LogJMPrototypeInventoryTravel, Display,
+		TEXT("Base inventory checkpoint restored. Success=%s Entries=%d"),
+		bRestoredAll ? TEXT("true") : TEXT("false"), SaveObject->Items.Num());
+	return bRestoredAll;
+}
+
+bool UJMPrototypeProgressionSubsystem::CommitBaseInventoryCheckpointIfPending(UInventoryComponent* Inventory)
+{
+	if (!bCommitInventoryCheckpointOnBaseArrival || !IsValid(Inventory))
+	{
+		return false;
+	}
+	UGameInstance* GameInstance = GetGameInstance();
+	UWorld* World = GameInstance ? GameInstance->GetWorld() : nullptr;
+	if (!World || !IsExactLevelName(World->GetOutermost()->GetName(), TEXT("Level_Prototype")))
+	{
+		return false;
+	}
+	bCommitInventoryCheckpointOnBaseArrival = false;
+	return SaveBaseInventoryCheckpoint(Inventory);
+}
+
+void UJMPrototypeProgressionSubsystem::BeginBaseInventoryCheckpointTracking(
+	UInventoryComponent* Inventory, const bool bTrustedBaseInventory)
+{
+	if (TrackedBaseInventory.IsValid())
+	{
+		TrackedBaseInventory->OnInventoryChanged.RemoveDynamic(this, &ThisClass::HandleTrackedBaseInventoryChanged);
+	}
+	TrackedBaseInventory.Reset();
+
+	UGameInstance* GameInstance = GetGameInstance();
+	UWorld* World = GameInstance ? GameInstance->GetWorld() : nullptr;
+	if (!bTrustedBaseInventory || !IsValid(Inventory) || !World
+		|| !IsExactLevelName(World->GetOutermost()->GetName(), TEXT("Level_Prototype")))
+	{
+		return;
+	}
+	TrackedBaseInventory = Inventory;
+	Inventory->OnInventoryChanged.AddUniqueDynamic(this, &ThisClass::HandleTrackedBaseInventoryChanged);
+	// This also creates the initial clean-base checkpoint on a new game.
+	SaveBaseInventoryCheckpoint(Inventory);
+}
+
+void UJMPrototypeProgressionSubsystem::HandleTrackedBaseInventoryChanged()
+{
+	if (bWritingInventoryCheckpoint || !TrackedBaseInventory.IsValid())
+	{
+		return;
+	}
+	bWritingInventoryCheckpoint = true;
+	SaveBaseInventoryCheckpoint(TrackedBaseInventory.Get());
+	bWritingInventoryCheckpoint = false;
+}
+
+void UJMPrototypeProgressionSubsystem::HandlePreLoadMap(const FString& MapName)
 {
 	UGameInstance* GameInstance = GetGameInstance();
 	UWorld* World = GameInstance ? GameInstance->GetWorld() : nullptr;
 	APawn* PlayerPawn = World ? UGameplayStatics::GetPlayerPawn(World, 0) : nullptr;
 	if (PlayerPawn)
 	{
-		CaptureEntireTravelInventory(JMPrototypeInventory::Resolve(PlayerPawn));
+		UInventoryComponent* Inventory = JMPrototypeInventory::Resolve(PlayerPawn);
+		CaptureEntireTravelInventory(Inventory);
+		const FString SourceMap = World->GetOutermost()->GetName();
+		const bool bEnteringDungeon = IsExactLevelName(SourceMap, TEXT("Level_Prototype"))
+			&& IsExactLevelName(MapName, TEXT("Level_Mapgenerate"));
+		const bool bReturningToBase = IsBaseReturnCheckpointTransition(SourceMap, MapName);
+		if (bEnteringDungeon)
+		{
+			bDungeonRunStartedThisSession = true;
+			bCommitInventoryCheckpointOnBaseArrival = false;
+		}
+		else if (bReturningToBase)
+		{
+			bCommitInventoryCheckpointOnBaseArrival = bDungeonRunStartedThisSession;
+			bDungeonRunStartedThisSession = false;
+		}
+		else
+		{
+			bDungeonRunStartedThisSession = false;
+			bCommitInventoryCheckpointOnBaseArrival = false;
+		}
 	}
 }
 

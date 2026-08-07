@@ -68,6 +68,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Base Upgrade Prototype|Travel")
 	void CaptureEntireTravelInventory(UInventoryComponent* Inventory);
 
+	/** Restores the last disk checkpoint, but only while the player is in the base level. */
+	UFUNCTION(BlueprintCallable, Category = "Base Upgrade Prototype|Save")
+	bool RestoreBaseInventoryCheckpoint(UInventoryComponent* Inventory);
+
+	/** Writes a staged dungeon-return checkpoint after the base inventory has actually been restored. */
+	bool CommitBaseInventoryCheckpointIfPending(UInventoryComponent* Inventory);
+
+	/** Starts checkpoint updates for trusted base inventory changes (quest turn-in, cooking, sorting, etc.). */
+	void BeginBaseInventoryCheckpointTracking(UInventoryComponent* Inventory, bool bTrustedBaseInventory);
+
+	/** Exact transition predicate kept public so the anti-exploit boundary can be automation-tested. */
+	static bool IsBaseReturnCheckpointTransition(const FString& SourceMap, const FString& DestinationMap);
+
 	/** Marks an intentional OpenLevel so the next map keeps the current run. */
 	void MarkLevelTravelPending();
 
@@ -99,7 +112,13 @@ public:
 	bool CanReturnToBase() const { return bConfigured && RunState == EJMPrototypeRunState::Exploring; }
 
 private:
+	UFUNCTION()
+	void HandleTrackedBaseInventoryChanged();
+
 	void HandlePreLoadMap(const FString& MapName);
+	bool SaveBaseInventoryCheckpoint(UInventoryComponent* Inventory) const;
+	static void ClearInventoryContents(UInventoryComponent* Inventory);
+	static bool IsExactLevelName(const FString& MapName, const TCHAR* ExpectedShortName);
 	void SetRunState(EJMPrototypeRunState NewState);
 	void AddCurrency(int32 Amount);
 
@@ -121,5 +140,14 @@ private:
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UInventoryItemDefinition>, int32> TravelInventory;
 
+	bool bHasTravelInventorySnapshot = false;
+	bool bDungeonRunStartedThisSession = false;
+	bool bCommitInventoryCheckpointOnBaseArrival = false;
+	bool bWritingInventoryCheckpoint = false;
+
+	TWeakObjectPtr<UInventoryComponent> TrackedBaseInventory;
+
 	bool bLevelTravelPending = false;
+
+	static const FString InventoryCheckpointSlot;
 };

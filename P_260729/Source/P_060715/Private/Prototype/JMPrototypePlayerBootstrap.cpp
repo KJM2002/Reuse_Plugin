@@ -85,7 +85,17 @@ void AJMPrototypePlayerBootstrap::SetupPlayer()
 	if (UJMPrototypeProgressionSubsystem* Progression = GetGameInstance()->GetSubsystem<UJMPrototypeProgressionSubsystem>())
 	{
 		Progression->ApplyOwnedInventoryCapacity(Inventory);
-		Progression->RestoreTravelInventory(Inventory);
+		bool bTrustedBaseInventory = false;
+		if (Progression->RestoreTravelInventory(Inventory))
+		{
+			bTrustedBaseInventory = Progression->CommitBaseInventoryCheckpointIfPending(Inventory);
+		}
+		else
+		{
+			Progression->RestoreBaseInventoryCheckpoint(Inventory);
+			bTrustedBaseInventory = true;
+		}
+		Progression->BeginBaseInventoryCheckpointTracking(Inventory, bTrustedBaseInventory);
 	}
 
 	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(Pawn->InputComponent);

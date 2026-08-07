@@ -5,6 +5,8 @@
 #include "Components/InventoryComponent.h"
 #include "Engine/GameInstance.h"
 #include "Items/InventoryItemDefinition.h"
+#include "Kismet/GameplayStatics.h"
+#include "Prototype/JMPrototypeInventorySaveGame.h"
 #include "Prototype/JMPrototypeProgressionSubsystem.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -49,6 +51,12 @@ bool FJMPrototypeFullEconomyLoopTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Entire inventory restores after travel"), Progression->RestoreTravelInventory(InventoryAfterTravel));
 	TestEqual(TEXT("Quest items survive map travel"), InventoryAfterTravel->GetItemQuantity(QuestItem), 3);
 	TestEqual(TEXT("Ingredient survives map travel"), InventoryAfterTravel->GetItemQuantity(Ingredient), 1);
+	UInventoryComponent* EmptyInventory = NewObject<UInventoryComponent>();
+	Progression->CaptureEntireTravelInventory(EmptyInventory);
+	UInventoryComponent* DestinationWithDefaults = NewObject<UInventoryComponent>();
+	TestTrue(TEXT("Destination starts with a removable default"), DestinationWithDefaults->AddItem(QuestItem, 2));
+	TestTrue(TEXT("An empty travel snapshot is still restored"), Progression->RestoreTravelInventory(DestinationWithDefaults));
+	TestEqual(TEXT("Empty snapshot clears destination defaults"), DestinationWithDefaults->GetItemQuantity(QuestItem), 0);
 	Inventory = InventoryAfterTravel;
 	TestTrue(TEXT("Player can return to base"), Progression->ReturnToBase().bSucceeded);
 	TestTrue(TEXT("Quest submission succeeds"), Progression->SubmitQuest(Inventory, QuestItem, 3).bSucceeded);
@@ -64,6 +72,71 @@ bool FJMPrototypeFullEconomyLoopTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Upgrade spends all prototype currency"), Progression->GetCurrency(), 0);
 	TestFalse(TEXT("Upgrade cannot be purchased twice"), Progression->PurchaseInventoryUpgrade(Inventory).bSucceeded);
 	TestTrue(TEXT("Next quest can be accepted"), Progression->AcceptQuest().bSucceeded);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FJMPrototypeCheckpointBoundaryTest,
+	"JM.Prototype.Progression.InventoryCheckpointBoundary",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FJMPrototypeCheckpointBoundaryTest::RunTest(const FString& Parameters)
+{
+	TestTrue(TEXT("Dungeon to base is a checkpoint transition"),
+		UJMPrototypeProgressionSubsystem::IsBaseReturnCheckpointTransition(
+			TEXT("/Game/Level/Level_Mapgenerate"), TEXT("/Game/Prototype/Maps/Level_Prototype")));
+	TestTrue(TEXT("PIE-prefixed dungeon to base is recognized"),
+		UJMPrototypeProgressionSubsystem::IsBaseReturnCheckpointTransition(
+			TEXT("/Game/Level/UEDPIE_12_Level_Mapgenerate"), TEXT("/Game/Prototype/Maps/UEDPIE_12_Level_Prototype?game=Test")));
+	TestFalse(TEXT("Base to dungeon never checkpoints"),
+		UJMPrototypeProgressionSubsystem::IsBaseReturnCheckpointTransition(
+			TEXT("Level_Prototype"), TEXT("Level_Mapgenerate")));
+	TestFalse(TEXT("Similar test map names never checkpoint"),
+		UJMPrototypeProgressionSubsystem::IsBaseReturnCheckpointTransition(
+			TEXT("Level_Mapgenerate_CycleTest"), TEXT("Level_Prototype")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FJMPrototypeInventoryCheckpointSerializationTest,
+	"JM.Prototype.Progression.InventoryCheckpointSerialization",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FJMPrototypeInventoryCheckpointSerializationTest::RunTest(const FString& Parameters)
+{
+	const FString TestSlot = TEXT("JMPrototype_Automation_InventoryCheckpoint");
+	UGameplayStatics::DeleteGameInSlot(TestSlot, 0);
+
+	UJMPrototypeInventorySaveGame* SaveObject = Cast<UJMPrototypeInventorySaveGame>(
+		UGameplayStatics::CreateSaveGameObject(UJMPrototypeInventorySaveGame::StaticClass()));
+	TestNotNull(TEXT("Checkpoint save object is created"), SaveObject);
+	if (!SaveObject)
+	{
+		return false;
+	}
+	SaveObject->InventoryCapacity = 6;
+	FJMPrototypeSavedInventoryEntry& Entry = SaveObject->Items.AddDefaulted_GetRef();
+	Entry.ItemDefinition = TSoftObjectPtr<UInventoryItemDefinition>(
+		FSoftObjectPath(TEXT("/Game/Prototype/Data/Items/DA_Item_SlimeSample.DA_Item_SlimeSample")));
+	Entry.Quantity = 3;
+
+	TestTrue(TEXT("Checkpoint is written to disk"), UGameplayStatics::SaveGameToSlot(SaveObject, TestSlot, 0));
+	UJMPrototypeInventorySaveGame* Loaded = Cast<UJMPrototypeInventorySaveGame>(
+		UGameplayStatics::LoadGameFromSlot(TestSlot, 0));
+	TestNotNull(TEXT("Checkpoint is loaded from disk"), Loaded);
+	if (Loaded)
+	{
+		TestEqual(TEXT("Saved inventory capacity survives serialization"), Loaded->InventoryCapacity, 6);
+		TestEqual(TEXT("Saved entry count survives serialization"), Loaded->Items.Num(), 1);
+		if (Loaded->Items.Num() == 1)
+		{
+			TestEqual(TEXT("Saved item quantity survives serialization"), Loaded->Items[0].Quantity, 3);
+			TestEqual(TEXT("Saved item asset path survives serialization"),
+				Loaded->Items[0].ItemDefinition.ToSoftObjectPath().ToString(),
+				FString(TEXT("/Game/Prototype/Data/Items/DA_Item_SlimeSample.DA_Item_SlimeSample")));
+		}
+	}
+	TestTrue(TEXT("Automation checkpoint is cleaned up"), UGameplayStatics::DeleteGameInSlot(TestSlot, 0));
 	return true;
 }
 

@@ -11,6 +11,7 @@
 ## 주요 책임
 
 - `UJMPrototypeProgressionSubsystem`: 의뢰 상태, 화폐, 인벤토리 업그레이드를 보관하고, 맵 로드 직전에 전체 인벤토리를 자동 저장해 새 Pawn에 복원합니다.
+- 영구 인벤토리 체크포인트는 `Level_Mapgenerate`에서 `Level_Prototype`으로 정상 귀환할 때만 기록됩니다. 던전에서 게임을 종료하면 그 탐사의 미귀환 아이템은 저장되지 않습니다.
 - `AJMPrototypeLevelPortal`: 진입·귀환 조건 검사, 아이템 임시 저장, 오버랩 잠금, 레벨 이동을 담당합니다.
 - `AJMPrototypeFlowCoordinator`: 최초 실행에만 프로토타입 설정을 구성하고, 레벨 이동 뒤에는 진행 상태를 초기화하지 않습니다.
 - `AJMPrototypeGeneratedDungeonDirector`: 생성된 방의 `ItemSpawnRoot`와 `AISpawnRoot`에 수집물, 순찰 지점, 몬스터를 분산 배치합니다.
