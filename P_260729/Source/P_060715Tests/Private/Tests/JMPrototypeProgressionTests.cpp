@@ -8,6 +8,40 @@
 #include "Kismet/GameplayStatics.h"
 #include "Prototype/JMPrototypeInventorySaveGame.h"
 #include "Prototype/JMPrototypeProgressionSubsystem.h"
+#include "Prototype/JMPrototypeStations.h"
+#include "Sound/SoundBase.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FJMPrototypeStationFeedbackContractTest,
+	"JM.Prototype.Interaction.StationFeedbackContract",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FJMPrototypeStationFeedbackContractTest::RunTest(const FString& Parameters)
+{
+	const AJMPrototypeInteractionActorBase* Stations[] =
+	{
+		GetDefault<AJMPrototypeQuestSubmitStation>(),
+		GetDefault<AJMPrototypeCookingStation>(),
+		GetDefault<AJMPrototypeUpgradeStation>()
+	};
+	for (const AJMPrototypeInteractionActorBase* Station : Stations)
+	{
+		TestNotNull(TEXT("Station default exists"), Station);
+		if (!Station)
+		{
+			continue;
+		}
+		TestTrue(TEXT("Station opens confirmation UI"), Station->bUseConfirmationUI);
+		TestFalse(TEXT("Station title is visible"), Station->InteractionTitle.IsEmpty());
+		TestFalse(TEXT("Station confirm label is visible"), Station->ConfirmButtonText.IsEmpty());
+		TestTrue(TEXT("Open feedback sound is configured"), !Station->OpenSound.IsNull());
+		TestTrue(TEXT("Success feedback sound is configured"), !Station->SuccessSound.IsNull());
+		TestTrue(TEXT("Failure feedback sound is configured"), !Station->FailureSound.IsNull());
+	}
+	TestNotNull(TEXT("Runtime-safe Engine feedback sound loads"),
+		LoadObject<USoundBase>(nullptr, TEXT("/Engine/EngineSounds/1kSineTonePing.1kSineTonePing")));
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FJMPrototypeFullEconomyLoopTest,

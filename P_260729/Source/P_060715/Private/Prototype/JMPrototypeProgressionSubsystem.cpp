@@ -94,23 +94,29 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::SubmitQuest(UInven
 {
 	if (!bConfigured || RunState != EJMPrototypeRunState::Returned)
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState, LOCTEXT("CannotSubmit", "Return from the dungeon before submitting the quest."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState,
+			LOCTEXT("CannotSubmit", "던전에서 기지로 정상 귀환한 뒤 제출할 수 있습니다."));
 	}
 	if (!IsValid(Inventory))
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::MissingInventory, LOCTEXT("MissingInventory", "No inventory was found."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::MissingInventory,
+			LOCTEXT("MissingInventory", "플레이어 인벤토리를 찾을 수 없습니다."));
 	}
 	if (!IsValid(QuestItem) || RequiredQuantity <= 0)
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::MissingItemDefinition, LOCTEXT("MissingQuestItem", "Quest item setup is invalid."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::MissingItemDefinition,
+			LOCTEXT("MissingQuestItem", "제출대에 의뢰 아이템이 설정되지 않았습니다."));
 	}
 	if (!Inventory->HasItem(QuestItem, RequiredQuantity))
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InsufficientItems, LOCTEXT("NotEnoughQuestItems", "The required quest items are missing."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InsufficientItems,
+			FText::Format(LOCTEXT("NotEnoughQuestItems", "점액 샘플이 부족합니다. 필요 {0}개 / 보유 {1}개"),
+				FText::AsNumber(RequiredQuantity), FText::AsNumber(Inventory->GetItemQuantity(QuestItem))));
 	}
 	if (!Inventory->RemoveItem(QuestItem, RequiredQuantity))
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InsufficientItems, LOCTEXT("RemoveQuestItemsFailed", "Quest items could not be removed."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InsufficientItems,
+			LOCTEXT("RemoveQuestItemsFailed", "점액 샘플 제출 처리에 실패했습니다. 인벤토리를 다시 확인해 주세요."));
 	}
 
 	AddCurrency(Config.QuestReward);
@@ -129,15 +135,24 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::CookAndSell(UInven
 	}
 	if (!IsValid(Inventory))
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::MissingInventory, LOCTEXT("MissingCookingInventory", "No inventory was found."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::MissingInventory,
+			LOCTEXT("MissingCookingInventory", "플레이어 인벤토리를 찾을 수 없습니다."));
 	}
 	if (!IsValid(Ingredient) || RequiredQuantity <= 0)
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::MissingItemDefinition, LOCTEXT("MissingIngredient", "Cooking ingredient setup is invalid."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::MissingItemDefinition,
+			LOCTEXT("MissingIngredient", "조리대에 요리 재료가 설정되지 않았습니다."));
 	}
-	if (!Inventory->HasItem(Ingredient, RequiredQuantity) || !Inventory->RemoveItem(Ingredient, RequiredQuantity))
+	if (!Inventory->HasItem(Ingredient, RequiredQuantity))
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InsufficientItems, LOCTEXT("NotEnoughIngredients", "The required cooking ingredient is missing."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InsufficientItems,
+			FText::Format(LOCTEXT("NotEnoughIngredients", "점액 부산물이 부족합니다. 필요 {0}개 / 보유 {1}개"),
+				FText::AsNumber(RequiredQuantity), FText::AsNumber(Inventory->GetItemQuantity(Ingredient))));
+	}
+	if (!Inventory->RemoveItem(Ingredient, RequiredQuantity))
+	{
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InsufficientItems,
+			LOCTEXT("RemoveIngredientFailed", "요리 재료 소비 처리에 실패했습니다. 인벤토리를 다시 확인해 주세요."));
 	}
 
 	AddCurrency(Config.CookingReward);
@@ -151,24 +166,30 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::PurchaseInventoryU
 {
 	if (!bConfigured || RunState == EJMPrototypeRunState::Exploring)
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState, LOCTEXT("CannotUpgrade", "Inventory upgrades are only available at the base."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState,
+			LOCTEXT("CannotUpgrade", "인벤토리 업그레이드는 기지에서만 할 수 있습니다."));
 	}
 	if (bInventoryUpgradePurchased)
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::AlreadyPurchased, LOCTEXT("AlreadyPurchased", "The inventory upgrade is already owned."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::AlreadyPurchased,
+			LOCTEXT("AlreadyPurchased", "인벤토리 업그레이드를 이미 구매했습니다."));
 	}
 	if (!IsValid(Inventory))
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::MissingInventory, LOCTEXT("MissingUpgradeInventory", "No inventory was found."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::MissingInventory,
+			LOCTEXT("MissingUpgradeInventory", "플레이어 인벤토리를 찾을 수 없습니다."));
 	}
 	if (Currency < Config.InventoryUpgradeCost)
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InsufficientCurrency, LOCTEXT("NotEnoughCurrency", "There is not enough currency for this upgrade."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InsufficientCurrency,
+			FText::Format(LOCTEXT("NotEnoughCurrency", "덕코인이 부족합니다. 비용 {0} / 보유 {1}"),
+				FText::AsNumber(Config.InventoryUpgradeCost), FText::AsNumber(Currency)));
 	}
 
 	if (Inventory->SetMaxInventorySlots(Config.UpgradedInventorySlots) != EInventoryCapacityChangeResult::Success)
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InventoryCapacityRejected, LOCTEXT("CapacityRejected", "The inventory capacity could not be changed."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InventoryCapacityRejected,
+			LOCTEXT("CapacityRejected", "가방에 든 아이템 때문에 슬롯 수를 변경할 수 없습니다."));
 	}
 
 	Currency -= Config.InventoryUpgradeCost;

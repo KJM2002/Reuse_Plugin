@@ -27,6 +27,7 @@ public:
 
 protected:
 	virtual FJMPrototypeOperationResult PerformPrototypeInteraction(const FJMInteractionContext& Context) override;
+	virtual FText BuildInteractionDescription(const FJMInteractionContext& Context) const override;
 };
 
 UCLASS(Blueprintable)
@@ -45,6 +46,7 @@ public:
 
 protected:
 	virtual FJMPrototypeOperationResult PerformPrototypeInteraction(const FJMInteractionContext& Context) override;
+	virtual FText BuildInteractionDescription(const FJMInteractionContext& Context) const override;
 };
 
 UCLASS(Blueprintable)
@@ -57,4 +59,5 @@ public:
 
 protected:
 	virtual FJMPrototypeOperationResult PerformPrototypeInteraction(const FJMInteractionContext& Context) override;
+	virtual FText BuildInteractionDescription(const FJMInteractionContext& Context) const override;
 };
