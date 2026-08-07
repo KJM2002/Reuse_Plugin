@@ -8,6 +8,7 @@
 #include "Components/ButtonSlot.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
+#include "Components/Image.h"
 #include "Components/ContentWidget.h"
 #include "Components/InventoryComponent.h"
 #include "Components/InventoryContainerComponent.h"
@@ -43,6 +44,7 @@ UInventoryDuckovWidgetBase::UInventoryDuckovWidgetBase(const FObjectInitializer&
 	ContainerHeaderTextFormat = NSLOCTEXT("InventorySystem", "ContainerHeaderFormat", "{0}");
 	DefaultLootContainerText = NSLOCTEXT("InventorySystem", "LootContainerTitle", "Loot");
 	SortButtonText = NSLOCTEXT("InventorySystem", "SortByQuantity", "Sort");
+	CurrencyTextFormat = NSLOCTEXT("InventorySystem", "CurrencyAmountFormat", "{0}");
 }
 
 void UInventoryDuckovWidgetBase::NativePreConstruct()
@@ -51,11 +53,13 @@ void UInventoryDuckovWidgetBase::NativePreConstruct()
 	EnsureExternalContainerWidgets();
 	PrepareInventoryLayout();
 	BuildPanelBlurIfNeeded();
+	EnsureCurrencyHeader();
 	BuildSortButtonIfNeeded();
 	ApplyDuckovPanelStyle();
 	ApplySortButtonStyle();
 	ApplyDuckovTypography();
 	ApplyHeaderLayout();
+	ApplyCurrencyDisplay();
 	ApplyReferencePanelSizing();
 }
 
@@ -163,10 +167,82 @@ void UInventoryDuckovWidgetBase::NativeConstruct()
 		CanvasPanel_ContextMenuLayer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
 	UpdateBackpackHeader();
+	ApplyCurrencyDisplay();
 	UpdateContainerHeader();
 	CloseTransientWidgets();
 	RebuildExternalContainerGrid();
 	ApplyReferencePanelSizing();
+}
+
+void UInventoryDuckovWidgetBase::SetCurrencyAmount(const int32 InCurrencyAmount)
+{
+	CurrencyAmount = FMath::Max(0, InCurrencyAmount);
+	EnsureCurrencyHeader();
+	ApplyCurrencyDisplay();
+}
+
+void UInventoryDuckovWidgetBase::EnsureCurrencyHeader()
+{
+	if (HorizontalBox_Currency || !HorizontalBox_Header || !WidgetTree)
+	{
+		return;
+	}
+	HorizontalBox_Currency = WidgetTree->ConstructWidget<UHorizontalBox>(
+		UHorizontalBox::StaticClass(), TEXT("HorizontalBox_Currency"));
+	USizeBox* IconBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("SizeBox_CurrencyIcon"));
+	IconBox->SetWidthOverride(CurrencyIconSize);
+	IconBox->SetHeightOverride(CurrencyIconSize);
+	Image_CurrencyIcon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Image_CurrencyIcon"));
+	IconBox->SetContent(Image_CurrencyIcon);
+	if (UHorizontalBoxSlot* IconSlot = HorizontalBox_Currency->AddChildToHorizontalBox(IconBox))
+	{
+		IconSlot->SetVerticalAlignment(VAlign_Center);
+		IconSlot->SetPadding(FMargin(0.0f, 0.0f, 6.0f, 0.0f));
+	}
+	Text_CurrencyAmount = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_CurrencyAmount"));
+	if (UHorizontalBoxSlot* AmountSlot = HorizontalBox_Currency->AddChildToHorizontalBox(Text_CurrencyAmount))
+	{
+		AmountSlot->SetVerticalAlignment(VAlign_Center);
+	}
+	const int32 InsertIndex = Text_PlayerContainerName
+		? FMath::Max(0, HorizontalBox_Header->GetChildIndex(Text_PlayerContainerName) + 1)
+		: 0;
+	HorizontalBox_Header->InsertChildAt(InsertIndex, HorizontalBox_Currency);
+	if (UHorizontalBoxSlot* CurrencySlot = Cast<UHorizontalBoxSlot>(HorizontalBox_Currency->Slot))
+	{
+		CurrencySlot->SetVerticalAlignment(VAlign_Center);
+		CurrencySlot->SetPadding(CurrencyPadding);
+	}
+}
+
+void UInventoryDuckovWidgetBase::ApplyCurrencyDisplay()
+{
+	if (HorizontalBox_Currency)
+	{
+		HorizontalBox_Currency->SetVisibility(bShowCurrencyDisplay ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	if (Image_CurrencyIcon)
+	{
+		if (UTexture2D* Icon = CurrencyIconTexture.LoadSynchronous())
+		{
+			Image_CurrencyIcon->SetBrushFromTexture(Icon, true);
+			Image_CurrencyIcon->SetColorAndOpacity(FLinearColor::White);
+		}
+		else
+		{
+			// Gold placeholder remains visible until final currency art is assigned in the Widget Blueprint.
+			Image_CurrencyIcon->SetColorAndOpacity(CurrencyColor);
+		}
+	}
+	if (Text_CurrencyAmount)
+	{
+		Text_CurrencyAmount->SetText(FText::Format(CurrencyTextFormat, FText::AsNumber(CurrencyAmount)));
+		Text_CurrencyAmount->SetColorAndOpacity(FSlateColor(CurrencyColor));
+		FSlateFontInfo Font = Text_CurrencyAmount->GetFont();
+		if (UFont* LoadedSemiBoldFont = SemiBoldFont.LoadSynchronous()) Font.FontObject = LoadedSemiBoldFont;
+		Font.Size = FMath::Max(1, CurrencyFontSize);
+		Text_CurrencyAmount->SetFont(Font);
+	}
 }
 
 void UInventoryDuckovWidgetBase::NativeDestruct()

@@ -66,6 +66,7 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::AcceptQuest()
 		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState, LOCTEXT("CannotAccept", "A quest cannot be accepted in the current state."));
 	}
 	SetRunState(EJMPrototypeRunState::QuestAccepted);
+	SaveTrackedBaseInventoryCheckpoint();
 	return FJMPrototypeOperationResult::Success();
 }
 
@@ -114,14 +115,17 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::SubmitQuest(UInven
 
 	AddCurrency(Config.QuestReward);
 	SetRunState(EJMPrototypeRunState::QuestCompleted);
-	return FJMPrototypeOperationResult::Success();
+	SaveTrackedBaseInventoryCheckpoint();
+	return FJMPrototypeOperationResult::Success(FText::Format(
+		LOCTEXT("QuestSubmitted", "점액 샘플 {0}개를 제출했습니다. 보상 +{1} 화폐"),
+		FText::AsNumber(RequiredQuantity), FText::AsNumber(Config.QuestReward)));
 }
 
 FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::CookAndSell(UInventoryComponent* Inventory, UInventoryItemDefinition* Ingredient, int32 RequiredQuantity)
 {
-	if (!bConfigured || RunState == EJMPrototypeRunState::Exploring || RunState == EJMPrototypeRunState::AwaitingQuest)
+	if (!bConfigured || RunState == EJMPrototypeRunState::Exploring)
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState, LOCTEXT("CannotCook", "Cooking is only available at the base during an active or completed run."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState, LOCTEXT("CannotCook", "요리는 기지에서만 사용할 수 있습니다."));
 	}
 	if (!IsValid(Inventory))
 	{
@@ -137,7 +141,10 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::CookAndSell(UInven
 	}
 
 	AddCurrency(Config.CookingReward);
-	return FJMPrototypeOperationResult::Success();
+	SaveTrackedBaseInventoryCheckpoint();
+	return FJMPrototypeOperationResult::Success(FText::Format(
+		LOCTEXT("CookingSold", "요리를 판매했습니다. 보상 +{0} 화폐"),
+		FText::AsNumber(Config.CookingReward)));
 }
 
 FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::PurchaseInventoryUpgrade(UInventoryComponent* Inventory)
@@ -168,7 +175,10 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::PurchaseInventoryU
 	bInventoryUpgradePurchased = true;
 	OnCurrencyChanged.Broadcast(Currency);
 	OnInventoryUpgradeChanged.Broadcast(true);
-	return FJMPrototypeOperationResult::Success();
+	SaveTrackedBaseInventoryCheckpoint();
+	return FJMPrototypeOperationResult::Success(FText::Format(
+		LOCTEXT("InventoryUpgraded", "인벤토리를 {0}칸으로 업그레이드했습니다. 비용 -{1} 화폐"),
+		FText::AsNumber(Config.UpgradedInventorySlots), FText::AsNumber(Config.InventoryUpgradeCost)));
 }
 
 FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::ApplyOwnedInventoryCapacity(UInventoryComponent* Inventory) const
@@ -321,6 +331,10 @@ bool UJMPrototypeProgressionSubsystem::SaveBaseInventoryCheckpoint(UInventoryCom
 		return false;
 	}
 	SaveObject->InventoryCapacity = Inventory->GetMaxInventorySlots();
+	SaveObject->SaveVersion = 1;
+	SaveObject->Currency = Currency;
+	SaveObject->bInventoryUpgradePurchased = bInventoryUpgradePurchased;
+	SaveObject->RunState = RunState;
 	for (const FInventorySlot& Slot : Inventory->GetSlotsNative())
 	{
 		if (!Slot.IsValid())
@@ -358,6 +372,14 @@ bool UJMPrototypeProgressionSubsystem::RestoreBaseInventoryCheckpoint(UInventory
 	{
 		Inventory->SetMaxInventorySlots(SaveObject->InventoryCapacity);
 	}
+	if (SaveObject->SaveVersion >= 1)
+	{
+		Currency = FMath::Max(0, SaveObject->Currency);
+		bInventoryUpgradePurchased = SaveObject->bInventoryUpgradePurchased;
+		SetRunState(SaveObject->RunState);
+		OnCurrencyChanged.Broadcast(Currency);
+		OnInventoryUpgradeChanged.Broadcast(bInventoryUpgradePurchased);
+	}
 	ClearInventoryContents(Inventory);
 	bool bRestoredAll = true;
 	for (const FJMPrototypeSavedInventoryEntry& Entry : SaveObject->Items)
@@ -372,6 +394,14 @@ bool UJMPrototypeProgressionSubsystem::RestoreBaseInventoryCheckpoint(UInventory
 		TEXT("Base inventory checkpoint restored. Success=%s Entries=%d"),
 		bRestoredAll ? TEXT("true") : TEXT("false"), SaveObject->Items.Num());
 	return bRestoredAll;
+}
+
+void UJMPrototypeProgressionSubsystem::SaveTrackedBaseInventoryCheckpoint() const
+{
+	if (TrackedBaseInventory.IsValid())
+	{
+		SaveBaseInventoryCheckpoint(TrackedBaseInventory.Get());
+	}
 }
 
 bool UJMPrototypeProgressionSubsystem::CommitBaseInventoryCheckpointIfPending(UInventoryComponent* Inventory)

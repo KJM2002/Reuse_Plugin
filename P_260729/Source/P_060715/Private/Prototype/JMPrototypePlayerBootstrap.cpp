@@ -12,6 +12,7 @@
 #include "Prototype/JMPrototypeRunResetComponent.h"
 #include "TimerManager.h"
 #include "Types/JMInteractionTypes.h"
+#include "UI/InventoryDuckovWidgetBase.h"
 
 AJMPrototypePlayerBootstrap::AJMPrototypePlayerBootstrap()
 {
@@ -31,6 +32,14 @@ void AJMPrototypePlayerBootstrap::BeginPlay()
 void AJMPrototypePlayerBootstrap::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	GetWorldTimerManager().ClearTimer(SetupTimer);
+	if (UInventoryUIComponent* InventoryUI = BoundInventoryUI.Get())
+	{
+		InventoryUI->OnInventoryOpened.RemoveDynamic(this, &ThisClass::HandleInventoryOpened);
+	}
+	if (UJMPrototypeProgressionSubsystem* Progression = BoundProgression.Get())
+	{
+		Progression->OnCurrencyChanged.RemoveDynamic(this, &ThisClass::HandleCurrencyChanged);
+	}
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -78,12 +87,16 @@ void AJMPrototypePlayerBootstrap::SetupPlayer()
 	InventoryUI->ToggleInventoryAction = InventoryAction;
 	InventoryUI->ToggleInputMappingContext = InputMappingContext;
 	InventoryUI->InventoryWidgetClass = InventoryWidgetClass;
+	InventoryUI->OnInventoryOpened.AddUniqueDynamic(this, &ThisClass::HandleInventoryOpened);
+	BoundInventoryUI = InventoryUI;
 	Interaction->OnInteractionFinished.AddUniqueDynamic(this, &AJMPrototypePlayerBootstrap::HandleInteractionFinished);
 	Reset->BaseRespawnTarget = BaseRespawnTarget;
 	Reset->RunOnlyItems = RunOnlyItems;
 	Reset->FailureLevelName = FailureLevelName;
 	if (UJMPrototypeProgressionSubsystem* Progression = GetGameInstance()->GetSubsystem<UJMPrototypeProgressionSubsystem>())
 	{
+		Progression->OnCurrencyChanged.AddUniqueDynamic(this, &ThisClass::HandleCurrencyChanged);
+		BoundProgression = Progression;
 		Progression->ApplyOwnedInventoryCapacity(Inventory);
 		bool bTrustedBaseInventory = false;
 		if (Progression->RestoreTravelInventory(Inventory))
@@ -122,6 +135,30 @@ void AJMPrototypePlayerBootstrap::SetupPlayer()
 	if (bInputBound)
 	{
 		GetWorldTimerManager().ClearTimer(SetupTimer);
+	}
+}
+
+void AJMPrototypePlayerBootstrap::HandleInventoryOpened()
+{
+	RefreshInventoryCurrency();
+}
+
+void AJMPrototypePlayerBootstrap::HandleCurrencyChanged(int32)
+{
+	RefreshInventoryCurrency();
+}
+
+void AJMPrototypePlayerBootstrap::RefreshInventoryCurrency()
+{
+	UInventoryUIComponent* InventoryUI = BoundInventoryUI.Get();
+	UJMPrototypeProgressionSubsystem* Progression = BoundProgression.Get();
+	if (!InventoryUI || !Progression)
+	{
+		return;
+	}
+	if (UInventoryDuckovWidgetBase* DuckovWidget = Cast<UInventoryDuckovWidgetBase>(InventoryUI->GetInventoryWidget()))
+	{
+		DuckovWidget->SetCurrencyAmount(Progression->GetCurrency());
 	}
 }
 

@@ -10,6 +10,7 @@ class UBackgroundBlur;
 class UBorder;
 class UButton;
 class UHorizontalBox;
+class UImage;
 class UInventoryContextActionWidgetBase;
 class UInventoryComponent;
 class UInventoryContainerComponent;
@@ -21,6 +22,7 @@ class UFont;
 class UTextBlock;
 class UUniformGridPanel;
 class UWidget;
+class UTexture2D;
 
 UCLASS(BlueprintType, Blueprintable)
 class INVENTORYSYSTEM_API UInventoryDuckovWidgetBase : public UInventoryWidgetBase
@@ -43,6 +45,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	void CloseTransientWidgets();
+
+	/** Updates the optional Duckov-style currency readout in the backpack header. */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|UI|Currency")
+	void SetCurrencyAmount(int32 InCurrencyAmount);
 
 	virtual void RefreshInventory() override;
 	virtual void BeginCloseTransition() override;
@@ -124,6 +130,28 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Appearance|Player Header")
 	FMargin PlayerHeaderPadding = FMargin(0.0f);
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Appearance|Currency")
+	bool bShowCurrencyDisplay = true;
+
+	/** Replace this in WBP_InventoryDuckov Class Defaults when final money art is ready. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Appearance|Currency")
+	TSoftObjectPtr<UTexture2D> CurrencyIconTexture;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Appearance|Currency")
+	FText CurrencyTextFormat;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Appearance|Currency", meta = (ClampMin = "8.0", ClampMax = "128.0"))
+	float CurrencyIconSize = 24.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Appearance|Currency", meta = (ClampMin = "1", ClampMax = "96"))
+	int32 CurrencyFontSize = 18;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Appearance|Currency")
+	FLinearColor CurrencyColor = FLinearColor(1.0f, 0.78f, 0.18f, 1.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Appearance|Currency")
+	FMargin CurrencyPadding = FMargin(18.0f, 0.0f, 10.0f, 0.0f);
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Appearance|Loot Header", meta = (ClampMin = "1", ClampMax = "96"))
 	int32 LootHeaderFontSize = 18;
 
@@ -161,6 +189,8 @@ protected:
 	void ApplySortButtonStyle();
 	void ApplyDuckovTypography();
 	void ApplyHeaderLayout();
+	void EnsureCurrencyHeader();
+	void ApplyCurrencyDisplay();
 	void ApplyReferencePanelSizing();
 	void ResetAllSlotHoverStates();
 	void UpdateBackpackHeader();
@@ -210,6 +240,15 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "Inventory|UI")
 	TObjectPtr<UButton> Button_Sort = nullptr;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "Inventory|UI|Currency")
+	TObjectPtr<UHorizontalBox> HorizontalBox_Currency = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "Inventory|UI|Currency")
+	TObjectPtr<UImage> Image_CurrencyIcon = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "Inventory|UI|Currency")
+	TObjectPtr<UTextBlock> Text_CurrencyAmount = nullptr;
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "Inventory|UI")
 	TObjectPtr<UCanvasPanel> CanvasPanel_TooltipLayer = nullptr;
 
@@ -235,6 +274,9 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UBorder> RuntimeExternalContainerBorder = nullptr;
+
+	UPROPERTY(Transient)
+	int32 CurrencyAmount = 0;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Inventory|UI")
 	TObjectPtr<UInventoryContainerComponent> ExternalContainer = nullptr;

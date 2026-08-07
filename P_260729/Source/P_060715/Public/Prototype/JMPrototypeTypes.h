@@ -53,7 +53,7 @@ struct P_060715_API FJMPrototypeConfig
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Economy", meta = (ClampMin = "0"))
-	int32 InitialCurrency = 0;
+	int32 InitialCurrency = 80;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Economy", meta = (ClampMin = "0"))
 	int32 QuestReward = 60;

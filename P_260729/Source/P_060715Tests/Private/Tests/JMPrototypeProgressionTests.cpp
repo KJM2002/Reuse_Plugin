@@ -26,7 +26,8 @@ bool FJMPrototypeFullEconomyLoopTest::RunTest(const FString& Parameters)
 	QuestItem->MaxStackSize = 10;
 	Ingredient->ItemId = TEXT("Prototype.SlimeSac");
 
-	const FJMPrototypeConfig Config;
+	FJMPrototypeConfig Config;
+	Config.InitialCurrency = 0;
 	TestTrue(TEXT("Valid defaults configure the prototype"), Progression->ConfigurePrototype(Config).bSucceeded);
 	TestTrue(TEXT("Base capacity is applied"), Progression->ApplyOwnedInventoryCapacity(Inventory).bSucceeded);
 	TestEqual(TEXT("Initial inventory has four slots"), Inventory->GetMaxInventorySlots(), 4);
@@ -59,14 +60,20 @@ bool FJMPrototypeFullEconomyLoopTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Empty snapshot clears destination defaults"), DestinationWithDefaults->GetItemQuantity(QuestItem), 0);
 	Inventory = InventoryAfterTravel;
 	TestTrue(TEXT("Player can return to base"), Progression->ReturnToBase().bSucceeded);
-	TestTrue(TEXT("Quest submission succeeds"), Progression->SubmitQuest(Inventory, QuestItem, 3).bSucceeded);
+	const FJMPrototypeOperationResult SubmitResult = Progression->SubmitQuest(Inventory, QuestItem, 3);
+	TestTrue(TEXT("Quest submission succeeds"), SubmitResult.bSucceeded);
+	TestFalse(TEXT("Quest submission provides visible feedback"), SubmitResult.Message.IsEmpty());
 	TestEqual(TEXT("Quest reward grants sixty currency"), Progression->GetCurrency(), 60);
 	TestEqual(TEXT("Quest items are consumed"), Inventory->GetItemQuantity(QuestItem), 0);
 	TestFalse(TEXT("Quest cannot be submitted twice"), Progression->SubmitQuest(Inventory, QuestItem, 3).bSucceeded);
 
-	TestTrue(TEXT("Ingredient can be cooked and sold"), Progression->CookAndSell(Inventory, Ingredient).bSucceeded);
+	const FJMPrototypeOperationResult CookingResult = Progression->CookAndSell(Inventory, Ingredient);
+	TestTrue(TEXT("Ingredient can be cooked and sold"), CookingResult.bSucceeded);
+	TestFalse(TEXT("Cooking provides visible feedback"), CookingResult.Message.IsEmpty());
 	TestEqual(TEXT("Cooking raises currency to eighty"), Progression->GetCurrency(), 80);
-	TestTrue(TEXT("Inventory upgrade can be purchased"), Progression->PurchaseInventoryUpgrade(Inventory).bSucceeded);
+	const FJMPrototypeOperationResult UpgradeResult = Progression->PurchaseInventoryUpgrade(Inventory);
+	TestTrue(TEXT("Inventory upgrade can be purchased"), UpgradeResult.bSucceeded);
+	TestFalse(TEXT("Upgrade provides visible feedback"), UpgradeResult.Message.IsEmpty());
 	TestTrue(TEXT("Upgrade ownership is recorded"), Progression->HasInventoryUpgrade());
 	TestEqual(TEXT("Upgrade expands inventory to six slots"), Inventory->GetMaxInventorySlots(), 6);
 	TestEqual(TEXT("Upgrade spends all prototype currency"), Progression->GetCurrency(), 0);
@@ -82,6 +89,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FJMPrototypeCheckpointBoundaryTest::RunTest(const FString& Parameters)
 {
+	TestEqual(TEXT("Prototype defaults include test currency"), FJMPrototypeConfig().InitialCurrency, 80);
 	TestTrue(TEXT("Dungeon to base is a checkpoint transition"),
 		UJMPrototypeProgressionSubsystem::IsBaseReturnCheckpointTransition(
 			TEXT("/Game/Level/Level_Mapgenerate"), TEXT("/Game/Prototype/Maps/Level_Prototype")));
@@ -115,6 +123,10 @@ bool FJMPrototypeInventoryCheckpointSerializationTest::RunTest(const FString& Pa
 		return false;
 	}
 	SaveObject->InventoryCapacity = 6;
+	SaveObject->SaveVersion = 1;
+	SaveObject->Currency = 80;
+	SaveObject->bInventoryUpgradePurchased = true;
+	SaveObject->RunState = EJMPrototypeRunState::QuestCompleted;
 	FJMPrototypeSavedInventoryEntry& Entry = SaveObject->Items.AddDefaulted_GetRef();
 	Entry.ItemDefinition = TSoftObjectPtr<UInventoryItemDefinition>(
 		FSoftObjectPath(TEXT("/Game/Prototype/Data/Items/DA_Item_SlimeSample.DA_Item_SlimeSample")));
@@ -127,6 +139,9 @@ bool FJMPrototypeInventoryCheckpointSerializationTest::RunTest(const FString& Pa
 	if (Loaded)
 	{
 		TestEqual(TEXT("Saved inventory capacity survives serialization"), Loaded->InventoryCapacity, 6);
+		TestEqual(TEXT("Saved currency survives serialization"), Loaded->Currency, 80);
+		TestTrue(TEXT("Saved upgrade ownership survives serialization"), Loaded->bInventoryUpgradePurchased);
+		TestEqual(TEXT("Saved run state survives serialization"), Loaded->RunState, EJMPrototypeRunState::QuestCompleted);
 		TestEqual(TEXT("Saved entry count survives serialization"), Loaded->Items.Num(), 1);
 		if (Loaded->Items.Num() == 1)
 		{
@@ -154,7 +169,8 @@ bool FJMPrototypeFailureSafetyTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Invalid configuration is rejected"), Progression->ConfigurePrototype(InvalidConfig).bSucceeded);
 	TestFalse(TEXT("Unconfigured quest cannot start"), Progression->AcceptQuest().bSucceeded);
 
-	const FJMPrototypeConfig ValidConfig;
+	FJMPrototypeConfig ValidConfig;
+	ValidConfig.InitialCurrency = 0;
 	TestTrue(TEXT("Valid configuration succeeds"), Progression->ConfigurePrototype(ValidConfig).bSucceeded);
 	TestFalse(TEXT("Dungeon cannot be entered before quest acceptance"), Progression->EnterDungeon().bSucceeded);
 	TestFalse(TEXT("Missing inventory cannot be upgraded"), Progression->PurchaseInventoryUpgrade(nullptr).bSucceeded);

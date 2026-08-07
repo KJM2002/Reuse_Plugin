@@ -117,6 +117,7 @@ private:
 
 	void HandlePreLoadMap(const FString& MapName);
 	bool SaveBaseInventoryCheckpoint(UInventoryComponent* Inventory) const;
+	void SaveTrackedBaseInventoryCheckpoint() const;
 	static void ClearInventoryContents(UInventoryComponent* Inventory);
 	static bool IsExactLevelName(const FString& MapName, const TCHAR* ExpectedShortName);
 	void SetRunState(EJMPrototypeRunState NewState);

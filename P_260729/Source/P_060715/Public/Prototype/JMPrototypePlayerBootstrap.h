@@ -9,8 +9,10 @@
 class UInputAction;
 class UInputMappingContext;
 class UInventoryItemDefinition;
+class UInventoryUIComponent;
 class UInventoryWidgetBase;
 class UJMPrototypeHUDWidget;
+class UJMPrototypeProgressionSubsystem;
 
 /** Adds the reusable prototype components and input bindings to the existing project pawn at runtime. */
 UCLASS(Blueprintable)
@@ -53,8 +55,18 @@ private:
 	UFUNCTION()
 	void HandleInteractionFinished(UObject* Interactable, FJMInteractionResult Result);
 
+	UFUNCTION()
+	void HandleInventoryOpened();
+
+	UFUNCTION()
+	void HandleCurrencyChanged(int32 NewCurrency);
+
+	void RefreshInventoryCurrency();
+
 	FTimerHandle SetupTimer;
 	TWeakObjectPtr<APawn> PlayerPawn;
 	TWeakObjectPtr<UJMPrototypeHUDWidget> PrototypeHUD;
+	TWeakObjectPtr<UInventoryUIComponent> BoundInventoryUI;
+	TWeakObjectPtr<UJMPrototypeProgressionSubsystem> BoundProgression;
 	bool bInputBound = false;
 };
