@@ -438,11 +438,22 @@ void UJMPrototypeProgressionSubsystem::HandlePreLoadMap(const FString& MapName)
 		const bool bReturningToBase = IsBaseReturnCheckpointTransition(SourceMap, MapName);
 		if (bEnteringDungeon)
 		{
+			// Portals intentionally have no quest gate, but an accepted quest still
+			// needs its lifecycle advanced when the level transition succeeds.
+			if (bConfigured && RunState == EJMPrototypeRunState::QuestAccepted)
+			{
+				SetRunState(EJMPrototypeRunState::Exploring);
+			}
 			bDungeonRunStartedThisSession = true;
 			bCommitInventoryCheckpointOnBaseArrival = false;
 		}
 		else if (bReturningToBase)
 		{
+			if (bConfigured && (RunState == EJMPrototypeRunState::Exploring
+				|| RunState == EJMPrototypeRunState::QuestAccepted))
+			{
+				SetRunState(EJMPrototypeRunState::Returned);
+			}
 			bCommitInventoryCheckpointOnBaseArrival = bDungeonRunStartedThisSession;
 			bDungeonRunStartedThisSession = false;
 		}
