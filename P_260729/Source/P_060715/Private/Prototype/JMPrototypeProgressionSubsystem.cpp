@@ -1,10 +1,29 @@
 #include "Prototype/JMPrototypeProgressionSubsystem.h"
 
 #include "Components/InventoryComponent.h"
+#include "Engine/GameInstance.h"
+#include "GameFramework/Pawn.h"
 #include "InventoryTypes.h"
 #include "Items/InventoryItemDefinition.h"
+#include "Kismet/GameplayStatics.h"
+#include "Prototype/JMPrototypeInventoryResolver.h"
+#include "UObject/UObjectGlobals.h"
 
 #define LOCTEXT_NAMESPACE "JMPrototypeProgression"
+
+DEFINE_LOG_CATEGORY_STATIC(LogJMPrototypeInventoryTravel, Log, All);
+
+void UJMPrototypeProgressionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+	FCoreUObjectDelegates::PreLoadMap.AddUObject(this, &UJMPrototypeProgressionSubsystem::HandlePreLoadMap);
+}
+
+void UJMPrototypeProgressionSubsystem::Deinitialize()
+{
+	FCoreUObjectDelegates::PreLoadMap.RemoveAll(this);
+	Super::Deinitialize();
+}
 
 FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::ConfigurePrototype(const FJMPrototypeConfig& InConfig, bool bResetPermanentProgress)
 {
@@ -209,7 +228,41 @@ bool UJMPrototypeProgressionSubsystem::RestoreTravelInventory(UInventoryComponen
 		bRestoredAll &= Inventory->AddItem(Item, Entry.Value);
 	}
 	TravelInventory.Reset();
+	UE_LOG(LogJMPrototypeInventoryTravel, Display, TEXT("Restored inventory after map travel. Success=%s"), bRestoredAll ? TEXT("true") : TEXT("false"));
 	return bRestoredAll;
+}
+
+void UJMPrototypeProgressionSubsystem::CaptureEntireTravelInventory(UInventoryComponent* Inventory)
+{
+	TravelInventory.Reset();
+	if (!IsValid(Inventory))
+	{
+		return;
+	}
+	int32 TotalQuantity = 0;
+	for (const FInventorySlot& Slot : Inventory->GetSlotsNative())
+	{
+		if (!Slot.IsValid())
+		{
+			continue;
+		}
+		TravelInventory.FindOrAdd(Slot.ItemDefinition) += Slot.Quantity;
+		TotalQuantity += Slot.Quantity;
+	}
+	UE_LOG(LogJMPrototypeInventoryTravel, Display,
+		TEXT("Captured inventory before map travel. ItemTypes=%d TotalQuantity=%d"),
+		TravelInventory.Num(), TotalQuantity);
+}
+
+void UJMPrototypeProgressionSubsystem::HandlePreLoadMap(const FString&)
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	UWorld* World = GameInstance ? GameInstance->GetWorld() : nullptr;
+	APawn* PlayerPawn = World ? UGameplayStatics::GetPlayerPawn(World, 0) : nullptr;
+	if (PlayerPawn)
+	{
+		CaptureEntireTravelInventory(JMPrototypeInventory::Resolve(PlayerPawn));
+	}
 }
 
 void UJMPrototypeProgressionSubsystem::MarkLevelTravelPending()

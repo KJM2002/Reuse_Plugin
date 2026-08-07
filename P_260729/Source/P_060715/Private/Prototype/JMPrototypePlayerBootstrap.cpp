@@ -21,8 +21,11 @@ AJMPrototypePlayerBootstrap::AJMPrototypePlayerBootstrap()
 void AJMPrototypePlayerBootstrap::BeginPlay()
 {
 	Super::BeginPlay();
-	SetupPlayer();
-	GetWorldTimerManager().SetTimer(SetupTimer, this, &AJMPrototypePlayerBootstrap::SetupPlayer, 0.25f, true);
+	// Defer until the possessed pawn and its authored InventoryComponent have
+	// completed BeginPlay. Restoring earlier would be followed by InitialItems
+	// initialization and duplicate carried quantities on every map transition.
+	GetWorldTimerManager().SetTimer(SetupTimer, this, &AJMPrototypePlayerBootstrap::SetupPlayer,
+		0.25f, true, 0.05f);
 }
 
 void AJMPrototypePlayerBootstrap::EndPlay(const EEndPlayReason::Type EndPlayReason)

@@ -19,6 +19,9 @@ class P_060715_API UJMPrototypeProgressionSubsystem : public UGameInstanceSubsys
 	GENERATED_BODY()
 
 public:
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
+
 	UPROPERTY(BlueprintAssignable, Category = "Base Upgrade Prototype|Events")
 	FJMPrototypeRunStateChangedSignature OnRunStateChanged;
 
@@ -61,6 +64,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Base Upgrade Prototype|Travel")
 	bool RestoreTravelInventory(UInventoryComponent* Inventory);
 
+	/** Snapshots every occupied inventory slot before map travel. */
+	UFUNCTION(BlueprintCallable, Category = "Base Upgrade Prototype|Travel")
+	void CaptureEntireTravelInventory(UInventoryComponent* Inventory);
+
 	/** Marks an intentional OpenLevel so the next map keeps the current run. */
 	void MarkLevelTravelPending();
 
@@ -92,6 +99,7 @@ public:
 	bool CanReturnToBase() const { return bConfigured && RunState == EJMPrototypeRunState::Exploring; }
 
 private:
+	void HandlePreLoadMap(const FString& MapName);
 	void SetRunState(EJMPrototypeRunState NewState);
 	void AddCurrency(int32 Amount);
 

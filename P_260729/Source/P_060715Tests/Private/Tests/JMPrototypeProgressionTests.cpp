@@ -43,6 +43,13 @@ bool FJMPrototypeFullEconomyLoopTest::RunTest(const FString& Parameters)
 
 	TestTrue(TEXT("Quest samples are collected"), Inventory->AddItem(QuestItem, 3));
 	TestTrue(TEXT("Cooking ingredient is collected"), Inventory->AddItem(Ingredient));
+	Progression->CaptureEntireTravelInventory(Inventory);
+	UInventoryComponent* InventoryAfterTravel = NewObject<UInventoryComponent>();
+	TestTrue(TEXT("Destination inventory receives base capacity"), Progression->ApplyOwnedInventoryCapacity(InventoryAfterTravel).bSucceeded);
+	TestTrue(TEXT("Entire inventory restores after travel"), Progression->RestoreTravelInventory(InventoryAfterTravel));
+	TestEqual(TEXT("Quest items survive map travel"), InventoryAfterTravel->GetItemQuantity(QuestItem), 3);
+	TestEqual(TEXT("Ingredient survives map travel"), InventoryAfterTravel->GetItemQuantity(Ingredient), 1);
+	Inventory = InventoryAfterTravel;
 	TestTrue(TEXT("Player can return to base"), Progression->ReturnToBase().bSucceeded);
 	TestTrue(TEXT("Quest submission succeeds"), Progression->SubmitQuest(Inventory, QuestItem, 3).bSucceeded);
 	TestEqual(TEXT("Quest reward grants sixty currency"), Progression->GetCurrency(), 60);
