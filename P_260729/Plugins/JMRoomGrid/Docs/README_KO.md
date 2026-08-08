@@ -1,6 +1,34 @@
-# JM Room Grid 1.4.1
+# JM Room Grid 1.5.0
 
 Unreal Engine 5.7용 모듈형 방 Blueprint 및 5×5 맵 생성 플러그인입니다. 현재 기본 라이브러리는 편집 가능한 13×13 타일 방 12종으로 구성됩니다.
+
+1.5.0부터 기존 고정 5×5 생성기와 별도로, 사용자가 활성 셀과 통로 방향을 직접 설계하는 `AJMCustomGridMapGenerator`를 제공합니다. 기존 `Level_Mapgenerate`, 표준 Generator Blueprint, Room Blueprint 및 Room Definition은 변경하지 않습니다.
+
+## 커스텀 그리드 생성기
+
+### 에디터 설정 순서
+
+1. Place Actors에서 C++ 클래스 `JMCustomGridMapGenerator`를 레벨에 배치합니다.
+2. `Grid Width`, `Grid Height`를 설정합니다. 크기가 바뀌면 셀 배열이 자동 동기화되며, 필요하면 `Synchronize Cells To Grid Size`를 누릅니다.
+3. `Room Definitions`에 기존 `/JMRoomGrid/Data/Rooms13x13/DA_Room13x13_*` 12개를 지정합니다.
+4. `Cells`에서 사용할 좌표만 `Enabled`로 켜고 `Open Directions`의 North/East/South/West를 선택합니다.
+5. Entrance 셀 하나와 Exit 셀 하나를 지정합니다. 각각은 활성 영역 바깥으로 열린 방향이 정확히 하나 있어야 합니다.
+6. 고정 방이 필요한 셀은 `Special Room Definition`을 지정합니다. 비어 있으면 기존 가중치와 Seed를 사용하는 랜덤 선택이 적용됩니다.
+7. `Draw Grid Design`으로 형태를 확인하고 `Validate Custom Grid`로 연결 오류를 검사합니다.
+8. `Generate Custom Preview`를 눌러 방을 생성합니다.
+
+커스텀 좌표는 Cartesian 방식입니다. East는 `X+1`, West는 `X-1`, North는 `Y+1`, South는 `Y-1`입니다. 활성 셀 사이에서는 양쪽 방향이 반드시 일치해야 합니다. 예를 들어 `(0,0).East`가 열리면 `(1,0).West`도 열려야 합니다. 일반 셀이 빈 셀 또는 Grid 밖으로 열리는 것도 오류이며, Entrance/Exit의 외부 통로만 예외입니다.
+
+방향 수로 Way를 계산합니다.
+
+- 1방향: 1-Way
+- 2방향: 2-Way
+- 3방향: 3-Way
+- 4방향: 4-Way
+
+기본 13×13 라이브러리는 기존과 동일하게 2/3/4-Way만 포함합니다. 1-Way 셀을 생성하려면 `AJMRoomModule` 기반 1-Way Blueprint와 `Junction Type = OneWay`, canonical North인 Room Definition을 별도로 만들어 `Room Definitions` 또는 해당 셀의 `Special Room Definition`에 지정해야 합니다. 기본 자동 구조는 중앙에서 North까지의 막다른 통로를 만들고 Generator가 이를 회전합니다. 해당 자산이 없으면 생성기는 셀 좌표와 함께 후보 없음 오류를 출력하며 기존 방을 임의로 변형하지 않습니다.
+
+`Clear All Custom Generated Rooms In Level`은 새 생성기가 만든 `JMRoomGrid.CustomGenerated` 방만 제거합니다. 기존 고정 생성기의 방과 `Level_Mapgenerate` 콘텐츠는 건드리지 않습니다.
 
 ## 현재 확정 규격
 

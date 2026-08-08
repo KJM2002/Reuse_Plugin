@@ -2,7 +2,7 @@
 
 ## Scope
 
-`JMRoomGridRuntime` owns direction math, the editable native room contract, room definitions, deterministic 5x5 topology selection, spawning and runtime-safe validation. It does not modify Blueprint assets or assemble structure meshes in the generator.
+`JMRoomGridRuntime` owns direction math, the editable native room contract, room definitions, deterministic fixed 5x5 topology selection, user-authored custom topology selection, spawning and runtime-safe validation. It does not modify Blueprint assets or assemble structure meshes in a generator.
 
 `JMRoomGridEditor` owns Project Settings asset validation and create-missing-only Blueprint/Data Asset authoring through Unreal Editor APIs. It never overwrites an existing asset.
 
@@ -14,11 +14,13 @@ The plugin has no dependency on another JM plugin or host-project class/content.
 
 ## Data flow
 
-The generator computes the exact required direction mask for each standard cell, rotates every enabled room definition's canonical mask by each explicitly allowed quarter turn, filters exact matches, performs deterministic weighted selection using `FRandomStream`, then spawns the selected Blueprint class at the cell transform. Validation re-derives topology and checks count, scale, direction and adjacency contracts.
+The fixed generator computes the exact required direction mask for each standard cell. The independent custom generator reads enabled cells and their explicit North/East/South/West masks. Both rotate every enabled room definition's canonical mask by each explicitly allowed quarter turn, filter exact matches, perform deterministic weighted selection using `FRandomStream`, then spawn the selected Blueprint class at the cell transform.
+
+Custom-grid validation runs before selection. It checks synchronized dimensions, coordinate uniqueness, one entrance and exit, exactly one external opening at each role, reciprocal adjacent openings and reachability of every active cell. A per-cell special definition bypasses the random pool but still has to match the configured direction mask under an allowed rotation.
 
 ## Blueprint and content boundary
 
-Room structure components are native default subobjects visible and editable in derived Blueprints. `ContentRoot`, `ItemSpawnRoot` and `AISpawnRoot` are user-owned extension roots. Neither generation nor asset validation deletes or reconstructs their children. Plugin-generated assets use the portable `/JMRoomGrid` mount point.
+Room structure components are native default subobjects visible and editable in derived Blueprints. `ContentRoot`, `ItemSpawnRoot` and `AISpawnRoot` are user-owned extension roots. Neither generation nor asset validation deletes or reconstructs their children. Plugin-generated assets use the portable `/JMRoomGrid` mount point. The custom generator is code-only and does not change the standard generator Blueprint, room Blueprints or host-project levels.
 
 ## Network, save and failure policy
 

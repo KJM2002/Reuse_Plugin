@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0
+
+### Added
+
+- Added the independent native `AJMCustomGridMapGenerator`; the fixed 5x5 generator and existing content remain unchanged.
+- Added editable grid dimensions, enabled cells, explicit direction masks, entrance, exit and per-cell special Room Definition overrides.
+- Added pre-generation validation for reciprocal connections, external openings, duplicate/out-of-range cells and whole-map reachability.
+- Added direction-count-based 1/2/3/4-Way classification while preserving serialized enum values for all existing assets.
+- Added isolated custom-generated actor cleanup, design debug drawing and custom-topology automation coverage.
+
 ## 1.4.1
 
 - Fixed generated 13x13 floor, wall, and ceiling components failing to attach to the movable `StructureRoot`.

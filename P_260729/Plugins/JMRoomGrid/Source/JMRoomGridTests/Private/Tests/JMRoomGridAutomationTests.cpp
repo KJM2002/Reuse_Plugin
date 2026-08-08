@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Actors/JMGridMapGenerator.h"
+#include "Actors/JMCustomGridMapGenerator.h"
 #include "Actors/JMRoomModule.h"
 #include "Blueprint/JMRoomGridLibrary.h"
 #include "Components/JMRoomPortComponent.h"
@@ -84,6 +85,36 @@ bool FJMStandardTopologyTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("South center entrance"), bEntrance);
     TestTrue(TEXT("North center exit"), bExit);
     TestEqual(TEXT("Every cell is reachable"), Visited.Num(), 25);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FJMCustomTopologyValidationTest, "JM.RoomGrid.CustomTopologyValidation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMCustomTopologyValidationTest::RunTest(const FString& Parameters)
+{
+    AJMCustomGridMapGenerator* Generator = NewObject<AJMCustomGridMapGenerator>();
+    Generator->GridWidth = 3;
+    Generator->GridHeight = 2;
+    Generator->SynchronizeGridCells();
+    Generator->SetCell(0, 0, true, static_cast<int32>(EJMRoomDirection::East | EJMRoomDirection::South), true, false);
+    Generator->SetCell(1, 0, true, static_cast<int32>(EJMRoomDirection::West | EJMRoomDirection::East));
+    Generator->SetCell(2, 0, true, static_cast<int32>(EJMRoomDirection::West | EJMRoomDirection::North));
+    Generator->SetCell(2, 1, true, static_cast<int32>(EJMRoomDirection::South | EJMRoomDirection::North), false, true);
+    TestTrue(TEXT("Irregular connected custom topology with external entrance/exit is valid"), Generator->ValidateGridDesign().bIsValid);
+
+    Generator->SetCell(1, 0, true, static_cast<int32>(EJMRoomDirection::West));
+    const FJMRoomValidationResult BrokenResult = Generator->ValidateGridDesign();
+    TestFalse(TEXT("One-sided adjacent opening is rejected"), BrokenResult.bIsValid);
+    TestTrue(TEXT("Mismatch produces an actionable validation error"), BrokenResult.Errors.ContainsByPredicate([](const FText& Error)
+    {
+        return Error.ToString().Contains(TEXT("does not match"));
+    }));
+
+    AJMRoomModule* OneWayRoom = NewObject<AJMRoomModule>();
+    OneWayRoom->JunctionType = EJMRoomJunctionType::OneWay;
+    OneWayRoom->CanonicalOpenDirections = static_cast<int32>(EJMRoomDirection::North);
+    TestTrue(TEXT("Native room contract accepts one canonical direction for OneWay"), OneWayRoom->ValidateRoomContract().bIsValid);
     return true;
 }
 

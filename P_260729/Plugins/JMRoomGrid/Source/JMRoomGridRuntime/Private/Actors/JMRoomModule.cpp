@@ -302,6 +302,11 @@ bool AJMRoomModule::IsTileWalkable(const int32 X, const int32 Y) const
         const bool E = H(6, 6, 12);
         const bool S = VL(6, 0, 6);
         const bool W = H(6, 0, 6);
+        if (JunctionType == EJMRoomJunctionType::OneWay)
+        {
+            // One-way definitions use canonical North and obtain E/S/W through generator rotation.
+            return N;
+        }
         if (JunctionType == EJMRoomJunctionType::TwoWay)
         {
             if (V == 0) return N || E || Rect(2, 5, 8, 10) || H(8, 5, 6) || Rect(8, 10, 2, 5) || VL(8, 5, 6);
@@ -332,7 +337,9 @@ bool AJMRoomModule::IsTileWalkable(const int32 X, const int32 Y) const
     static const uint8 FourWay[4][5] = {
         { 4, 4, 31, 4, 4 }, { 4, 14, 31, 14, 4 }, { 4, 10, 31, 10, 4 }, { 4, 6, 31, 12, 4 }
     };
-    const uint8* Rows = JunctionType == EJMRoomJunctionType::TwoWay ? TwoWay[Variant]
+    static const uint8 OneWay[5] = { 0, 0, 4, 4, 4 };
+    const uint8* Rows = JunctionType == EJMRoomJunctionType::OneWay ? OneWay
+        : JunctionType == EJMRoomJunctionType::TwoWay ? TwoWay[Variant]
         : JunctionType == EJMRoomJunctionType::ThreeWay ? ThreeWay[Variant] : FourWay[Variant];
     return (Rows[Y] & (1 << X)) != 0;
 }
@@ -451,7 +458,9 @@ FJMRoomValidationResult AJMRoomModule::ValidateRoomContract(const float Toleranc
     if (PortWest) Require(PortWest->GetRelativeLocation().Equals(FVector(-200, 0, 0), Tolerance), LOCTEXT("BadWestPort", "West port must be at (-200,0,0)."));
     }
 
-    const int32 ExpectedCount = JunctionType == EJMRoomJunctionType::TwoWay ? 2 : JunctionType == EJMRoomJunctionType::ThreeWay ? 3 : 4;
+    const int32 ExpectedCount = JunctionType == EJMRoomJunctionType::OneWay ? 1
+        : JunctionType == EJMRoomJunctionType::TwoWay ? 2
+        : JunctionType == EJMRoomJunctionType::ThreeWay ? 3 : 4;
     Require(UJMRoomGridLibrary::CountDirections(static_cast<EJMRoomDirection>(CanonicalOpenDirections)) == ExpectedCount,
         LOCTEXT("BadJunction", "Junction type does not match canonical open direction count."));
     return Result;

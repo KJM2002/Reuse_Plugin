@@ -20,7 +20,9 @@ enum class EJMRoomJunctionType : uint8
 {
     TwoWay,
     ThreeWay,
-    FourWay
+    FourWay,
+    /** Appended to preserve the serialized values of the existing 2/3/4-way assets. */
+    OneWay
 };
 
 UENUM(BlueprintType)

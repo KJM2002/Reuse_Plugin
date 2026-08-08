@@ -1,9 +1,9 @@
 {
   "FileVersion": 3,
-  "Version": 10401,
-  "VersionName": "1.4.1",
+  "Version": 10500,
+  "VersionName": "1.5.0",
   "FriendlyName": "JM Room Grid",
-  "Description": "Data-driven modular room Blueprints and deterministic grid map generation.",
+  "Description": "Data-driven modular room Blueprints with fixed and user-authored grid map generation.",
   "Category": "JM Plugins",
   "CreatedBy": "JM",
   "CanContainContent": true,
