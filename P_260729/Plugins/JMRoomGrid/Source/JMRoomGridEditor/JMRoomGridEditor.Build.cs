@@ -9,7 +9,7 @@ public class JMRoomGridEditor : ModuleRules
         {
             "Core", "CoreUObject", "Engine", "UnrealEd", "AssetTools", "AssetRegistry",
             "BlueprintGraph", "Kismet", "KismetCompiler", "ToolMenus", "Slate", "SlateCore",
-            "JMRoomGridRuntime"
+            "PropertyEditor", "JMRoomGridRuntime"
         });
     }
 }

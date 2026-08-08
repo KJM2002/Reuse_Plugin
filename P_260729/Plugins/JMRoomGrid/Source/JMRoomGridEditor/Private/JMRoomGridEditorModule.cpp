@@ -1,5 +1,6 @@
 #include "Actors/JMRoomModule.h"
 #include "Actors/JMGridMapGenerator.h"
+#include "Actors/JMCustomGridMapGenerator.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Blueprint/JMRoomGridLibrary.h"
 #include "Data/JMRoomDefinition.h"
@@ -12,10 +13,12 @@
 #include "HAL/FileManager.h"
 #include "JMRoomGridRuntime.h"
 #include "JMRoomGridEditorTools.h"
+#include "JMCustomGridMapGeneratorDetails.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Misc/MessageDialog.h"
 #include "Misc/PackageName.h"
 #include "Modules/ModuleManager.h"
+#include "PropertyEditorModule.h"
 #include "Settings/JMRoomGridSettings.h"
 #include "ToolMenus.h"
 #include "UObject/Package.h"
@@ -699,11 +702,22 @@ class FJMRoomGridEditorModule final : public IModuleInterface
 public:
     virtual void StartupModule() override
     {
+        FPropertyEditorModule& PropertyEditor = FModuleManager::LoadModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
+        PropertyEditor.RegisterCustomClassLayout(
+            AJMCustomGridMapGenerator::StaticClass()->GetFName(),
+            FOnGetDetailCustomizationInstance::CreateStatic(&FJMCustomGridMapGeneratorDetails::MakeInstance));
+        PropertyEditor.NotifyCustomizationModuleChanged();
         UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FJMRoomGridEditorModule::RegisterMenus));
     }
 
     virtual void ShutdownModule() override
     {
+        if (FModuleManager::Get().IsModuleLoaded(TEXT("PropertyEditor")))
+        {
+            FPropertyEditorModule& PropertyEditor = FModuleManager::GetModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
+            PropertyEditor.UnregisterCustomClassLayout(AJMCustomGridMapGenerator::StaticClass()->GetFName());
+            PropertyEditor.NotifyCustomizationModuleChanged();
+        }
         UToolMenus::UnRegisterStartupCallback(this);
         UToolMenus::UnregisterOwner(this);
     }

@@ -9,6 +9,7 @@
 - Added pre-generation validation for reciprocal connections, external openings, duplicate/out-of-range cells and whole-map reachability.
 - Added direction-count-based 1/2/3/4-Way classification while preserving serialized enum values for all existing assets.
 - Added isolated custom-generated actor cleanup, design debug drawing and custom-topology automation coverage.
+- Added a visual Grid Designer Details panel with separate shape and connection editing modes, clickable sectors, Way presets, reciprocal direction toggles, roles, special rooms and build actions.
 
 ### Fixed
 
