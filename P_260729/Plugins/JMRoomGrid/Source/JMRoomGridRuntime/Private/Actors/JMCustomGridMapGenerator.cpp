@@ -42,7 +42,7 @@ namespace
         }
     }
 
-    UJMRoomPortComponent* FindPortForWorldDirection(const AJMRoomModule* Room, const EJMRoomDirection Direction)
+    UJMRoomPortComponent* FindCustomGridPortForWorldDirection(const AJMRoomModule* Room, const EJMRoomDirection Direction)
     {
         const TArray<UJMRoomPortComponent*> Ports { Room->PortNorth, Room->PortEast, Room->PortSouth, Room->PortWest };
         for (UJMRoomPortComponent* Port : Ports)
@@ -549,8 +549,8 @@ FJMRoomValidationResult AJMCustomGridMapGenerator::ValidateGeneratedMap() const
             const FJMGeneratedRoomRecord* Other = *Found;
             if (!IsValid(Record.RoomActor) || !IsValid(Other->RoomActor)) continue;
             const EJMRoomDirection WorldDirection = UJMRoomGridLibrary::RotateDirectionMask(Step.Direction, GeneratorYaw);
-            const UJMRoomPortComponent* PortA = FindPortForWorldDirection(Record.RoomActor, WorldDirection);
-            const UJMRoomPortComponent* PortB = FindPortForWorldDirection(Other->RoomActor, UJMRoomGridLibrary::OppositeDirection(WorldDirection));
+            const UJMRoomPortComponent* PortA = FindCustomGridPortForWorldDirection(Record.RoomActor, WorldDirection);
+            const UJMRoomPortComponent* PortB = FindCustomGridPortForWorldDirection(Other->RoomActor, UJMRoomGridLibrary::OppositeDirection(WorldDirection));
             if (!PortA || !PortB || !PortA->GetComponentLocation().Equals(PortB->GetComponentLocation(), 1.0f))
                 Result.AddError(CellMessage(Record.Coordinate, FString::Printf(TEXT("port does not meet cell (%d,%d)."), OtherCoordinate.X, OtherCoordinate.Y)));
         }

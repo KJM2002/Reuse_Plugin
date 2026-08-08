@@ -10,6 +10,10 @@
 - Added direction-count-based 1/2/3/4-Way classification while preserving serialized enum values for all existing assets.
 - Added isolated custom-generated actor cleanup, design debug drawing and custom-topology automation coverage.
 
+### Fixed
+
+- Fixed a Unity Build compile failure caused by the fixed and custom generator translation units using the same anonymous-namespace helper name.
+
 ## 1.4.1
 
 - Fixed generated 13x13 floor, wall, and ceiling components failing to attach to the movable `StructureRoot`.
