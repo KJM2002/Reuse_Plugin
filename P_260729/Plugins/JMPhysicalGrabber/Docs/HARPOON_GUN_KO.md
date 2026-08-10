@@ -10,7 +10,7 @@
 
 - 적용 캐릭터: `/Game/FirstPerson/Blueprints/BP_FirstPersonCharacter`
 - 기능 컴포넌트: `JMHarpoonGun`
-- 기본 입력: 마우스 왼쪽 버튼
+- 기본 입력: 왼쪽 클릭은 발사/회수, 오른쪽 클릭 유지는 플레이어 그래플
 - 총 외형 클래스: `/Game/FirstPerson/Blueprints/BP_JMHarpoonGunVisual`
 - 발사체 외형 클래스: `/Game/FirstPerson/Blueprints/BP_JMHarpoonProjectile`
 - 기존 근거리 `JMPhysicalGrabber` 컴포넌트는 비활성화되어 있다.
@@ -23,6 +23,16 @@
 | `Flying` | 비행 중인 작살 회수 시작 |
 | `Embedded` | 박힌 작살 또는 물리 오브젝트 회수 시작 |
 | `Retracting` | 추가 입력 무시 |
+
+마우스 오른쪽 버튼은 `Enable Player Grapple`이 켜져 있을 때 다음처럼 동작한다.
+
+| 현재 상태 | 오른쪽 버튼 결과 |
+|---|---|
+| `Ready` | 무시 |
+| `Flying` | `Armed`. 버튼을 유지하면 명중 순간 당김 시작 |
+| `Embedded` | 버튼을 누르는 동안 플레이어를 작살 방향으로 당김 |
+| `Retracting` | 무시 |
+| `Pulling` 중 버튼 해제 | 당김만 중단하고 작살은 박힌 상태 유지 |
 
 ## 2. 기능 요약
 
@@ -63,6 +73,18 @@
 - 아래에 바닥이 없으면 안전 시간 후 총구 호밍으로 전환되어 작살이 유실되지 않는다.
 - 회수 중에는 작살이 이동 방향을 바라보며, 윈치는 발사 때와 반대 방향으로 회전한다.
 
+### 플레이어 그래플
+
+- 기능은 `Enable Player Grapple`로 독립적으로 켜고 끌 수 있으며, 꺼도 기존 좌클릭 작살 기능은 유지된다.
+- 비행 중 우클릭을 유지하면 명중을 대기하고, 박힌 뒤에는 작살의 현재 위치를 앵커로 사용한다.
+- 완전한 캐릭터 물리 시뮬레이션 대신 `CharacterMovement`의 속도를 가속도 한도 안에서 변경한다.
+- 앵커 방향 속도를 높이면서 횡방향 속도를 보존해 직선 이동과 완만한 스윙 감각을 함께 만든다.
+- 앵커 근처에서는 속도를 낮추고 도착 시 안쪽 속도를 감속해 벽에 강하게 충돌하는 현상을 줄인다.
+- 카메라 위치에서 다음 프레임의 이동 경로를 구형 스윕으로 미리 검사한다. 천장이나 벽에 닿기 전에 표면 안쪽 속도만 제거하므로 카메라 관통을 막으면서 옆 방향 관성은 유지한다.
+- 우클릭을 놓으면 현재 관성을 유지한 채 당김만 끝난다. 좌클릭 회수, 기능 Off, 앵커 유실, 맵 이탈에서는 즉시 취소된다.
+- 물리 오브젝트 앵커는 선택적으로 허용할 수 있다. 허용한 경우 작살이 붙은 움직이는 대상을 계속 따라간다.
+- 그래플 중 중력, 최대 하강 속도, 최대 사용 시간, 막힘 타임아웃을 별도로 제한한다.
+
 ### 외형 상태 처리
 
 - `Ready`: `Projectile Class`와 동일한 `LoadedHarpoonPreview`가 표시된다.
@@ -84,6 +106,8 @@ stateDiagram-v2
     Flying --> Ready: 발사체 유실 시 안전 초기화
     Embedded --> Ready: 대상과 발사체 유실 시 안전 초기화
 ```
+
+플레이어 그래플은 위 상태와 분리된 `Disabled → Idle → Armed/Pulling` 상태 머신을 사용한다. 따라서 우클릭 이동을 중단해도 작살의 `Embedded` 상태는 유지된다.
 
 ## 4. 가장 자주 수정하는 위치
 
@@ -128,6 +152,44 @@ stateDiagram-v2
 | `Fire Key` | `Left Mouse Button` | 발사와 회수에 사용하는 토글 입력 키 |
 
 컴포넌트가 직접 키 입력을 확인하므로, 같은 키를 다른 기능에서도 사용하면 두 기능이 동시에 실행될 수 있다.
+
+### Player Grapple > Input
+
+| 속성 | 기본값 | 설명 |
+|---|---:|---|
+| `Enable Player Grapple` | 플러그인 `false`, 현재 캐릭터 `true` | 플레이어 당김 전체 On/Off. 실행 중 끄면 즉시 정상 이동 값으로 복구한다. |
+| `Player Grapple Key` | `Right Mouse Button` | 누르고 있는 동안 플레이어 그래플 사용 |
+| `Allow Dynamic Player Grapple Anchors` | `true` | 물리 시뮬레이션 오브젝트에 박힌 작살도 앵커로 허용 |
+
+### Player Grapple > Movement
+
+| 속성 | 기본값 | 단위 | 설명 |
+|---|---:|---:|---|
+| `Player Grapple Acceleration` | `6500` | cm/s² | 앵커 방향으로 속도를 바꾸는 최대 가속도 |
+| `Player Grapple Max Speed` | `2500` | cm/s | 그래플 중 캐릭터 최대 속도 |
+| `Player Grapple Stop Distance` | `140` | cm | 앵커 도착으로 판정할 캐릭터 중심 거리 |
+| `Player Grapple Approach Slow Distance` | `550` | cm | 앵커 접근 감속을 시작하는 거리 |
+| `Player Grapple Tangential Retention` | `0.9` | 0~1 | 횡방향 관성 보존 비율. 높을수록 스윙 느낌이 강해진다. |
+| `Player Grapple Gravity Scale` | `0.35` | 배율 | 그래플 중 CharacterMovement 중력 배율 |
+| `Player Grapple Arrival Braking` | `0.8` | 0~1 | 도착 시 앵커 안쪽 속도를 제거하는 비율 |
+
+### Player Grapple > Safety
+
+| 속성 | 기본값 | 단위 | 설명 |
+|---|---:|---:|---|
+| `Player Grapple Max Duration` | `3.0` | s | 한 번 우클릭으로 플레이어를 당길 수 있는 최대 시간 |
+| `Player Grapple Blocked Timeout` | `0.5` | s | 충분히 가까워지지 못할 때 막힘으로 취소하는 시간 |
+| `Player Grapple Minimum Progress` | `10` | cm | 막힘 타이머를 초기화할 최소 접근 거리 |
+| `Player Grapple Max Downward Speed` | `1200` | cm/s | 낙하 중인 동적 앵커가 플레이어를 아래로 끄는 최대 속도 |
+| `Player Grapple Camera Clearance` | `55` | cm | 그래플 중 카메라와 진행 방향의 충돌 표면 사이에 확보할 여유 거리 |
+| `Player Grapple Camera Probe Radius` | `14` | cm | 다음 프레임 카메라 경로를 검사하는 구의 반지름. 모서리에서 화면이 비치면 높인다. |
+
+### Player Grapple > Presentation
+
+| 속성 | 기본값 | 설명 |
+|---|---:|---|
+| `Player Grapple FOV Boost` | `6도` | 당김 중 카메라 FOV 증가량 |
+| `Player Grapple FOV Interp Speed` | `10` | 시작과 종료 시 FOV 보간 속도 |
 
 ### Fire
 
@@ -305,6 +367,11 @@ stateDiagram-v2
 | `ResetHarpoon()` | 없음 | 활성 작살을 제거하고 줄을 숨긴 뒤 즉시 `Ready`로 초기화한다. |
 | `GetHarpoonState()` | 상태 Enum | 현재 `Ready`, `Flying`, `Embedded`, `Retracting` 상태를 반환한다. |
 | `GetActiveHarpoon()` | Projectile Actor | 현재 발사된 작살을 반환한다. 없으면 `None`이다. |
+| `SetPlayerGrappleEnabled(bool)` | 없음 | 플레이어 그래플을 런타임에 켜거나 끈다. 끄면 진행 중 당김도 취소한다. |
+| `IsPlayerGrappleEnabled()` | `bool` | 플레이어 그래플 On/Off 값을 반환한다. |
+| `StartPlayerGrapple()` | `bool` | 박힌 작살과 유효한 CharacterMovement가 있을 때 당김을 시작한다. |
+| `StopPlayerGrapple()` | 없음 | 작살은 유지하고 플레이어 당김만 중단한다. |
+| `GetPlayerGrappleState()` | 상태 Enum | `Disabled`, `Idle`, `Armed`, `Pulling` 상태를 반환한다. |
 
 ### 이벤트 디스패처
 
@@ -314,6 +381,8 @@ stateDiagram-v2
 | `On Harpoon Embedded` | Projectile, Hit Result | 작살이 대상에 박힌 직후 |
 | `On Harpoon Recall Started` | Projectile | 회수 상태로 전환한 직후 |
 | `On Harpoon Returned` | Projectile | 작살을 파괴하고 `Ready`로 돌아가기 직전 |
+| `On Player Grapple Started` | Projectile | 플레이어 당김이 실제로 시작된 직후 |
+| `On Player Grapple Ended` | Projectile, End Reason | 해제, 도착, 회수, 앵커 유실, 시간 초과, 막힘, 기능 Off로 당김이 끝날 때 |
 
 이 이벤트에 사운드, 카메라 셰이크, Niagara, UI, 게임 규칙을 연결하면 C++ 핵심 로직을 수정하지 않고 타격감을 확장할 수 있다.
 
@@ -356,6 +425,18 @@ stateDiagram-v2
 7. 플레이어 근처에서 바닥을 떠나 총구로 들어오는지 확인한다.
 8. 회수 완료 후 장전 작살이 다시 나타나는지 확인한다.
 
+### 플레이어 그래플 테스트
+
+1. 벽을 향해 발사하고 비행 중 우클릭을 유지해, 박히는 순간 자동으로 당겨지는지 확인한다.
+2. 박힌 뒤 우클릭을 눌러 앵커 방향으로 가속되는지 확인한다.
+3. 이동 중 우클릭을 놓아 횡방향 관성이 유지되고 작살은 박혀 있는지 확인한다.
+4. 당기는 중 좌클릭을 눌러 플레이어 이동이 중단되고 기존 작살 회수가 시작되는지 확인한다.
+5. `Enable Player Grapple`을 실행 중 꺼 중력, 보행 속도, 마찰, FOV가 원래 값으로 돌아오는지 확인한다.
+6. 천장에 박고 당겨도 카메라가 천장을 뚫지 않고 약 `55 cm` 앞에서 당김이 끝나는지 확인한다.
+7. 옆 벽을 비스듬히 당겼을 때 벽 안쪽 속도는 사라지지만 옆 방향 관성은 남는지 확인한다.
+8. 낙하하는 물리 구체에서 동적 앵커를 따라가되, 막힘/최대 시간/맵 이탈 시 안전하게 취소되는지 확인한다.
+9. `Allow Dynamic Player Grapple Anchors`를 끄고 물리 오브젝트에서는 우클릭 당김이 시작되지 않는지 확인한다.
+
 ### 물리 무게 테스트
 
 테스트용 Static Mesh Actor를 세 개 만들고 다음을 설정한다.
@@ -394,6 +475,7 @@ stateDiagram-v2
 ## 12. 제한 사항
 
 - 입력과 Tick은 로컬 플레이어 컨트롤러에서만 처리한다.
+- 플레이어 그래플은 소유자가 `ACharacter`이고 `CharacterMovementComponent`를 가지고 있을 때만 시작된다.
 - 현재 버전은 서버 권위 멀티플레이 복제를 구현하지 않았다.
 - 케이블은 월드 충돌을 사용하지 않으므로 벽 모서리를 감아 돌아가지 않는다.
 - 회수 중인 작살은 절차적 이동이며 완전한 리지드 바디 물리를 사용하지 않는다. WorldStatic, WorldDynamic, PhysicsBody 바닥 감지와 바닥 추종만 수행하므로 벽에 걸리거나 장애물과 복잡하게 충돌하지 않는다.

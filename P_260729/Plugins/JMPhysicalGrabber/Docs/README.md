@@ -6,6 +6,8 @@
 
 Add `JM Harpoon Gun Component` to a locally controlled pawn. Left click fires; left click again recalls. The projectile embeds in every blocking primitive. Physics targets are pulled toward the muzzle, while static or immovable targets release the projectile and return only the harpoon.
 
+The optional Player Grapple mode uses right-mouse hold after firing. Pressing it during flight arms the grapple; an embedded projectile then pulls an `ACharacter` toward the anchor through CharacterMovement while retaining sideways momentum. A predictive camera sphere sweep stops inward velocity before ceilings and walls can clip the first-person view. Disable `Enable Player Grapple` to keep the original harpoon-only behavior.
+
 The component creates a prototype gun from the engine Cube, Cylinder, and Cone meshes. It also creates a built-in Cable Component between the muzzle and projectile. No project content is required.
 
 The sample project exposes both presentations as editable Blueprint children:
@@ -31,6 +33,7 @@ Important tuning values:
 - `Return Ground Search Timeout`: guarantees recovery in maps with no floor below the harpoon.
 - `Return Gravity Fade Time` and `Return Homing Responsiveness`: tune the final lift from the floor into the muzzle.
 - `Cable Num Segments`, solver iterations, gravity scale, and length interpolation: tune rope stability without changing Cable settings after registration.
+- `Player Grapple Camera Clearance` and `Player Grapple Camera Probe Radius`: tune first-person camera clearance near ceilings, walls, and corners.
 - `Return Separation Distance`: pulls the spear out of an overlapped hit surface before recall.
 - `Heavy Target Timeout`: guarantees recovery from immovable targets.
 - `Muzzle Offset` and `Gun Visual Offset`: first-person placement.

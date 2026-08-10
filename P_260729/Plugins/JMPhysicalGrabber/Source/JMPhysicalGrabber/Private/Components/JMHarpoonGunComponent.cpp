@@ -8,6 +8,8 @@
 #include "Components/SceneComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/WorldSettings.h"
@@ -26,11 +28,19 @@ UJMHarpoonGunComponent::UJMHarpoonGunComponent()
 void UJMHarpoonGunComponent::BeginPlay()
 {
     Super::BeginPlay();
+    PlayerGrappleState = bEnablePlayerGrapple
+        ? EJMPlayerGrappleState::Idle
+        : EJMPlayerGrappleState::Disabled;
     EnsurePresentation();
 }
 
 void UJMHarpoonGunComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    EndPlayerGrapple(EJMPlayerGrappleEndReason::InvalidAnchor);
+    if (bPlayerGrappleFOVActive && GrappleCamera.IsValid())
+    {
+        GrappleCamera->SetFieldOfView(GrappleBaseFOV);
+    }
     ResetHarpoon();
     DestroyPresentation();
     Super::EndPlay(EndPlayReason);
@@ -61,8 +71,11 @@ void UJMHarpoonGunComponent::TickComponent(float DeltaTime, ELevelTick TickType,
         }
     }
 
+    UpdatePlayerGrappleInput(Controller);
+
 #if !UE_BUILD_SHIPPING
     UpdateFailSafeSmoke();
+    UpdatePlayerGrappleSmoke(DeltaTime);
 #endif
 
     if (State != EJMHarpoonGunState::Ready && HasHarpoonSafetyViolation())
@@ -85,7 +98,440 @@ void UJMHarpoonGunComponent::TickComponent(float DeltaTime, ELevelTick TickType,
         break;
     }
 
+    UpdatePlayerGrapple(DeltaTime);
+    UpdatePlayerGrappleFOV(DeltaTime);
+
     UpdatePresentation(DeltaTime);
+}
+
+void UJMHarpoonGunComponent::SetPlayerGrappleEnabled(bool bEnabled)
+{
+    if (!bEnabled)
+    {
+        bEnablePlayerGrapple = false;
+        EndPlayerGrapple(EJMPlayerGrappleEndReason::FeatureDisabled);
+        PlayerGrappleState = EJMPlayerGrappleState::Disabled;
+        return;
+    }
+
+    bEnablePlayerGrapple = true;
+    if (PlayerGrappleState == EJMPlayerGrappleState::Disabled)
+    {
+        PlayerGrappleState = EJMPlayerGrappleState::Idle;
+    }
+}
+
+bool UJMHarpoonGunComponent::StartPlayerGrapple()
+{
+    if (!bEnablePlayerGrapple
+        || State != EJMHarpoonGunState::Embedded
+        || !IsValid(ActiveProjectile)
+        || !IsValid(EmbeddedComponent))
+    {
+        return false;
+    }
+
+    if (!bAllowDynamicPlayerGrappleAnchors
+        && EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone))
+    {
+        PlayerGrappleState = EJMPlayerGrappleState::Idle;
+        return false;
+    }
+
+    ACharacter* Character = Cast<ACharacter>(GetOwner());
+    UCharacterMovementComponent* Movement = Character ? Character->GetCharacterMovement() : nullptr;
+    if (!Character || !Movement)
+    {
+        PlayerGrappleState = EJMPlayerGrappleState::Idle;
+        return false;
+    }
+
+    const float Distance = FVector::Distance(Character->GetActorLocation(), ActiveProjectile->GetActorLocation());
+    if (!FMath::IsFinite(Distance) || Distance <= PlayerGrappleStopDistance)
+    {
+        PlayerGrappleState = EJMPlayerGrappleState::Idle;
+        return false;
+    }
+
+    if (PlayerGrappleState == EJMPlayerGrappleState::Pulling)
+    {
+        return true;
+    }
+
+    GrappleCharacter = Character;
+    GrappleMovement = Movement;
+    GrappleOriginalGravityScale = Movement->GravityScale;
+    GrappleOriginalMaxWalkSpeed = Movement->MaxWalkSpeed;
+    GrappleOriginalGroundFriction = Movement->GroundFriction;
+    GrappleOriginalBrakingFrictionFactor = Movement->BrakingFrictionFactor;
+    bPlayerGrappleMovementOverridden = true;
+
+    Movement->GravityScale = PlayerGrappleGravityScale;
+    Movement->MaxWalkSpeed = FMath::Max(Movement->MaxWalkSpeed, PlayerGrappleMaxSpeed);
+    Movement->GroundFriction = FMath::Min(Movement->GroundFriction, 0.5f);
+    Movement->BrakingFrictionFactor = 0.0f;
+
+    if (!bPlayerGrappleFOVActive)
+    {
+        GrappleCamera = GetOwner()->FindComponentByClass<UCameraComponent>();
+        if (GrappleCamera.IsValid())
+        {
+            GrappleBaseFOV = GrappleCamera->FieldOfView;
+            bPlayerGrappleFOVActive = true;
+        }
+    }
+
+    PlayerGrappleElapsed = 0.0f;
+    PlayerGrappleBlockedElapsed = 0.0f;
+    PlayerGrappleProgressStartDistance = Distance;
+    PlayerGrappleState = EJMPlayerGrappleState::Pulling;
+    OnPlayerGrappleStarted.Broadcast(ActiveProjectile);
+    return true;
+}
+
+void UJMHarpoonGunComponent::StopPlayerGrapple()
+{
+    EndPlayerGrapple(EJMPlayerGrappleEndReason::Released);
+}
+
+void UJMHarpoonGunComponent::UpdatePlayerGrappleInput(APlayerController* Controller)
+{
+    if (!bEnablePlayerGrapple)
+    {
+        if (PlayerGrappleState != EJMPlayerGrappleState::Disabled)
+        {
+            EndPlayerGrapple(EJMPlayerGrappleEndReason::FeatureDisabled);
+            PlayerGrappleState = EJMPlayerGrappleState::Disabled;
+        }
+        return;
+    }
+
+    if (PlayerGrappleState == EJMPlayerGrappleState::Disabled)
+    {
+        PlayerGrappleState = EJMPlayerGrappleState::Idle;
+    }
+
+    if (Controller->WasInputKeyJustPressed(PlayerGrappleKey))
+    {
+        if (State == EJMHarpoonGunState::Flying)
+        {
+            PlayerGrappleState = EJMPlayerGrappleState::Armed;
+        }
+        else if (State == EJMHarpoonGunState::Embedded)
+        {
+            StartPlayerGrapple();
+        }
+    }
+
+    if (Controller->WasInputKeyJustReleased(PlayerGrappleKey))
+    {
+        if (PlayerGrappleState == EJMPlayerGrappleState::Pulling)
+        {
+            EndPlayerGrapple(EJMPlayerGrappleEndReason::Released);
+        }
+        else if (PlayerGrappleState == EJMPlayerGrappleState::Armed)
+        {
+            PlayerGrappleState = EJMPlayerGrappleState::Idle;
+        }
+    }
+}
+
+void UJMHarpoonGunComponent::UpdatePlayerGrapple(float DeltaTime)
+{
+    if (PlayerGrappleState != EJMPlayerGrappleState::Pulling)
+    {
+        return;
+    }
+
+    if (!bEnablePlayerGrapple)
+    {
+        EndPlayerGrapple(EJMPlayerGrappleEndReason::FeatureDisabled);
+        return;
+    }
+
+    if (State != EJMHarpoonGunState::Embedded
+        || !IsValid(ActiveProjectile)
+        || !IsValid(EmbeddedComponent)
+        || !GrappleCharacter.IsValid()
+        || !GrappleMovement.IsValid())
+    {
+        const EJMPlayerGrappleEndReason Reason = State == EJMHarpoonGunState::Retracting
+            ? EJMPlayerGrappleEndReason::HarpoonRecall
+            : EJMPlayerGrappleEndReason::InvalidAnchor;
+        EndPlayerGrapple(Reason);
+        return;
+    }
+
+    if (!bAllowDynamicPlayerGrappleAnchors
+        && EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone))
+    {
+        EndPlayerGrapple(EJMPlayerGrappleEndReason::InvalidAnchor);
+        return;
+    }
+
+    ACharacter* Character = GrappleCharacter.Get();
+    UCharacterMovementComponent* Movement = GrappleMovement.Get();
+    const FVector AnchorLocation = ActiveProjectile->GetActorLocation();
+    const FVector CharacterLocation = Character->GetActorLocation();
+    const FVector ToAnchor = AnchorLocation - CharacterLocation;
+    const float Distance = ToAnchor.Size();
+    if (!FMath::IsFinite(Distance) || AnchorLocation.ContainsNaN())
+    {
+        EndPlayerGrapple(EJMPlayerGrappleEndReason::InvalidAnchor);
+        return;
+    }
+
+    PlayerGrappleElapsed += DeltaTime;
+    if (PlayerGrappleElapsed >= PlayerGrappleMaxDuration)
+    {
+        EndPlayerGrapple(EJMPlayerGrappleEndReason::Timeout);
+        return;
+    }
+
+    const FVector PullDirection = ToAnchor.GetSafeNormal();
+    if (Distance <= PlayerGrappleStopDistance || PullDirection.IsNearlyZero())
+    {
+        const float InwardSpeed = FVector::DotProduct(Movement->Velocity, PullDirection);
+        if (InwardSpeed > 0.0f)
+        {
+            Movement->Velocity -= PullDirection * InwardSpeed * PlayerGrappleArrivalBraking;
+        }
+        EndPlayerGrapple(EJMPlayerGrappleEndReason::ReachedAnchor);
+        return;
+    }
+
+    if (Distance <= PlayerGrappleProgressStartDistance - PlayerGrappleMinimumProgress)
+    {
+        PlayerGrappleProgressStartDistance = Distance;
+        PlayerGrappleBlockedElapsed = 0.0f;
+    }
+    else
+    {
+        PlayerGrappleBlockedElapsed += DeltaTime;
+        if (PlayerGrappleBlockedElapsed >= PlayerGrappleBlockedTimeout)
+        {
+            EndPlayerGrapple(EJMPlayerGrappleEndReason::Blocked);
+            return;
+        }
+    }
+
+    const float SafeSlowDistance = FMath::Max(
+        PlayerGrappleApproachSlowDistance,
+        PlayerGrappleStopDistance + 1.0f);
+    const float SpeedAlpha = FMath::Clamp(
+        (Distance - PlayerGrappleStopDistance) / (SafeSlowDistance - PlayerGrappleStopDistance),
+        0.0f,
+        1.0f);
+    const float MinimumApproachSpeed = FMath::Min(600.0f, PlayerGrappleMaxSpeed);
+    const float TargetInwardSpeed = FMath::Lerp(
+        MinimumApproachSpeed,
+        PlayerGrappleMaxSpeed,
+        SpeedAlpha);
+
+    const FVector CurrentVelocity = Movement->Velocity;
+    const FVector TangentialVelocity = CurrentVelocity
+        - PullDirection * FVector::DotProduct(CurrentVelocity, PullDirection);
+    const FVector DesiredVelocity = PullDirection * TargetInwardSpeed
+        + TangentialVelocity * PlayerGrappleTangentialRetention;
+    const FVector VelocityDelta = (DesiredVelocity - CurrentVelocity).GetClampedToMaxSize(
+        PlayerGrappleAcceleration * DeltaTime);
+    FVector NewVelocity = (CurrentVelocity + VelocityDelta).GetClampedToMaxSize(PlayerGrappleMaxSpeed);
+    if (PullDirection.Z < -0.1f)
+    {
+        NewVelocity.Z = FMath::Max(NewVelocity.Z, -PlayerGrappleMaxDownwardSpeed);
+    }
+
+    const FVector CameraLocation = GrappleCamera.IsValid()
+        ? GrappleCamera->GetComponentLocation()
+        : Character->GetPawnViewLocation();
+    FVector ClosestAnchorPoint = FVector::ZeroVector;
+    const float CameraToAnchorSurface = EmbeddedComponent->GetOwner() != GetOwner()
+        ? EmbeddedComponent->GetClosestPointOnCollision(
+            CameraLocation,
+            ClosestAnchorPoint,
+            EmbeddedBone)
+        : -1.0f;
+    const float SafeCameraClearance = FMath::Max(0.0f, PlayerGrappleCameraClearance);
+    if (CameraToAnchorSurface >= 0.0f
+        && CameraToAnchorSurface <= SafeCameraClearance + PlayerGrappleCameraProbeRadius)
+    {
+        FVector SurfaceDirection = (ClosestAnchorPoint - CameraLocation).GetSafeNormal();
+        if (SurfaceDirection.IsNearlyZero())
+        {
+            SurfaceDirection = PullDirection;
+        }
+        const bool bSurfaceIsAhead = FVector::DotProduct(SurfaceDirection, PullDirection) > 0.35f;
+        const float SurfaceSpeed = FVector::DotProduct(NewVelocity, SurfaceDirection);
+        if (bSurfaceIsAhead && SurfaceSpeed > 0.0f)
+        {
+            NewVelocity -= SurfaceDirection * SurfaceSpeed;
+            Movement->Velocity = NewVelocity;
+            EndPlayerGrapple(EJMPlayerGrappleEndReason::ReachedAnchor);
+            return;
+        }
+    }
+
+    FHitResult CameraHit;
+    if (SweepPlayerGrappleCamera(
+        CameraLocation,
+        PullDirection,
+        NewVelocity,
+        DeltaTime,
+        CameraHit))
+    {
+        FVector HitNormal = CameraHit.Normal.GetSafeNormal();
+        if (HitNormal.IsNearlyZero())
+        {
+            HitNormal = -PullDirection;
+        }
+        const float IntoSurfaceSpeed = FVector::DotProduct(NewVelocity, HitNormal);
+        if (IntoSurfaceSpeed < 0.0f)
+        {
+            NewVelocity -= HitNormal * IntoSurfaceSpeed;
+        }
+
+        const bool bReachedAnchor = CameraHit.GetComponent() == EmbeddedComponent;
+        Movement->Velocity = NewVelocity;
+        EndPlayerGrapple(bReachedAnchor
+            ? EJMPlayerGrappleEndReason::ReachedAnchor
+            : EJMPlayerGrappleEndReason::Blocked);
+        return;
+    }
+
+    Movement->GravityScale = PlayerGrappleGravityScale;
+    Movement->Velocity = NewVelocity;
+    if (Movement->IsMovingOnGround() && PullDirection.Z > 0.15f)
+    {
+        Movement->SetMovementMode(MOVE_Falling);
+    }
+}
+
+bool UJMHarpoonGunComponent::SweepPlayerGrappleCamera(
+    const FVector& CameraLocation,
+    const FVector& PullDirection,
+    const FVector& CandidateVelocity,
+    float DeltaTime,
+    FHitResult& OutHit) const
+{
+    UWorld* World = GetWorld();
+    if (!World || PlayerGrappleCameraProbeRadius <= 0.0f)
+    {
+        return false;
+    }
+
+    const float SafeDeltaTime = FMath::Clamp(DeltaTime, 0.0f, 0.1f);
+    const FVector PredictedCameraLocation = CameraLocation + CandidateVelocity * SafeDeltaTime;
+    const FVector ProbeEnd = PredictedCameraLocation
+        + PullDirection * FMath::Max(0.0f, PlayerGrappleCameraClearance);
+
+    FCollisionObjectQueryParams ObjectQuery;
+    ObjectQuery.AddObjectTypesToQuery(ECC_WorldStatic);
+    ObjectQuery.AddObjectTypesToQuery(ECC_WorldDynamic);
+    ObjectQuery.AddObjectTypesToQuery(ECC_PhysicsBody);
+
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(JMPlayerGrappleCameraSafety), false, GetOwner());
+    if (IsValid(ActiveProjectile))
+    {
+        QueryParams.AddIgnoredActor(ActiveProjectile);
+    }
+    if (IsValid(GunVisualActor))
+    {
+        QueryParams.AddIgnoredActor(GunVisualActor);
+    }
+
+    const bool bBlocked = World->SweepSingleByObjectType(
+        OutHit,
+        CameraLocation,
+        ProbeEnd,
+        FQuat::Identity,
+        ObjectQuery,
+        FCollisionShape::MakeSphere(PlayerGrappleCameraProbeRadius),
+        QueryParams);
+
+    if (bDrawDebug)
+    {
+        const FColor ProbeColor = bBlocked ? FColor::Red : FColor::Green;
+        DrawDebugLine(World, CameraLocation, ProbeEnd, ProbeColor, false, 0.1f, 0, 1.0f);
+        DrawDebugSphere(
+            World,
+            bBlocked ? OutHit.Location : ProbeEnd,
+            PlayerGrappleCameraProbeRadius,
+            12,
+            ProbeColor,
+            false,
+            0.1f,
+            0,
+            1.0f);
+    }
+
+    return bBlocked;
+}
+
+void UJMHarpoonGunComponent::RestorePlayerGrappleMovement()
+{
+    if (bPlayerGrappleMovementOverridden && GrappleMovement.IsValid())
+    {
+        UCharacterMovementComponent* Movement = GrappleMovement.Get();
+        Movement->GravityScale = GrappleOriginalGravityScale;
+        Movement->MaxWalkSpeed = GrappleOriginalMaxWalkSpeed;
+        Movement->GroundFriction = GrappleOriginalGroundFriction;
+        Movement->BrakingFrictionFactor = GrappleOriginalBrakingFrictionFactor;
+    }
+
+    bPlayerGrappleMovementOverridden = false;
+    GrappleCharacter.Reset();
+    GrappleMovement.Reset();
+}
+
+void UJMHarpoonGunComponent::EndPlayerGrapple(EJMPlayerGrappleEndReason Reason)
+{
+    const bool bWasPulling = PlayerGrappleState == EJMPlayerGrappleState::Pulling;
+    AJMHarpoonProjectile* GrappledProjectile = ActiveProjectile;
+    RestorePlayerGrappleMovement();
+
+    PlayerGrappleElapsed = 0.0f;
+    PlayerGrappleBlockedElapsed = 0.0f;
+    PlayerGrappleProgressStartDistance = 0.0f;
+    PlayerGrappleState = bEnablePlayerGrapple
+        ? EJMPlayerGrappleState::Idle
+        : EJMPlayerGrappleState::Disabled;
+
+    if (bWasPulling)
+    {
+        OnPlayerGrappleEnded.Broadcast(GrappledProjectile, Reason);
+    }
+}
+
+void UJMHarpoonGunComponent::UpdatePlayerGrappleFOV(float DeltaTime)
+{
+    if (!bPlayerGrappleFOVActive)
+    {
+        return;
+    }
+
+    if (!GrappleCamera.IsValid())
+    {
+        bPlayerGrappleFOVActive = false;
+        return;
+    }
+
+    const float TargetFOV = PlayerGrappleState == EJMPlayerGrappleState::Pulling
+        ? GrappleBaseFOV + PlayerGrappleFOVBoost
+        : GrappleBaseFOV;
+    const float NewFOV = FMath::FInterpTo(
+        GrappleCamera->FieldOfView,
+        TargetFOV,
+        DeltaTime,
+        PlayerGrappleFOVInterpSpeed);
+    GrappleCamera->SetFieldOfView(NewFOV);
+
+    if (PlayerGrappleState != EJMPlayerGrappleState::Pulling
+        && FMath::IsNearlyEqual(NewFOV, GrappleBaseFOV, 0.05f))
+    {
+        GrappleCamera->SetFieldOfView(GrappleBaseFOV);
+        bPlayerGrappleFOVActive = false;
+        GrappleCamera.Reset();
+    }
 }
 
 bool UJMHarpoonGunComponent::FireHarpoon()
@@ -157,6 +603,8 @@ bool UJMHarpoonGunComponent::RecallHarpoon()
         return false;
     }
 
+    EndPlayerGrapple(EJMPlayerGrappleEndReason::HarpoonRecall);
+
     const bool bWasFlying = State == EJMHarpoonGunState::Flying;
     RecallElapsed = 0.0f;
     bDeadlineRecoveryTriggered = false;
@@ -191,6 +639,8 @@ bool UJMHarpoonGunComponent::RecallHarpoon()
 
 void UJMHarpoonGunComponent::ResetHarpoon()
 {
+    EndPlayerGrapple(EJMPlayerGrappleEndReason::InvalidAnchor);
+
     if (ActiveProjectile)
     {
         ActiveProjectile->Destroy();
@@ -240,6 +690,11 @@ void UJMHarpoonGunComponent::NotifyProjectileImpact(
 
     State = EJMHarpoonGunState::Embedded;
     RecoilAlpha = FMath::Max(RecoilAlpha, 0.45f);
+
+    if (PlayerGrappleState == EJMPlayerGrappleState::Armed)
+    {
+        StartPlayerGrapple();
+    }
 
     if (APlayerController* Controller = GetOwningPlayerController())
     {
@@ -436,6 +891,8 @@ bool UJMHarpoonGunComponent::HasHarpoonSafetyViolation() const
 
 void UJMHarpoonGunComponent::BeginEmergencyReturn()
 {
+    EndPlayerGrapple(EJMPlayerGrappleEndReason::InvalidAnchor);
+
     if (!GetWorld() || !GetOwner() || !ProjectileClass)
     {
         ResetHarpoon();
@@ -590,6 +1047,112 @@ void UJMHarpoonGunComponent::UpdateFailSafeSmoke()
         {
             UE_LOG(LogTemp, Display, TEXT("JM_HARPOON_FAILSAFE_SMOKE_SUCCESS: replacement harpoon returned"));
         }
+    }
+#endif
+}
+
+void UJMHarpoonGunComponent::UpdatePlayerGrappleSmoke(float DeltaTime)
+{
+#if UE_BUILD_SHIPPING
+    return;
+#else
+    if (!FParse::Param(FCommandLine::Get(), TEXT("JMHarpoonPlayerGrappleSmoke"))
+        || bPlayerGrappleSmokeCompleted)
+    {
+        return;
+    }
+
+    if (!bPlayerGrappleSmokeStarted && State == EJMHarpoonGunState::Ready)
+    {
+        SetPlayerGrappleEnabled(true);
+        if (!FireHarpoon() || !IsValid(ActiveProjectile))
+        {
+            return;
+        }
+
+        const FVector AnchorLocation = GetOwner()->GetActorLocation()
+            + GetOwner()->GetActorForwardVector().GetSafeNormal() * 1000.0f
+            + FVector::UpVector * 500.0f;
+        ActiveProjectile->BeginFreeReturn();
+        ActiveProjectile->SetActorLocation(AnchorLocation, false, nullptr, ETeleportType::TeleportPhysics);
+        EmbeddedComponent = Cast<UPrimitiveComponent>(GetOwner()->GetRootComponent());
+        EmbeddedBone = NAME_None;
+        State = EJMHarpoonGunState::Embedded;
+
+        PlayerGrappleSmokeStartDistance = FVector::Distance(
+            GetOwner()->GetActorLocation(),
+            AnchorLocation);
+        if (!StartPlayerGrapple())
+        {
+            UE_LOG(LogTemp, Error, TEXT("JM_HARPOON_PLAYER_GRAPPLE_SMOKE_FAILED: grapple did not start"));
+            bPlayerGrappleSmokeCompleted = true;
+            ResetHarpoon();
+            return;
+        }
+
+        bPlayerGrappleSmokeStarted = true;
+        PlayerGrappleSmokeElapsed = 0.0f;
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT("JM_HARPOON_PLAYER_GRAPPLE_SMOKE: pull started at %.1f cm"),
+            PlayerGrappleSmokeStartDistance);
+        return;
+    }
+
+    if (!bPlayerGrappleSmokeStarted)
+    {
+        return;
+    }
+
+    PlayerGrappleSmokeElapsed += DeltaTime;
+    const float CurrentDistance = IsValid(ActiveProjectile)
+        ? FVector::Distance(GetOwner()->GetActorLocation(), ActiveProjectile->GetActorLocation())
+        : BIG_NUMBER;
+    if (CurrentDistance <= PlayerGrappleSmokeStartDistance - 200.0f)
+    {
+        UCharacterMovementComponent* TestMovement = Cast<ACharacter>(GetOwner())
+            ? Cast<ACharacter>(GetOwner())->GetCharacterMovement()
+            : nullptr;
+        SetPlayerGrappleEnabled(false);
+        const bool bMovementRestored = TestMovement
+            && PlayerGrappleState == EJMPlayerGrappleState::Disabled
+            && FMath::IsNearlyEqual(TestMovement->GravityScale, GrappleOriginalGravityScale)
+            && FMath::IsNearlyEqual(TestMovement->MaxWalkSpeed, GrappleOriginalMaxWalkSpeed)
+            && FMath::IsNearlyEqual(TestMovement->GroundFriction, GrappleOriginalGroundFriction)
+            && FMath::IsNearlyEqual(
+                TestMovement->BrakingFrictionFactor,
+                GrappleOriginalBrakingFrictionFactor);
+        if (bMovementRestored)
+        {
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT("JM_HARPOON_PLAYER_GRAPPLE_SMOKE_SUCCESS: distance %.1f -> %.1f cm, OnOff restore passed"),
+                PlayerGrappleSmokeStartDistance,
+                CurrentDistance);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Error, TEXT("JM_HARPOON_PLAYER_GRAPPLE_SMOKE_FAILED: OnOff movement restore failed"));
+        }
+        bPlayerGrappleSmokeCompleted = true;
+        ResetHarpoon();
+        return;
+    }
+
+    if (PlayerGrappleSmokeElapsed >= 2.0f
+        || PlayerGrappleState != EJMPlayerGrappleState::Pulling)
+    {
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT("JM_HARPOON_PLAYER_GRAPPLE_SMOKE_FAILED: state=%d distance=%.1f cm"),
+            static_cast<int32>(PlayerGrappleState),
+            CurrentDistance);
+        bPlayerGrappleSmokeCompleted = true;
+        EndPlayerGrapple(EJMPlayerGrappleEndReason::Timeout);
+        ResetHarpoon();
     }
 #endif
 }

@@ -6,9 +6,11 @@
 
 class AJMHarpoonProjectile;
 class AJMHarpoonGunVisualActor;
+class ACharacter;
 class APlayerController;
 class UCableComponent;
 class UCameraComponent;
+class UCharacterMovementComponent;
 class UPrimitiveComponent;
 class USceneComponent;
 
@@ -21,8 +23,34 @@ enum class EJMHarpoonGunState : uint8
     Retracting
 };
 
+UENUM(BlueprintType)
+enum class EJMPlayerGrappleState : uint8
+{
+    Disabled,
+    Idle,
+    Armed,
+    Pulling
+};
+
+UENUM(BlueprintType)
+enum class EJMPlayerGrappleEndReason : uint8
+{
+    Released,
+    ReachedAnchor,
+    HarpoonRecall,
+    InvalidAnchor,
+    Timeout,
+    Blocked,
+    FeatureDisabled
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FJMHarpoonStateEvent, AJMHarpoonProjectile*, Projectile);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FJMHarpoonImpactEvent, AJMHarpoonProjectile*, Projectile, const FHitResult&, Hit);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FJMPlayerGrappleStartedEvent, AJMHarpoonProjectile*, Projectile);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+    FJMPlayerGrappleEndedEvent,
+    AJMHarpoonProjectile*, Projectile,
+    EJMPlayerGrappleEndReason, Reason);
 
 /**
  * Fast first-person harpoon gun. It embeds in every blocking primitive and always supports recall.
@@ -55,6 +83,21 @@ public:
     UFUNCTION(BlueprintPure, Category="JM|Harpoon Gun")
     AJMHarpoonProjectile* GetActiveHarpoon() const { return ActiveProjectile; }
 
+    UFUNCTION(BlueprintCallable, Category="JM|Harpoon Gun|Player Grapple")
+    void SetPlayerGrappleEnabled(bool bEnabled);
+
+    UFUNCTION(BlueprintPure, Category="JM|Harpoon Gun|Player Grapple")
+    bool IsPlayerGrappleEnabled() const { return bEnablePlayerGrapple; }
+
+    UFUNCTION(BlueprintCallable, Category="JM|Harpoon Gun|Player Grapple")
+    bool StartPlayerGrapple();
+
+    UFUNCTION(BlueprintCallable, Category="JM|Harpoon Gun|Player Grapple")
+    void StopPlayerGrapple();
+
+    UFUNCTION(BlueprintPure, Category="JM|Harpoon Gun|Player Grapple")
+    EJMPlayerGrappleState GetPlayerGrappleState() const { return PlayerGrappleState; }
+
     void NotifyProjectileImpact(AJMHarpoonProjectile* Projectile, const FHitResult& Hit, const FVector& ImpactVelocity);
 
     UPROPERTY(BlueprintAssignable, Category="JM|Harpoon Gun")
@@ -69,8 +112,74 @@ public:
     UPROPERTY(BlueprintAssignable, Category="JM|Harpoon Gun")
     FJMHarpoonStateEvent OnHarpoonReturned;
 
+    UPROPERTY(BlueprintAssignable, Category="JM|Harpoon Gun|Player Grapple")
+    FJMPlayerGrappleStartedEvent OnPlayerGrappleStarted;
+
+    UPROPERTY(BlueprintAssignable, Category="JM|Harpoon Gun|Player Grapple")
+    FJMPlayerGrappleEndedEvent OnPlayerGrappleEnded;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Input")
     FKey FireKey = EKeys::LeftMouseButton;
+
+    /** Master switch. Turning it off during a pull immediately restores normal movement. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Input")
+    bool bEnablePlayerGrapple = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Input")
+    FKey PlayerGrappleKey = EKeys::RightMouseButton;
+
+    /** Allows the player to follow a projectile embedded in a moving physics body. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Input")
+    bool bAllowDynamicPlayerGrappleAnchors = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Movement", meta=(ClampMin="100.0", Units="cm/s^2"))
+    float PlayerGrappleAcceleration = 6500.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Movement", meta=(ClampMin="100.0", Units="cm/s"))
+    float PlayerGrappleMaxSpeed = 2500.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Movement", meta=(ClampMin="10.0", Units="cm"))
+    float PlayerGrappleStopDistance = 140.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Movement", meta=(ClampMin="10.0", Units="cm"))
+    float PlayerGrappleApproachSlowDistance = 550.0f;
+
+    /** Fraction of sideways velocity retained while the cable pulls inward. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Movement", meta=(ClampMin="0.0", ClampMax="1.0"))
+    float PlayerGrappleTangentialRetention = 0.9f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Movement", meta=(ClampMin="0.0", ClampMax="2.0"))
+    float PlayerGrappleGravityScale = 0.35f;
+
+    /** Removes this fraction of inward velocity when the player reaches the anchor. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Movement", meta=(ClampMin="0.0", ClampMax="1.0"))
+    float PlayerGrappleArrivalBraking = 0.8f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Safety", meta=(ClampMin="0.1", Units="s"))
+    float PlayerGrappleMaxDuration = 3.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Safety", meta=(ClampMin="0.1", Units="s"))
+    float PlayerGrappleBlockedTimeout = 0.5f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Safety", meta=(ClampMin="0.0", Units="cm"))
+    float PlayerGrappleMinimumProgress = 10.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Safety", meta=(ClampMin="100.0", Units="cm/s"))
+    float PlayerGrappleMaxDownwardSpeed = 1200.0f;
+
+    /** Keeps the first-person camera this far from blocking geometry while grappling. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Safety", meta=(ClampMin="0.0", Units="cm"))
+    float PlayerGrappleCameraClearance = 55.0f;
+
+    /** Radius of the predictive camera sweep. Increase it if narrow corners still clip. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Safety", meta=(ClampMin="0.0", Units="cm"))
+    float PlayerGrappleCameraProbeRadius = 14.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Presentation", meta=(ClampMin="0.0", ClampMax="30.0", Units="deg"))
+    float PlayerGrappleFOVBoost = 6.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Presentation", meta=(ClampMin="0.1"))
+    float PlayerGrappleFOVInterpSpeed = 10.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Fire", meta=(ClampMin="100.0", Units="cm/s"))
     float FireSpeed = 6500.0f;
@@ -253,10 +362,22 @@ private:
     void ShowCable(bool bShow);
     void AttachCableToActiveProjectile(float InitialLength);
     void SmoothCableLength(float TargetLength, float DeltaTime);
+    void UpdatePlayerGrappleInput(APlayerController* Controller);
+    void UpdatePlayerGrapple(float DeltaTime);
+    bool SweepPlayerGrappleCamera(
+        const FVector& CameraLocation,
+        const FVector& PullDirection,
+        const FVector& CandidateVelocity,
+        float DeltaTime,
+        FHitResult& OutHit) const;
+    void UpdatePlayerGrappleFOV(float DeltaTime);
+    void EndPlayerGrapple(EJMPlayerGrappleEndReason Reason);
+    void RestorePlayerGrappleMovement();
     bool HasHarpoonSafetyViolation() const;
     void BeginEmergencyReturn();
     void ForceCompleteReturnAtDeadline();
     void UpdateFailSafeSmoke();
+    void UpdatePlayerGrappleSmoke(float DeltaTime);
     void UpdateFlying(float DeltaTime);
     void UpdateEmbedded(float DeltaTime);
     void UpdateRetracting(float DeltaTime);
@@ -284,6 +405,7 @@ private:
     FVector EmbeddedLocalPoint = FVector::ZeroVector;
     FVector LastImpactVelocity = FVector::ZeroVector;
     EJMHarpoonGunState State = EJMHarpoonGunState::Ready;
+    EJMPlayerGrappleState PlayerGrappleState = EJMPlayerGrappleState::Disabled;
     float CooldownRemaining = 0.0f;
     float RecallElapsed = 0.0f;
     float RecallStartDistance = 0.0f;
@@ -297,6 +419,23 @@ private:
     bool bFreeReturnGrounded = false;
     bool bFreeReturnFinalLift = false;
     bool bDeadlineRecoveryTriggered = false;
+    TWeakObjectPtr<ACharacter> GrappleCharacter;
+    TWeakObjectPtr<UCharacterMovementComponent> GrappleMovement;
+    TWeakObjectPtr<UCameraComponent> GrappleCamera;
+    float GrappleOriginalGravityScale = 1.0f;
+    float GrappleOriginalMaxWalkSpeed = 600.0f;
+    float GrappleOriginalGroundFriction = 8.0f;
+    float GrappleOriginalBrakingFrictionFactor = 2.0f;
+    float GrappleBaseFOV = 90.0f;
+    float PlayerGrappleElapsed = 0.0f;
+    float PlayerGrappleBlockedElapsed = 0.0f;
+    float PlayerGrappleProgressStartDistance = 0.0f;
+    bool bPlayerGrappleMovementOverridden = false;
+    bool bPlayerGrappleFOVActive = false;
     bool bFailSafeSmokeStarted = false;
     bool bFailSafeSmokeCompleted = false;
+    bool bPlayerGrappleSmokeStarted = false;
+    bool bPlayerGrappleSmokeCompleted = false;
+    float PlayerGrappleSmokeElapsed = 0.0f;
+    float PlayerGrappleSmokeStartDistance = 0.0f;
 };

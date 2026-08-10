@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.4.1
+
+### Added
+
+- Camera-surface clearance and a predictive sphere sweep for player grappling, both exposed as Blueprint tuning values.
+
+### Fixed
+
+- Pulling toward ceilings, walls, and corners no longer allows the first-person camera to cross blocking geometry.
+- Surface blocking removes only velocity into the hit normal, retaining useful tangential momentum.
+
+## 1.4.0
+
+### Added
+
+- Optional player grappling feature with a Blueprint/runtime master switch and configurable input key.
+- Right-mouse hold flow: arm while the projectile is flying, begin pulling on embed, and preserve release momentum.
+- CharacterMovement-based acceleration, approach slowdown, tangential velocity retention, reduced grapple gravity, arrival braking, and FOV feedback.
+- Static and optional dynamic physics anchors, blocked-progress cancellation, downward-speed limiting, maximum grapple duration, and Blueprint start/end events.
+
+### Changed
+
+- Harpoon recall, emergency recovery, invalid anchors, and feature disable now restore all temporarily overridden character movement values before continuing.
+
 ## 1.3.6
 
 ### Added
