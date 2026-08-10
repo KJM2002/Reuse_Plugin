@@ -154,6 +154,19 @@ stateDiagram-v2
 | `Minimum Recall Progress` | `100` | cm | 위 시간 동안 이 거리보다 적게 움직이면 물체를 포기하고 작살만 회수한다. |
 | `Return Separation Distance` | `20` | cm | 박힌 표면과 겹친 작살을 발사 반대 방향으로 먼저 빼낸 뒤 회수를 시작하는 거리 |
 
+### Recall > Safety
+
+| 속성 | 기본값 | 단위 | 설명 |
+|---|---:|---:|---|
+| `Fail Safe Max Distance` | `6000` | cm | 플레이어와 작살의 거리가 이 값을 넘으면 물체를 포기하고 비상 회수한다. 실제 판정은 `Max Range × 1.5`보다 작아지지 않는다. |
+| `Fail Safe Max Vertical Drop` | `5000` | cm | 작살이 플레이어보다 이 높이 이상 아래로 떨어지면 비상 회수한다. |
+| `Fail Safe Kill Z Margin` | `1000` | cm | 월드 `KillZ`에 도달하기 전에 미리 비상 회수하는 여유 높이 |
+| `Fail Safe Recovery Distance` | `450` | cm | 기존 작살이 이미 엔진에서 삭제된 경우 플레이어 앞에 회수용 작살을 복구할 거리 |
+| `Max Recall Duration` | `4.0` | s | 회수 시작부터 반드시 `Ready` 상태가 되기까지 허용하는 절대 최대 시간 |
+| `Recall Deadline Lead Time` | `0.75` | s | 마감 전에 물체를 포기하고 플레이어 앞에서 마지막 귀환 연출을 시작할 시간 |
+
+비상 회수 시 박힌 물리 오브젝트와의 연결을 끊고, 기존 작살이 유효하면 제거한다. 이후 플레이어 앞의 안전한 지점에 충돌 없는 회수용 작살을 생성하고 총구로 마지막 호밍을 수행한다. `Max Recall Duration - Recall Deadline Lead Time` 시점까지 정상 귀환하지 못하면 이 비상 귀환을 강제로 시작한다. 그래도 마감 시각까지 완료하지 못하면 작살을 총구에 즉시 복귀시키고 `Ready` 상태를 확정한다. 레벨 전환이나 월드 종료 때문에 생성 자체가 불가능한 경우에도 장전 상태로 즉시 복구된다.
+
 물리 오브젝트를 더 쉽게 끌고 싶다면 먼저 `Max Pull Force`를 높인다. 당김 반응만 빠르게 만들고 싶다면 `Pull Strength`를 높이고, 진동하거나 플레이어를 지나치는 현상이 생기면 `Pull Damping`, `Physics Release Distance`, `Release Braking`을 조정한다.
 
 ### Recall > Arc

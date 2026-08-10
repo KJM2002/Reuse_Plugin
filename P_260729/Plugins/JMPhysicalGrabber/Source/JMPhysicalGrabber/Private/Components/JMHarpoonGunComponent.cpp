@@ -10,6 +10,9 @@
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/WorldSettings.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 UJMHarpoonGunComponent::UJMHarpoonGunComponent()
 {
@@ -56,6 +59,15 @@ void UJMHarpoonGunComponent::TickComponent(float DeltaTime, ELevelTick TickType,
         {
             RecallHarpoon();
         }
+    }
+
+#if !UE_BUILD_SHIPPING
+    UpdateFailSafeSmoke();
+#endif
+
+    if (State != EJMHarpoonGunState::Ready && HasHarpoonSafetyViolation())
+    {
+        BeginEmergencyReturn();
     }
 
     switch (State)
@@ -122,13 +134,7 @@ bool UJMHarpoonGunComponent::FireHarpoon()
     State = EJMHarpoonGunState::Flying;
     RecoilAlpha = 1.0f;
     ShowCable(true);
-    if (Cable)
-    {
-        USceneComponent* CableEnd = ActiveProjectile->GetCableAnchor();
-        Cable->EndLocation = FVector::ZeroVector;
-        Cable->SetAttachEndToComponent(CableEnd ? CableEnd : ActiveProjectile->GetRootComponent());
-        Cable->CableLength = 100.0f;
-    }
+    AttachCableToActiveProjectile(100.0f);
 
     if (APlayerController* Controller = GetOwningPlayerController())
     {
@@ -153,6 +159,7 @@ bool UJMHarpoonGunComponent::RecallHarpoon()
 
     const bool bWasFlying = State == EJMHarpoonGunState::Flying;
     RecallElapsed = 0.0f;
+    bDeadlineRecoveryTriggered = false;
     RecallStartDistance = FVector::Distance(GetMuzzleLocation(), ActiveProjectile->GetActorLocation());
     bPullingPhysicsTarget = State == EJMHarpoonGunState::Embedded
         && IsValid(EmbeddedComponent)
@@ -202,6 +209,7 @@ void UJMHarpoonGunComponent::ResetHarpoon()
     FreeReturnGroundNormal = FVector::UpVector;
     bFreeReturnGrounded = false;
     bFreeReturnFinalLift = false;
+    bDeadlineRecoveryTriggered = false;
     State = EJMHarpoonGunState::Ready;
     ShowCable(false);
 }
@@ -377,6 +385,215 @@ void UJMHarpoonGunComponent::ShowCable(bool bShow)
     }
 }
 
+void UJMHarpoonGunComponent::AttachCableToActiveProjectile(float InitialLength)
+{
+    if (!Cable || !IsValid(ActiveProjectile))
+    {
+        return;
+    }
+
+    USceneComponent* CableEnd = ActiveProjectile->GetCableAnchor();
+    Cable->EndLocation = FVector::ZeroVector;
+    Cable->SetAttachEndToComponent(CableEnd ? CableEnd : ActiveProjectile->GetRootComponent());
+    Cable->CableLength = FMath::Max(100.0f, InitialLength);
+}
+
+bool UJMHarpoonGunComponent::HasHarpoonSafetyViolation() const
+{
+    if (!IsValid(ActiveProjectile))
+    {
+        return true;
+    }
+
+    const FVector ProjectileLocation = ActiveProjectile->GetActorLocation();
+    const FVector MuzzleLocation = GetMuzzleLocation();
+    if (ProjectileLocation.ContainsNaN() || MuzzleLocation.ContainsNaN())
+    {
+        return true;
+    }
+
+    const float SafeMaxDistance = FMath::Max(FailSafeMaxDistance, MaxRange * 1.5f);
+    if (FVector::DistSquared(ProjectileLocation, MuzzleLocation) > FMath::Square(SafeMaxDistance))
+    {
+        return true;
+    }
+
+    if (ProjectileLocation.Z < MuzzleLocation.Z - FailSafeMaxVerticalDrop)
+    {
+        return true;
+    }
+
+    if (const AWorldSettings* WorldSettings = GetWorld() ? GetWorld()->GetWorldSettings() : nullptr)
+    {
+        if (ProjectileLocation.Z <= WorldSettings->KillZ + FailSafeKillZMargin)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void UJMHarpoonGunComponent::BeginEmergencyReturn()
+{
+    if (!GetWorld() || !GetOwner() || !ProjectileClass)
+    {
+        ResetHarpoon();
+        return;
+    }
+
+    const bool bRecallAlreadyStarted = State == EJMHarpoonGunState::Retracting;
+    const float PreservedRecallElapsed = RecallElapsed;
+    AJMHarpoonProjectile* LostProjectile = ActiveProjectile;
+    ActiveProjectile = nullptr;
+    if (IsValid(LostProjectile))
+    {
+        LostProjectile->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+        LostProjectile->Destroy();
+    }
+
+    EmbeddedComponent = nullptr;
+    EmbeddedBone = NAME_None;
+    EmbeddedLocalPoint = FVector::ZeroVector;
+    bPullingPhysicsTarget = false;
+
+    const FVector MuzzleLocation = GetMuzzleLocation();
+    FVector ViewLocation;
+    FVector ViewDirection;
+    if (!GetView(ViewLocation, ViewDirection) || ViewDirection.ContainsNaN())
+    {
+        ViewDirection = GetOwner()->GetActorForwardVector();
+    }
+    ViewDirection = ViewDirection.GetSafeNormal(SMALL_NUMBER, FVector::ForwardVector);
+    const FVector RecoveryLocation = MuzzleLocation
+        + ViewDirection * FailSafeRecoveryDistance
+        + FVector::DownVector * FMath::Min(75.0f, FailSafeRecoveryDistance * 0.15f);
+    const FRotator RecoveryRotation = (MuzzleLocation - RecoveryLocation).Rotation();
+
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.Owner = GetOwner();
+    SpawnParams.Instigator = Cast<APawn>(GetOwner());
+    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    ActiveProjectile = GetWorld()->SpawnActor<AJMHarpoonProjectile>(
+        ProjectileClass,
+        RecoveryLocation,
+        RecoveryRotation,
+        SpawnParams);
+
+    if (!ActiveProjectile)
+    {
+        // The visible loaded preview is the final fallback if actor spawning is
+        // unavailable during world shutdown or level transition.
+        ResetHarpoon();
+        return;
+    }
+
+    if (GunVisualActor && GunVisualActor->GetMuzzlePoint())
+    {
+        ActiveProjectile->SetActorScale3D(GunVisualActor->GetMuzzlePoint()->GetComponentScale());
+    }
+    ActiveProjectile->BeginFreeReturn();
+
+    RecallElapsed = bRecallAlreadyStarted ? PreservedRecallElapsed : 0.0f;
+    RecallStartDistance = FVector::Distance(MuzzleLocation, RecoveryLocation);
+    FreeReturnElapsed = 0.0f;
+    FreeReturnPhaseElapsed = 0.0f;
+    FreeReturnVelocity = FVector::ZeroVector;
+    FreeReturnGroundNormal = FVector::UpVector;
+    bFreeReturnGrounded = false;
+    bFreeReturnFinalLift = true;
+    bDeadlineRecoveryTriggered = true;
+    State = EJMHarpoonGunState::Retracting;
+
+    ShowCable(true);
+    AttachCableToActiveProjectile(RecallStartDistance);
+    if (!bRecallAlreadyStarted)
+    {
+        OnHarpoonRecallStarted.Broadcast(ActiveProjectile);
+    }
+}
+
+void UJMHarpoonGunComponent::ForceCompleteReturnAtDeadline()
+{
+    EmbeddedComponent = nullptr;
+    EmbeddedBone = NAME_None;
+    EmbeddedLocalPoint = FVector::ZeroVector;
+    bPullingPhysicsTarget = false;
+
+    if (IsValid(ActiveProjectile))
+    {
+        ActiveProjectile->BeginFreeReturn();
+        ActiveProjectile->SetActorLocationAndRotation(
+            GetMuzzleLocation(),
+            GetOwner() ? GetOwner()->GetActorForwardVector().Rotation() : FRotator::ZeroRotator,
+            false,
+            nullptr,
+            ETeleportType::TeleportPhysics);
+    }
+
+    CompleteReturn();
+}
+
+void UJMHarpoonGunComponent::UpdateFailSafeSmoke()
+{
+#if UE_BUILD_SHIPPING
+    return;
+#else
+    const bool bRunLostProjectileSmoke = FParse::Param(
+        FCommandLine::Get(),
+        TEXT("JMHarpoonFailSafeSmoke"));
+    const bool bRunDeadlineSmoke = FParse::Param(
+        FCommandLine::Get(),
+        TEXT("JMHarpoonDeadlineSmoke"));
+    if ((!bRunLostProjectileSmoke && !bRunDeadlineSmoke) || bFailSafeSmokeCompleted)
+    {
+        return;
+    }
+
+    if (!bFailSafeSmokeStarted && State == EJMHarpoonGunState::Ready)
+    {
+        if (FireHarpoon() && IsValid(ActiveProjectile))
+        {
+            if (bRunDeadlineSmoke)
+            {
+                // Make ordinary return impossible within the test deadline.
+                // The hard deadline must perform the final state recovery.
+                MaxRecallDuration = 0.75f;
+                RecallDeadlineLeadTime = 0.25f;
+                ReelSpeed = 100.0f;
+                const FVector FarLocation = GetMuzzleLocation()
+                    + GetOwner()->GetActorForwardVector().GetSafeNormal() * 3000.0f;
+                ActiveProjectile->SetActorLocation(FarLocation, false, nullptr, ETeleportType::TeleportPhysics);
+                RecallHarpoon();
+                UE_LOG(LogTemp, Display, TEXT("JM_HARPOON_DEADLINE_SMOKE: slow return started 3000 cm away"));
+            }
+            else
+            {
+                // Simulate the strongest failure mode: the world deleted the
+                // projectile before the gun component could detach it.
+                ActiveProjectile->Destroy();
+                UE_LOG(LogTemp, Display, TEXT("JM_HARPOON_FAILSAFE_SMOKE: original projectile destroyed"));
+            }
+            bFailSafeSmokeStarted = true;
+        }
+        return;
+    }
+
+    if (bFailSafeSmokeStarted && State == EJMHarpoonGunState::Ready)
+    {
+        bFailSafeSmokeCompleted = true;
+        if (bRunDeadlineSmoke)
+        {
+            UE_LOG(LogTemp, Display, TEXT("JM_HARPOON_DEADLINE_SMOKE_SUCCESS: Ready state forced before deadline"));
+        }
+        else
+        {
+            UE_LOG(LogTemp, Display, TEXT("JM_HARPOON_FAILSAFE_SMOKE_SUCCESS: replacement harpoon returned"));
+        }
+    }
+#endif
+}
+
 void UJMHarpoonGunComponent::SmoothCableLength(float TargetLength, float DeltaTime)
 {
     if (!Cable)
@@ -440,6 +657,24 @@ void UJMHarpoonGunComponent::UpdateRetracting(float DeltaTime)
     }
 
     RecallElapsed += DeltaTime;
+    const float SafeMaxRecallDuration = FMath::Max(MaxRecallDuration, 0.5f);
+    if (RecallElapsed >= SafeMaxRecallDuration)
+    {
+        ForceCompleteReturnAtDeadline();
+        return;
+    }
+
+    const float SafeDeadlineLeadTime = FMath::Clamp(
+        RecallDeadlineLeadTime,
+        0.1f,
+        SafeMaxRecallDuration);
+    if (!bDeadlineRecoveryTriggered
+        && RecallElapsed >= SafeMaxRecallDuration - SafeDeadlineLeadTime)
+    {
+        BeginEmergencyReturn();
+        return;
+    }
+
     const FVector MuzzleLocation = GetMuzzleLocation();
 
     if (bPullingPhysicsTarget && IsValid(EmbeddedComponent) && EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone))
@@ -803,6 +1038,7 @@ void UJMHarpoonGunComponent::CompleteReturn()
     bPullingPhysicsTarget = false;
     bFreeReturnGrounded = false;
     bFreeReturnFinalLift = false;
+    bDeadlineRecoveryTriggered = false;
     State = EJMHarpoonGunState::Ready;
     CooldownRemaining = FireCooldown;
     RecoilAlpha = 0.35f;

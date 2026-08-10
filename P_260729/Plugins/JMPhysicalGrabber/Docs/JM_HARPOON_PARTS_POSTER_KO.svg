@@ -242,5 +242,5 @@
 
   <!-- Footer -->
   <text x="64" y="1180" class="small">※ Cable은 런타임에 MuzzlePoint와 발사체 뒤쪽 CableAnchor 사이에 생성됩니다.</text>
-  <text x="1852" y="1180" text-anchor="end" class="small">JMPhysicalGrabber · v1.3.4</text>
+  <text x="1852" y="1180" text-anchor="end" class="small">JMPhysicalGrabber · v1.3.6</text>
 </svg>

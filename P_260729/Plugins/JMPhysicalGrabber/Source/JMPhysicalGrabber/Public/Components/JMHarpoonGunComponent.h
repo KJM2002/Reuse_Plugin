@@ -176,6 +176,30 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall", meta=(ClampMin="0.0", Units="cm"))
     float ReturnSeparationDistance = 20.0f;
 
+    /** Emergency recovery begins if the projectile exceeds this player distance. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Safety", meta=(ClampMin="1000.0", Units="cm"))
+    float FailSafeMaxDistance = 6000.0f;
+
+    /** Emergency recovery begins this far below the player, even when the map KillZ is much lower. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Safety", meta=(ClampMin="500.0", Units="cm"))
+    float FailSafeMaxVerticalDrop = 5000.0f;
+
+    /** Recovery starts above the world's KillZ so the engine cannot delete the harpoon first. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Safety", meta=(ClampMin="0.0", Units="cm"))
+    float FailSafeKillZMargin = 1000.0f;
+
+    /** Distance in front of the player where a lost or invalid harpoon is recreated for final return. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Safety", meta=(ClampMin="100.0", Units="cm"))
+    float FailSafeRecoveryDistance = 450.0f;
+
+    /** Absolute deadline from recall start to the Ready state. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Safety", meta=(ClampMin="0.5", Units="s"))
+    float MaxRecallDuration = 4.0f;
+
+    /** Before the deadline, abandon the target and recreate the spear nearby for a visible final return. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Safety", meta=(ClampMin="0.1", Units="s"))
+    float RecallDeadlineLeadTime = 0.75f;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation")
     FVector MuzzleOffset = FVector(80.0f, 18.0f, -14.0f);
 
@@ -227,7 +251,12 @@ private:
     void EnsurePresentation();
     void DestroyPresentation();
     void ShowCable(bool bShow);
+    void AttachCableToActiveProjectile(float InitialLength);
     void SmoothCableLength(float TargetLength, float DeltaTime);
+    bool HasHarpoonSafetyViolation() const;
+    void BeginEmergencyReturn();
+    void ForceCompleteReturnAtDeadline();
+    void UpdateFailSafeSmoke();
     void UpdateFlying(float DeltaTime);
     void UpdateEmbedded(float DeltaTime);
     void UpdateRetracting(float DeltaTime);
@@ -267,4 +296,7 @@ private:
     bool bPullingPhysicsTarget = false;
     bool bFreeReturnGrounded = false;
     bool bFreeReturnFinalLift = false;
+    bool bDeadlineRecoveryTriggered = false;
+    bool bFailSafeSmokeStarted = false;
+    bool bFailSafeSmokeCompleted = false;
 };

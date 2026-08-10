@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.3.6
+
+### Added
+
+- Absolute recall deadline with an early emergency-return window and a final forced Ready-state fallback.
+
+### Fixed
+
+- Continuously falling or otherwise moving physics targets can no longer bypass the heavy-target progress timeout forever.
+- Preserve the original recall elapsed time when emergency recreation occurs, preventing recovery from extending the deadline.
+
+## 1.3.5
+
+### Added
+
+- Continuous harpoon fail-safe checks for invalid coordinates, excessive player distance, excessive vertical drop, and the world KillZ margin.
+- Emergency return actor recreation in front of the player when the original projectile was already destroyed outside the world.
+
+### Fixed
+
+- A harpoon attached to a physics object that leaves the playable map can no longer be permanently lost with that object.
+
 ## 1.3.4
 
 ### Added
