@@ -69,6 +69,14 @@
 		{
 			"Name": "JMRoomGrid",
 			"Enabled": true
+		},
+		{
+			"Name": "JMPhysicalGrabber",
+			"Enabled": true
+		},
+		{
+			"Name": "CableComponent",
+			"Enabled": true
 		}
 	]
 }

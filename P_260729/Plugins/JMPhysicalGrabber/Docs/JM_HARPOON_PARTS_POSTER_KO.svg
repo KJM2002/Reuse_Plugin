@@ -1,0 +1,246 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1200" viewBox="0 0 1920 1200">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#26354a" stroke-width="1" opacity="0.38"/>
+    </pattern>
+    <linearGradient id="wood" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9c643c"/>
+      <stop offset="0.48" stop-color="#6f3f29"/>
+      <stop offset="1" stop-color="#3f241c"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d7dde2"/>
+      <stop offset="0.32" stop-color="#7d8994"/>
+      <stop offset="0.72" stop-color="#3e4954"/>
+      <stop offset="1" stop-color="#171f29"/>
+    </linearGradient>
+    <linearGradient id="darkMetal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#687582"/>
+      <stop offset="1" stop-color="#1e2833"/>
+    </linearGradient>
+    <radialGradient id="impactGlow">
+      <stop offset="0" stop-color="#fff8cf" stop-opacity="0.95"/>
+      <stop offset="0.34" stop-color="#ffb244" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#ff7138" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+    <marker id="arrowCyan" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#55d9e8"/>
+    </marker>
+    <style>
+      .title { font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif; font-size: 50px; font-weight: 700; fill: #f3f0e8; }
+      .subtitle { font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif; font-size: 21px; fill: #9fb0c4; }
+      .section { font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif; font-size: 27px; font-weight: 700; fill: #f3f0e8; }
+      .label-title { font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif; font-size: 17px; font-weight: 700; fill: #f3f0e8; }
+      .label-body { font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif; font-size: 14px; fill: #b9c6d3; }
+      .body { font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif; font-size: 18px; fill: #c9d3df; }
+      .small { font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif; font-size: 14px; fill: #9fb0c4; }
+      .orange-line { stroke: #ff9a45; stroke-width: 2.5; fill: none; }
+      .cyan-line { stroke: #55d9e8; stroke-width: 2.5; fill: none; stroke-dasharray: 8 7; }
+      .card { fill: #131f2f; stroke: #33465d; stroke-width: 1.5; }
+      .visible-dot { fill: #ff9a45; stroke: #ffe1c2; stroke-width: 2; }
+      .logic-dot { fill: #55d9e8; stroke: #c4f8ff; stroke-width: 2; }
+    </style>
+  </defs>
+
+  <rect width="1920" height="1200" fill="#0b1320"/>
+  <rect width="1920" height="1200" fill="url(#grid)"/>
+
+  <!-- Header -->
+  <text x="64" y="76" class="title">JM 작살총 파츠 가이드</text>
+  <text x="66" y="112" class="subtitle">완성 모델이 아니라 기능·위치·상태를 먼저 검증하기 위한 엔진 기본 도형 그레이박스</text>
+  <rect x="1372" y="45" width="480" height="58" rx="16" fill="#172538" stroke="#ff9a45" stroke-width="2"/>
+  <circle cx="1406" cy="74" r="10" class="visible-dot"/>
+  <text x="1428" y="69" class="label-title">주황색 · 실게임에 보이는 메시</text>
+  <circle cx="1406" cy="89" r="8" class="logic-dot"/>
+  <text x="1428" y="94" class="label-body">청록색 · 게임에서 보이지 않는 기능 컴포넌트</text>
+
+  <!-- Warning / diagnosis banner -->
+  <rect x="64" y="136" width="1788" height="64" rx="14" fill="#2d211d" stroke="#b96539" stroke-width="1.5"/>
+  <path d="M88 181 L108 145 L128 181 Z" fill="#ff9a45"/>
+  <text x="146" y="161" class="label-title">현재 뷰포트가 흩어져 보이는 이유</text>
+  <text x="146" y="184" class="label-body">Cylinder/Cone의 기본 길이축은 Z인데 Yaw만 90° 적용되어 세로로 남았습니다. 의도는 아래처럼 총열과 작살이 X축을 따라 가로로 연결되는 형태입니다.</text>
+
+  <!-- Main gun panel -->
+  <rect x="64" y="224" width="1220" height="574" rx="22" fill="#0f1a29" stroke="#33465d" stroke-width="2"/>
+  <text x="94" y="266" class="section">총 외형 BP · BP_JMHarpoonGunVisual</text>
+  <text x="94" y="294" class="small">해적선 작살총의 옆모습을 기준으로 한 의도된 조립 형태</text>
+
+  <!-- Gun silhouette -->
+  <g filter="url(#shadow)">
+    <!-- body -->
+    <rect x="338" y="444" width="390" height="116" rx="25" fill="url(#wood)" stroke="#d59861" stroke-width="3"/>
+    <path d="M365 472 C445 452 598 458 700 485" stroke="#ba8053" stroke-width="7" opacity="0.32" fill="none"/>
+    <path d="M376 525 C500 505 604 520 695 538" stroke="#38231d" stroke-width="6" opacity="0.42" fill="none"/>
+    <!-- handle -->
+    <path d="M415 548 L515 548 L487 724 Q475 748 451 742 L389 716 Z" fill="url(#wood)" stroke="#d59861" stroke-width="3"/>
+    <path d="M424 579 L488 578 L474 692 L418 681 Z" fill="#2b1d19" opacity="0.6"/>
+    <!-- barrel -->
+    <rect x="650" y="451" width="420" height="54" rx="24" fill="url(#metal)" stroke="#dbe3ea" stroke-width="2"/>
+    <rect x="685" y="462" width="348" height="8" rx="4" fill="#f3f6f8" opacity="0.34"/>
+    <!-- muzzle -->
+    <path d="M1037 432 L1128 432 L1146 451 L1146 505 L1128 524 L1037 524 Z" fill="url(#darkMetal)" stroke="#a9b5c0" stroke-width="3"/>
+    <rect x="1125" y="446" width="28" height="64" rx="8" fill="#111a24" stroke="#d2dae1" stroke-width="3"/>
+    <!-- winch supports -->
+    <path d="M446 443 L468 383 L524 383 L551 443" fill="none" stroke="#596775" stroke-width="13"/>
+    <!-- winch drum -->
+    <ellipse cx="500" cy="374" rx="84" ry="70" fill="#222f3c" stroke="#c1c9cf" stroke-width="4"/>
+    <ellipse cx="500" cy="374" rx="58" ry="48" fill="#73513a" stroke="#c98b57" stroke-width="4"/>
+    <circle cx="500" cy="374" r="17" fill="#c6ced5" stroke="#26313d" stroke-width="5"/>
+    <path d="M450 350 Q500 330 550 350 M445 371 Q500 351 555 371 M448 394 Q500 374 552 394" fill="none" stroke="#d1aa77" stroke-width="6" opacity="0.75"/>
+    <!-- loaded shaft -->
+    <rect x="615" y="467" width="478" height="14" rx="7" fill="#d3d8dc" stroke="#4c5966" stroke-width="2"/>
+    <!-- loaded tip -->
+    <path d="M1090 456 L1172 474 L1090 492 Z" fill="#dce2e6" stroke="#4b5864" stroke-width="3"/>
+    <!-- decorative band -->
+    <rect x="611" y="444" width="32" height="70" rx="8" fill="#3a4652" stroke="#aeb8c1" stroke-width="2"/>
+    <!-- rope -->
+    <path d="M542 345 C655 322 781 355 895 405 C970 437 1028 435 1129 432" fill="none" stroke="#c89d66" stroke-width="8" stroke-linecap="round"/>
+    <path d="M542 345 C655 322 781 355 895 405 C970 437 1028 435 1129 432" fill="none" stroke="#5d432c" stroke-width="2" stroke-dasharray="7 7"/>
+  </g>
+
+  <!-- Muzzle point logic marker -->
+  <circle cx="1154" cy="478" r="24" fill="none" stroke="#55d9e8" stroke-width="3" stroke-dasharray="6 5"/>
+  <path d="M1154 464 L1168 478 L1154 492 L1140 478 Z" fill="#55d9e8"/>
+
+  <!-- Gun callout cards -->
+  <g>
+    <rect x="92" y="326" width="226" height="60" rx="12" class="card"/>
+    <circle cx="112" cy="345" r="9" class="visible-dot"/>
+    <text x="130" y="348" class="label-title">BODY · 몸체</text>
+    <text x="112" y="372" class="label-body">모든 총 파츠를 묶는 중심 프레임</text>
+    <path d="M318 356 L374 423 L420 459" class="orange-line"/>
+
+    <rect x="92" y="640" width="226" height="66" rx="12" class="card"/>
+    <circle cx="112" cy="660" r="9" class="visible-dot"/>
+    <text x="130" y="663" class="label-title">HANDLE · 손잡이</text>
+    <text x="112" y="687" class="label-body">플레이어가 잡는 외형 파츠</text>
+    <path d="M318 671 L386 671 L430 648" class="orange-line"/>
+
+    <rect x="670" y="326" width="224" height="60" rx="12" class="card"/>
+    <circle cx="690" cy="345" r="9" class="visible-dot"/>
+    <text x="708" y="348" class="label-title">BARREL · 총열</text>
+    <text x="690" y="372" class="label-body">작살이 지나가는 긴 레일</text>
+    <path d="M786 386 L786 448" class="orange-line"/>
+
+    <rect x="932" y="326" width="226" height="60" rx="12" class="card"/>
+    <circle cx="952" cy="345" r="9" class="visible-dot"/>
+    <text x="970" y="348" class="label-title">MUZZLE · 총구</text>
+    <text x="952" y="372" class="label-body">총열 끝의 보이는 외형</text>
+    <path d="M1048 386 L1080 432" class="orange-line"/>
+
+    <rect x="92" y="540" width="226" height="66" rx="12" class="card"/>
+    <circle cx="112" cy="560" r="9" class="visible-dot"/>
+    <text x="130" y="563" class="label-title">WINCH · 줄 감개</text>
+    <text x="112" y="587" class="label-body">발사·회수 때 회전하는 드럼</text>
+    <path d="M318 572 L393 520 L466 416" class="orange-line"/>
+
+    <rect x="584" y="640" width="248" height="68" rx="12" class="card"/>
+    <circle cx="604" cy="660" r="9" class="visible-dot"/>
+    <text x="622" y="663" class="label-title">LOADED PREVIEW</text>
+    <text x="604" y="687" class="label-body">Projectile Class 전체 외형 표시</text>
+    <path d="M708 640 L742 536 L742 482" class="orange-line"/>
+
+    <rect x="848" y="640" width="244" height="68" rx="12" class="card"/>
+    <circle cx="868" cy="660" r="9" class="visible-dot"/>
+    <text x="886" y="663" class="label-title">자동 동기화</text>
+    <text x="868" y="687" class="label-body">회전 · 메시 · 재질 · 스케일 공유</text>
+    <path d="M970 640 L1078 505 L1110 489" class="orange-line"/>
+
+    <rect x="1098" y="640" width="158" height="84" rx="12" class="card"/>
+    <circle cx="1118" cy="660" r="9" class="logic-dot"/>
+    <text x="1136" y="663" class="label-title">MUZZLE POINT</text>
+    <text x="1118" y="686" class="label-body">작살 생성 위치</text>
+    <text x="1118" y="706" class="label-body">+ 케이블 시작점</text>
+    <path d="M1176 640 L1164 526 L1154 502" class="cyan-line"/>
+  </g>
+
+  <!-- Explanation panel -->
+  <rect x="1308" y="224" width="544" height="574" rx="22" fill="#101c2b" stroke="#33465d" stroke-width="2"/>
+  <text x="1340" y="267" class="section">무슨 의도였나?</text>
+  <text x="1340" y="308" class="body">① 기능을 먼저 나눈 그레이박스</text>
+  <text x="1362" y="337" class="small">Body, Barrel, Winch처럼 역할별 파츠를 분리해</text>
+  <text x="1362" y="359" class="small">상태 애니메이션과 교체 지점을 먼저 확보했습니다.</text>
+
+  <text x="1340" y="405" class="body">② 해적선 작살총의 옆 실루엣</text>
+  <text x="1362" y="434" class="small">몸체 아래 손잡이, 앞쪽 긴 총열, 위쪽 줄 감개,</text>
+  <text x="1362" y="456" class="small">총열 중앙의 장전 작살을 의도했습니다.</text>
+
+  <text x="1340" y="502" class="body">③ 메시와 기능 컴포넌트 분리</text>
+  <text x="1362" y="531" class="small">MuzzlePoint, Collision, ImpactLight,</text>
+  <text x="1362" y="553" class="small">ProjectileMovement는 위치·판정·로직이며 모델이 아닙니다.</text>
+
+  <rect x="1340" y="590" width="480" height="168" rx="16" fill="#1c2939" stroke="#55d9e8" stroke-width="1.5"/>
+  <text x="1364" y="624" class="label-title">스크린샷 아이콘 해석</text>
+  <circle cx="1372" cy="655" r="12" fill="#fff" opacity="0.9"/>
+  <path d="M1366 667 L1378 667" stroke="#fff" stroke-width="6"/>
+  <text x="1400" y="661" class="label-body">큰 전구 = ImpactLight 편집 아이콘</text>
+  <path d="M1360 704 L1382 704 M1371 693 L1371 715" stroke="#55d9e8" stroke-width="4"/>
+  <path d="M1382 704 L1375 698 M1382 704 L1375 710" stroke="#55d9e8" stroke-width="3"/>
+  <text x="1400" y="710" class="label-body">큰 화살표 = 이동 컴포넌트 편집 아이콘</text>
+  <text x="1364" y="742" class="small">둘 다 게임 화면에서는 그대로 보이지 않습니다.</text>
+
+  <!-- Projectile panel -->
+  <rect x="64" y="824" width="1788" height="318" rx="22" fill="#0f1a29" stroke="#33465d" stroke-width="2"/>
+  <text x="94" y="868" class="section">발사체 BP · BP_JMHarpoonProjectile</text>
+  <text x="94" y="896" class="small">장전 미리보기와 실제 발사에 함께 사용되어 외형 수정이 자동으로 공유되는 Actor</text>
+
+  <!-- projectile visible shape -->
+  <g filter="url(#shadow)">
+    <path d="M435 965 L505 930 L505 956 L612 956 L612 978 L505 978 L505 1004 Z" fill="#697787" stroke="#c7d0d7" stroke-width="3"/>
+    <rect x="492" y="956" width="610" height="24" rx="11" fill="url(#metal)" stroke="#dbe3ea" stroke-width="2"/>
+    <path d="M1098 934 L1200 968 L1098 1002 Z" fill="#dce2e6" stroke="#53606c" stroke-width="3"/>
+    <rect x="496" y="950" width="44" height="36" rx="8" fill="#313e4b" stroke="#9eabb6" stroke-width="2"/>
+  </g>
+
+  <!-- projectile motion and logic -->
+  <path d="M422 936 C650 852 1010 858 1228 930" class="cyan-line" marker-end="url(#arrowCyan)"/>
+  <ellipse cx="1140" cy="968" rx="88" ry="76" fill="#55d9e8" opacity="0.09" stroke="#55d9e8" stroke-width="3" stroke-dasharray="9 7"/>
+  <circle cx="1164" cy="968" r="54" fill="url(#impactGlow)" opacity="0.72"/>
+
+  <!-- projectile callouts -->
+  <rect x="94" y="930" width="270" height="78" rx="12" class="card"/>
+  <circle cx="116" cy="951" r="9" class="visible-dot"/>
+  <text x="134" y="954" class="label-title">FIN A / FIN B · 안정 날개</text>
+  <text x="116" y="979" class="label-body">작살 뒤쪽의 보이는 두 날개</text>
+  <path d="M364 968 L435 968" class="orange-line"/>
+
+  <rect x="640" y="1028" width="276" height="76" rx="12" class="card"/>
+  <circle cx="662" cy="1049" r="9" class="visible-dot"/>
+  <text x="680" y="1052" class="label-title">SHAFT · 비행 몸통</text>
+  <text x="662" y="1077" class="label-body">실제로 날아가는 긴 작살 몸통</text>
+  <path d="M778 1028 L778 982" class="orange-line"/>
+
+  <rect x="968" y="1028" width="260" height="76" rx="12" class="card"/>
+  <circle cx="990" cy="1049" r="9" class="visible-dot"/>
+  <text x="1008" y="1052" class="label-title">TIP · 앞부분</text>
+  <text x="990" y="1077" class="label-body">명중 시 표면에 박혀 보이는 촉</text>
+  <path d="M1098 1028 L1134 1000" class="orange-line"/>
+
+  <rect x="1260" y="908" width="258" height="76" rx="12" class="card"/>
+  <circle cx="1282" cy="929" r="9" class="logic-dot"/>
+  <text x="1300" y="932" class="label-title">COLLISION · 명중 판정</text>
+  <text x="1282" y="957" class="label-body">반경 6 cm의 투명 Sphere 루트</text>
+  <path d="M1260 950 L1228 960" class="cyan-line"/>
+
+  <rect x="1260" y="1000" width="258" height="76" rx="12" class="card"/>
+  <circle cx="1282" cy="1021" r="9" class="logic-dot"/>
+  <text x="1300" y="1024" class="label-title">IMPACT LIGHT · 플래시</text>
+  <text x="1282" y="1049" class="label-body">명중 순간만 켜지는 기능 라이트</text>
+  <path d="M1260 1038 L1204 990" class="cyan-line"/>
+
+  <rect x="1544" y="908" width="278" height="168" rx="12" class="card"/>
+  <circle cx="1566" cy="931" r="9" class="logic-dot"/>
+  <text x="1584" y="934" class="label-title">PROJECTILE MOVEMENT</text>
+  <text x="1566" y="962" class="label-body">발사 속도 · 비행 중력 · 회전</text>
+  <text x="1566" y="986" class="label-body">· CCD 서브스테핑을 담당하는 로직</text>
+  <text x="1566" y="1024" class="small">에디터의 화살표 아이콘은</text>
+  <text x="1566" y="1046" class="small">실게임 메시가 아닙니다.</text>
+  <path d="M1544 948 L1464 906 L1230 907" class="cyan-line"/>
+
+  <!-- Footer -->
+  <text x="64" y="1180" class="small">※ Cable은 이 두 BP의 고정 파츠가 아니라 JMHarpoonGunComponent가 런타임에 MuzzlePoint와 발사체 사이에 생성합니다.</text>
+  <text x="1852" y="1180" text-anchor="end" class="small">JMPhysicalGrabber · v1.3.2</text>
+</svg>
