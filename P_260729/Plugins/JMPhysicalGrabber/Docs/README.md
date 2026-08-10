@@ -10,8 +10,8 @@ The component creates a prototype gun from the engine Cube, Cylinder, and Cone m
 
 The sample project exposes both presentations as editable Blueprint children:
 
-- `/Game/FirstPerson/Blueprints/BP_JMHarpoonGunVisual`: edit `Body`, `Handle`, `Barrel`, `Muzzle`, and `Winch` in the Components panel or viewport. `LoadedHarpoonPreview` displays the configured projectile class. Move `MuzzlePoint` to change both the projectile spawn point and cable origin.
-- `/Game/FirstPerson/Blueprints/BP_JMHarpoonProjectile`: edit `Shaft`, `Tip`, `FinA`, `FinB`, `Collision`, and `ImpactLight`. Meshes, materials, transforms, collision size, and light values can be changed without rebuilding C++. The same complete visual is used while loaded and after firing.
+- `/Game/FirstPerson/Blueprints/BP_JMHarpoonGunVisual`: edit `Body`, `Handle`, `Barrel`, `Muzzle`, and `Winch` in the Components panel or viewport. Select `MuzzleAssembly` to move, rotate, or scale the muzzle, loaded projectile, projectile spawn point, and cable origin together. `MuzzlePoint` remains available as a fine local offset.
+- `/Game/FirstPerson/Blueprints/BP_JMHarpoonProjectile`: edit `Shaft`, `Tip`, `FinA`, `FinB`, `CableAnchor`, `Collision`, and `ImpactLight`. Move `CableAnchor` to the rear end of a customized projectile mesh. Meshes, materials, transforms, collision size, and light values can be changed without rebuilding C++. The same complete visual is used while loaded and after firing.
 
 `BP_FirstPersonCharacter`'s `JMHarpoonGun` component references both classes through `Visual Actor Class` and `Projectile Class`. `Gun Visual Offset` moves the complete gun relative to the first-person camera.
 

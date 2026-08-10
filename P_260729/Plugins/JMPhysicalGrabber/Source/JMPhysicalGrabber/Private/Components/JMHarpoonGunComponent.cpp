@@ -110,13 +110,23 @@ bool UJMHarpoonGunComponent::FireHarpoon()
         return false;
     }
 
+    // MuzzleAssembly is the shared authoring transform for the visible muzzle
+    // and loaded preview. Carry its world scale into the fired actor so the
+    // loaded and flying states stay visually identical after viewport edits.
+    if (GunVisualActor && GunVisualActor->GetMuzzlePoint())
+    {
+        ActiveProjectile->SetActorScale3D(GunVisualActor->GetMuzzlePoint()->GetComponentScale());
+    }
+
     ActiveProjectile->InitializeHarpoon(this, ShotDirection, FireSpeed);
     State = EJMHarpoonGunState::Flying;
     RecoilAlpha = 1.0f;
     ShowCable(true);
     if (Cable)
     {
-        Cable->SetAttachEndToComponent(ActiveProjectile->GetRootComponent());
+        USceneComponent* CableEnd = ActiveProjectile->GetCableAnchor();
+        Cable->EndLocation = FVector::ZeroVector;
+        Cable->SetAttachEndToComponent(CableEnd ? CableEnd : ActiveProjectile->GetRootComponent());
         Cable->CableLength = 100.0f;
     }
 
@@ -334,6 +344,7 @@ void UJMHarpoonGunComponent::EnsurePresentation()
     Cable->bEnableCollision = false;
     Cable->bAttachStart = true;
     Cable->bAttachEnd = true;
+    Cable->EndLocation = FVector::ZeroVector;
     Cable->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     Cable->SetVisibility(false);
     // Cable allocates NumSegments + 1 simulation particles when it registers.

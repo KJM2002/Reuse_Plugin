@@ -22,18 +22,22 @@ AJMHarpoonGunVisualActor::AJMHarpoonGunVisualActor()
     Barrel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Barrel"));
     Barrel->SetupAttachment(VisualRoot);
 
+    MuzzleAssembly = CreateDefaultSubobject<USceneComponent>(TEXT("MuzzleAssembly"));
+    MuzzleAssembly->SetupAttachment(VisualRoot);
+
     Muzzle = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Muzzle"));
-    Muzzle->SetupAttachment(VisualRoot);
+    Muzzle->SetupAttachment(MuzzleAssembly);
 
     Winch = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Winch"));
     Winch->SetupAttachment(VisualRoot);
 
     MuzzlePoint = CreateDefaultSubobject<USceneComponent>(TEXT("MuzzlePoint"));
-    MuzzlePoint->SetupAttachment(VisualRoot);
+    MuzzlePoint->SetupAttachment(MuzzleAssembly);
 
     LoadedHarpoonPreview = CreateDefaultSubobject<UChildActorComponent>(TEXT("LoadedHarpoonPreview"));
     LoadedHarpoonPreview->SetupAttachment(MuzzlePoint);
-    LoadedHarpoonPreview->SetChildActorClass(AJMHarpoonProjectile::StaticClass());
+    LoadedHarpoonPreviewClass = AJMHarpoonProjectile::StaticClass();
+    LoadedHarpoonPreview->SetChildActorClass(LoadedHarpoonPreviewClass);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderFinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
@@ -51,19 +55,30 @@ AJMHarpoonGunVisualActor::AJMHarpoonGunVisualActor()
     Barrel->SetRelativeLocation(FVector(28.0f, 0.0f, 5.0f));
     Barrel->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));
     Barrel->SetRelativeScale3D(FVector(0.075f, 0.075f, 0.42f));
-    Muzzle->SetRelativeLocation(FVector(66.0f, 0.0f, 5.0f));
+    // Put the shared assembly pivot at the actual projectile spawn point. The
+    // visible muzzle is offset back from it, preserving the previous world pose
+    // while making the Blueprint viewport gizmo appear where artists expect.
+    MuzzleAssembly->SetRelativeLocation(FVector(74.0f, 0.0f, 5.0f));
+    Muzzle->SetRelativeLocation(FVector(-8.0f, 0.0f, 0.0f));
     Muzzle->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));
     Muzzle->SetRelativeScale3D(FVector(0.12f, 0.12f, 0.08f));
     Winch->SetRelativeLocation(FVector(-4.0f, 0.0f, 13.0f));
     Winch->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));
     Winch->SetRelativeScale3D(FVector(0.13f, 0.13f, 0.12f));
-    MuzzlePoint->SetRelativeLocation(FVector(74.0f, 0.0f, 5.0f));
+    MuzzlePoint->SetRelativeLocation(FVector::ZeroVector);
 
     ConfigurePart(Body);
     ConfigurePart(Handle);
     ConfigurePart(Barrel);
     ConfigurePart(Muzzle);
     ConfigurePart(Winch);
+}
+
+void AJMHarpoonGunVisualActor::OnConstruction(const FTransform& Transform)
+{
+    Super::OnConstruction(Transform);
+
+    SetLoadedHarpoonClass(LoadedHarpoonPreviewClass);
 }
 
 void AJMHarpoonGunVisualActor::BeginPlay()
@@ -89,6 +104,11 @@ void AJMHarpoonGunVisualActor::SetWinchAngle(float AngleDegrees)
 
 void AJMHarpoonGunVisualActor::SetLoadedHarpoonClass(TSubclassOf<AJMHarpoonProjectile> InProjectileClass)
 {
+    if (InProjectileClass)
+    {
+        LoadedHarpoonPreviewClass = InProjectileClass;
+    }
+
     if (LoadedHarpoonPreview && InProjectileClass && LoadedHarpoonPreview->GetChildActorClass() != InProjectileClass)
     {
         LoadedHarpoonPreview->SetChildActorClass(InProjectileClass);

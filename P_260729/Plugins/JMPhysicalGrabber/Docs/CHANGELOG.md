@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.3.4
+
+### Added
+
+- Blueprint-visible `CableAnchor` on the projectile, positioned at the rear of the prototype harpoon.
+
+### Fixed
+
+- Attach the cable to `CableAnchor` with a zero end offset instead of attaching it to the front collision root.
+
+## 1.3.3
+
+### Added
+
+- `MuzzleAssembly`, a shared Blueprint viewport transform for the muzzle mesh, loaded projectile preview, projectile spawn point, and cable origin.
+- Blueprint viewport preview-class selection, assigned to `BP_JMHarpoonProjectile` in the sample visual Blueprint.
+
+### Changed
+
+- Scale authored on the muzzle assembly is transferred to the spawned projectile so loaded and flying presentation sizes remain consistent.
+
 ## 1.3.2
 
 ### Changed

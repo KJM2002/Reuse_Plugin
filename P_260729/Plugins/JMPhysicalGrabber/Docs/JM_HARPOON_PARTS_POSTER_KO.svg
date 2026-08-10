@@ -127,8 +127,8 @@
 
     <rect x="932" y="326" width="226" height="60" rx="12" class="card"/>
     <circle cx="952" cy="345" r="9" class="visible-dot"/>
-    <text x="970" y="348" class="label-title">MUZZLE · 총구</text>
-    <text x="952" y="372" class="label-body">총열 끝의 보이는 외형</text>
+    <text x="970" y="348" class="label-title">MUZZLE ASSEMBLY</text>
+    <text x="952" y="372" class="label-body">총구·장전 작살 공통 Transform</text>
     <path d="M1048 386 L1080 432" class="orange-line"/>
 
     <rect x="92" y="540" width="226" height="66" rx="12" class="card"/>
@@ -241,6 +241,6 @@
   <path d="M1544 948 L1464 906 L1230 907" class="cyan-line"/>
 
   <!-- Footer -->
-  <text x="64" y="1180" class="small">※ Cable은 이 두 BP의 고정 파츠가 아니라 JMHarpoonGunComponent가 런타임에 MuzzlePoint와 발사체 사이에 생성합니다.</text>
-  <text x="1852" y="1180" text-anchor="end" class="small">JMPhysicalGrabber · v1.3.2</text>
+  <text x="64" y="1180" class="small">※ Cable은 런타임에 MuzzlePoint와 발사체 뒤쪽 CableAnchor 사이에 생성됩니다.</text>
+  <text x="1852" y="1180" text-anchor="end" class="small">JMPhysicalGrabber · v1.3.4</text>
 </svg>

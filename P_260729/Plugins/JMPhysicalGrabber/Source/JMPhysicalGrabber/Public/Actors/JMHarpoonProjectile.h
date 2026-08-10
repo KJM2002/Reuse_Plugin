@@ -7,6 +7,7 @@
 class UJMHarpoonGunComponent;
 class UPointLightComponent;
 class UProjectileMovementComponent;
+class USceneComponent;
 class USphereComponent;
 class UStaticMeshComponent;
 
@@ -29,6 +30,7 @@ public:
     void SetLoadedPreviewMode(bool bEnabled);
 
     FVector GetTravelDirection() const;
+    USceneComponent* GetCableAnchor() const { return CableAnchor; }
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="JM|Harpoon|Parts")
     TObjectPtr<USphereComponent> Collision;
@@ -44,6 +46,10 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="JM|Harpoon|Parts")
     TObjectPtr<UStaticMeshComponent> FinMeshB;
+
+    /** Editable tail attachment point for the cable. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="JM|Harpoon|Parts")
+    TObjectPtr<USceneComponent> CableAnchor;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="JM|Harpoon|Parts")
     TObjectPtr<UPointLightComponent> ImpactLight;

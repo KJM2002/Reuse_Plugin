@@ -2,6 +2,7 @@
 
 #include "Components/JMHarpoonGunComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/SceneComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
@@ -48,6 +49,10 @@ AJMHarpoonProjectile::AJMHarpoonProjectile()
     FinMeshB->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     FinMeshB->SetRelativeLocation(FVector(-55.0f, 0.0f, -5.0f));
     FinMeshB->SetRelativeScale3D(FVector(0.14f, 0.025f, 0.08f));
+
+    CableAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("CableAnchor"));
+    CableAnchor->SetupAttachment(Collision);
+    CableAnchor->SetRelativeLocation(FVector(-62.0f, 0.0f, 0.0f));
 
     ImpactLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("ImpactLight"));
     ImpactLight->SetupAttachment(Collision);

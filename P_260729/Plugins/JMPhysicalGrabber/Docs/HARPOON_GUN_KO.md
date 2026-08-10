@@ -101,6 +101,12 @@ stateDiagram-v2
 2. `Components` 패널에서 원하는 파츠를 선택한다.
 3. Viewport 또는 Details에서 `Static Mesh`, `Materials`, `Location`, `Rotation`, `Scale`을 수정한다.
 
+총구와 장전 작살을 함께 조절하려면 `MuzzleAssembly`를 선택한다. 이 컴포넌트의 위치, 회전, 크기를 바꾸면 `Muzzle`, `MuzzlePoint`, `LoadedHarpoonPreview`가 한 조립체처럼 같이 움직인다. 실제 발사 위치와 케이블 시작점도 함께 변경되며, 조립체의 크기는 발사된 작살에도 전달된다.
+
+`MuzzleAssembly`의 기본 피벗은 실제 작살 생성 지점에 있으므로, 선택하면 변환 기즈모가 장전 작살의 앞부분에 표시된다.
+
+`Loaded Harpoon Preview Class`는 이 뷰포트에 표시할 발사체 클래스다. 샘플 에셋에는 `BP_JMHarpoonProjectile`이 지정되어 있으므로, 실제 커스텀 발사체를 총구와 함께 보면서 정렬할 수 있다.
+
 총 전체의 카메라 기준 위치는 `BP_FirstPersonCharacter > JMHarpoonGun > Gun Visual Offset`에서 수정한다.
 
 ### 발사되는 작살 외형 수정
@@ -213,15 +219,18 @@ stateDiagram-v2
 | `Body` | 총 몸체 | Mesh, Material, Transform |
 | `Handle` | 손잡이 | Mesh, Material, Transform |
 | `Barrel` | 총열 | Mesh, Material, Transform |
+| `MuzzleAssembly` | 총구와 작살의 공통 조립체 | 이것 하나로 총구, 장전 작살, 발사 위치, 줄 시작점의 Location, Rotation, Scale을 함께 조절한다. |
 | `Muzzle` | 총구 외형 | Mesh, Material, Transform |
 | `Winch` | 줄을 감는 회전 파츠 | Mesh, Material, Transform. 비행/회수 중 코드가 회전을 추가한다. |
 | `MuzzlePoint` | 실제 발사 및 케이블 시작 위치 | Location을 외형 총구 끝으로 옮긴다. 발사 방향은 이 컴포넌트의 Rotation이 아니라 카메라 조준으로 계산한다. |
 | `LoadedHarpoonPreview` | 장전 상태 미리보기 | `JMHarpoonGun > Projectile Class`의 전체 외형을 자동 표시한다. 별도 메시를 수정하지 않는다. |
+| `Loaded Harpoon Preview Class` | 뷰포트 미리보기 클래스 | 기본 샘플은 `BP_JMHarpoonProjectile`. 총 Blueprint 뷰포트에서 실제 발사체 외형을 함께 보여준다. |
 
 주의 사항:
 
-- `Muzzle`은 보이는 메시일 뿐이며 실제 발사 위치는 `MuzzlePoint`다.
-- 총구 메시를 옮겼다면 `MuzzlePoint`도 반드시 같이 옮긴다.
+- 총구와 작살 전체를 배치할 때는 `MuzzleAssembly`를 사용한다.
+- `Muzzle`은 보이는 메시일 뿐이며, 조립체 내부에서 총구 메시만 미세 조정할 때 사용한다.
+- `MuzzlePoint`는 조립체 내부의 실제 발사 위치다. 총구 끝과 작살촉 기준점을 세부적으로 맞출 때만 상대 위치를 조정한다.
 - `LoadedHarpoonPreview`의 기준점은 `MuzzlePoint`다. 장전 작살 자체의 회전과 파츠 배치는 `BP_JMHarpoonProjectile`에서 수정한다.
 - `Winch`의 Blueprint 기본 회전을 기준으로 런타임 회전이 더해진다.
 - 총 메시들은 충돌, 내비게이션 영향, 그림자가 기본적으로 꺼져 있다.
@@ -238,6 +247,7 @@ stateDiagram-v2
 | `Tip` | 작살촉 | Engine Cone, 위치 `(-1,0,0)`, 회전 `(0,90,0)`, 스케일 `(0.11,0.11,0.22)` |
 | `FinA` | 뒤쪽 날개 A | Engine Cube, 위치 `(-55,0,5)`, 스케일 `(0.14,0.025,0.08)` |
 | `FinB` | 뒤쪽 날개 B | Engine Cube, 위치 `(-55,0,-5)`, 스케일 `(0.14,0.025,0.08)` |
+| `CableAnchor` | 줄이 연결되는 뒤쪽 기준점 | 위치 `(-62,0,0)`. 커스텀 작살의 꼬리 끝에 맞춰 Location을 조절한다. |
 | `ImpactLight` | 명중 순간 플래시 | 색상 `(1.0,0.22,0.04)`, 반경 `180`, 그림자 없음 |
 | `ProjectileMovement` | 발사 비행 처리 | 중력 배율 `0.12`, 속도 방향 회전, Bounce 없음, 서브스테핑 사용 |
 
@@ -246,6 +256,8 @@ stateDiagram-v2
 `ImpactLight`의 색상과 반경은 Blueprint에서 바꿀 수 있지만, 명중 시 세기 `12000`과 지속 시간 `0.09초`는 현재 C++ 런타임 값이므로 아래 C++ 수정 위치에서 변경해야 한다.
 
 `Collision` 반경을 지나치게 줄이면 빠른 발사체가 작은 물체를 맞히기 어려워지고, 지나치게 키우면 작살촉이 닿기 전에 박히는 것처럼 보일 수 있다.
+
+줄 위치가 작살 외형과 맞지 않으면 `BP_JMHarpoonProjectile > CableAnchor`만 선택해서 꼬리 끝으로 옮긴다. 케이블 끝은 이 컴포넌트의 위치에 오프셋 없이 연결된다.
 
 ## 8. 케이블 줄 설정
 
@@ -263,7 +275,7 @@ stateDiagram-v2
 | `bEnableStiffness` | `true` | 줄 강성 사용 |
 | `bEnableCollision` | `false` | 줄과 월드 충돌 비활성화 |
 | `bAttachStart` | `true` | 시작점을 총구에 부착 |
-| `bAttachEnd` | `true` | 끝점을 작살에 부착 |
+| `bAttachEnd` | `true` | 끝점을 작살 뒤쪽의 `CableAnchor`에 부착 |
 
 컴포넌트 Details에서 값을 지정하면 다음 PIE 시작 시 `RegisterComponent()` 전에 적용된다. PIE 중에 `NumSegments`를 런타임으로 직접 변경하면 Cable 내부 파티클 배열 크기가 맞지 않아 Array index assertion이 발생할 수 있다.
 
