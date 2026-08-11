@@ -2,8 +2,104 @@
 #include "Components/JMHarpoonWireRouteComponent.h"
 #include "Misc/AutomationTest.h"
 #include "Types/JMHarpoonCableLengthModel.h"
+#include "Types/JMHarpoonLightPullModel.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FJMHarpoonLightMassClassificationTest,
+    "JM.PhysicalGrabber.Harpoon.LightPull.MassClassification",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMHarpoonLightMassClassificationTest::RunTest(const FString& Parameters)
+{
+    TestTrue(TEXT("1 kg selects Light Pull"), FJMHarpoonLightPullModel::IsLightMass(1.0f, 5.0f));
+    TestTrue(TEXT("3 kg selects Light Pull"), FJMHarpoonLightPullModel::IsLightMass(3.0f, 5.0f));
+    TestTrue(TEXT("4.99 kg selects Light Pull"), FJMHarpoonLightPullModel::IsLightMass(4.99f, 5.0f));
+    TestFalse(TEXT("5 kg selects Standard Pull"), FJMHarpoonLightPullModel::IsLightMass(5.0f, 5.0f));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FJMHarpoonLightAccelerationClampTest,
+    "JM.PhysicalGrabber.Harpoon.LightPull.AccelerationClamp",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMHarpoonLightAccelerationClampTest::RunTest(const FString& Parameters)
+{
+    const FVector Acceleration = FJMHarpoonLightPullModel::CalculateAcceleration(
+        FVector::ForwardVector,
+        FVector(-5000.0f, 1000.0f, 0.0f),
+        2000.0f,
+        220.0f,
+        1100.0f,
+        650.0f,
+        0.15f,
+        8.0f,
+        2500.0f,
+        1.0f);
+    TestTrue(TEXT("Acceleration stays inside the configured limit"), Acceleration.Size() <= 2500.01f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FJMHarpoonLightAngularDampingTest,
+    "JM.PhysicalGrabber.Harpoon.LightPull.AngularDamping",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMHarpoonLightAngularDampingTest::RunTest(const FString& Parameters)
+{
+    const FVector AngularVelocity(0.0f, 20.0f, -10.0f);
+    const FVector Deceleration = FJMHarpoonLightPullModel::CalculateAngularDeceleration(
+        AngularVelocity,
+        9.0f,
+        80.0f);
+    TestTrue(TEXT("Angular damping opposes the current rotation"), FVector::DotProduct(AngularVelocity, Deceleration) < 0.0f);
+    TestTrue(TEXT("Angular deceleration is clamped"), Deceleration.Size() <= 80.01f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FJMHarpoonLightDistanceSpeedTest,
+    "JM.PhysicalGrabber.Harpoon.LightPull.DistanceSpeed",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMHarpoonLightDistanceSpeedTest::RunTest(const FString& Parameters)
+{
+    const float NearSpeed = FJMHarpoonLightPullModel::CalculateTargetSpeed(0.0f, 220.0f, 1100.0f, 650.0f);
+    const float FarSpeed = FJMHarpoonLightPullModel::CalculateTargetSpeed(650.0f, 220.0f, 1100.0f, 650.0f);
+    TestEqual(TEXT("Near-release speed uses the minimum"), NearSpeed, 220.0f);
+    TestEqual(TEXT("Far speed uses the maximum"), FarSpeed, 1100.0f);
+    TestTrue(TEXT("Far targets move faster than near targets"), FarSpeed > NearSpeed);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FJMHarpoonLightPullRampTest,
+    "JM.PhysicalGrabber.Harpoon.LightPull.PullRamp",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMHarpoonLightPullRampTest::RunTest(const FString& Parameters)
+{
+    TestEqual(TEXT("Recall starts at zero output"), FJMHarpoonLightPullModel::CalculatePullRamp(0.0f, 0.1f), 0.0f);
+    TestEqual(TEXT("Ramp midpoint is smooth and symmetric"), FJMHarpoonLightPullModel::CalculatePullRamp(0.05f, 0.1f), 0.5f);
+    TestEqual(TEXT("Ramp reaches full output"), FJMHarpoonLightPullModel::CalculatePullRamp(0.1f, 0.1f), 1.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FJMHarpoonStandardPullClassificationTest,
+    "JM.PhysicalGrabber.Harpoon.StandardPull.Unchanged",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMHarpoonStandardPullClassificationTest::RunTest(const FString& Parameters)
+{
+    TestFalse(TEXT("Threshold mass stays on Standard Pull"), FJMHarpoonLightPullModel::IsLightMass(5.0f, 5.0f));
+    TestFalse(TEXT("10 kg stays on Standard Pull"), FJMHarpoonLightPullModel::IsLightMass(10.0f, 5.0f));
+    TestFalse(TEXT("30 kg stays on Standard Pull"), FJMHarpoonLightPullModel::IsLightMass(30.0f, 5.0f));
+    TestFalse(TEXT("75 kg stays on Standard Pull"), FJMHarpoonLightPullModel::IsLightMass(75.0f, 5.0f));
+    return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FJMHarpoonWireSurfaceOffsetTest,

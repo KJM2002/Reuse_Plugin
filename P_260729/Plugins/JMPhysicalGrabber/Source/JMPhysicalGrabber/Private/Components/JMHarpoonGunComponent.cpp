@@ -1,6 +1,7 @@
 #include "Components/JMHarpoonGunComponent.h"
 
 #include "Interfaces/JMHarpoonInteractable.h"
+#include "Types/JMHarpoonLightPullModel.h"
 
 #include "Actors/JMHarpoonGunVisualActor.h"
 #include "Actors/JMHarpoonProjectile.h"
@@ -63,7 +64,7 @@ void UJMHarpoonGunComponent::TickComponent(float DeltaTime, ELevelTick TickType,
     UpdateCableStartProxy(DeltaTime);
     CooldownRemaining = FMath::Max(0.0f, CooldownRemaining - DeltaTime);
 
-    if (Controller->WasInputKeyJustPressed(FireKey))
+    if (bUseLegacyKeyPolling && Controller->WasInputKeyJustPressed(FireKey))
     {
         if (State == EJMHarpoonGunState::Ready)
         {
@@ -75,7 +76,10 @@ void UJMHarpoonGunComponent::TickComponent(float DeltaTime, ELevelTick TickType,
         }
     }
 
-    UpdatePlayerGrappleInput(Controller);
+    if (bUseLegacyKeyPolling)
+    {
+        UpdatePlayerGrappleInput(Controller);
+    }
 
 #if !UE_BUILD_SHIPPING
     UpdateFailSafeSmoke();
@@ -129,10 +133,20 @@ void UJMHarpoonGunComponent::SetPlayerGrappleEnabled(bool bEnabled)
 
 bool UJMHarpoonGunComponent::StartPlayerGrapple()
 {
-    if (!bEnablePlayerGrapple
-        || State != EJMHarpoonGunState::Embedded
-        || !IsValid(ActiveProjectile)
-        || !IsValid(EmbeddedComponent))
+    if (!bEnablePlayerGrapple || !IsValid(ActiveProjectile))
+    {
+        return false;
+    }
+
+    // Enhanced Input can call the same public API on Started while the spear
+    // is still flying. Embedding consumes this armed state below.
+    if (State == EJMHarpoonGunState::Flying)
+    {
+        PlayerGrappleState = EJMPlayerGrappleState::Armed;
+        return true;
+    }
+
+    if (State != EJMHarpoonGunState::Embedded || !IsValid(EmbeddedComponent))
     {
         return false;
     }
@@ -219,11 +233,7 @@ void UJMHarpoonGunComponent::UpdatePlayerGrappleInput(APlayerController* Control
 
     if (Controller->WasInputKeyJustPressed(PlayerGrappleKey))
     {
-        if (State == EJMHarpoonGunState::Flying)
-        {
-            PlayerGrappleState = EJMPlayerGrappleState::Armed;
-        }
-        else if (State == EJMHarpoonGunState::Embedded)
+        if (State == EJMHarpoonGunState::Flying || State == EJMHarpoonGunState::Embedded)
         {
             StartPlayerGrapple();
         }
@@ -555,8 +565,13 @@ bool UJMHarpoonGunComponent::FireHarpoon()
     }
 
     const FVector MuzzleLocation = GetMuzzleLocation();
-    const FVector AimPoint = ViewLocation + ViewDirection * MaxRange;
+    const FVector AimPoint = ResolveAimPoint(ViewLocation, ViewDirection);
     const FVector ShotDirection = (AimPoint - MuzzleLocation).GetSafeNormal(SMALL_NUMBER, ViewDirection);
+    FHitResult MuzzleObstructionHit;
+    const bool bMuzzleObstructed = SweepMuzzleObstruction(
+        MuzzleLocation,
+        ShotDirection,
+        MuzzleObstructionHit);
 
     FActorSpawnParameters SpawnParams;
     SpawnParams.Owner = GetOwner();
@@ -599,6 +614,13 @@ bool UJMHarpoonGunComponent::FireHarpoon()
     }
 
     OnHarpoonFired.Broadcast(ActiveProjectile);
+    if (bMuzzleObstructed && State == EJMHarpoonGunState::Flying)
+    {
+        NotifyProjectileImpact(
+            ActiveProjectile,
+            MuzzleObstructionHit,
+            ShotDirection * FireSpeed);
+    }
     return true;
 }
 
@@ -633,9 +655,12 @@ bool UJMHarpoonGunComponent::RecallHarpoon()
         }
         const FVector MuzzleLocation = GetMuzzleLocation();
         const FVector GrabPoint = EmbeddedComponent->GetComponentTransform().TransformPosition(EmbeddedLocalPoint);
-        const FVector PullDirection = (MuzzleLocation - GrabPoint).GetSafeNormal();
+        const FVector PhysicsPoint = IsLightPhysicsTarget()
+            ? EmbeddedComponent->GetCenterOfMass(EmbeddedBone)
+            : GrabPoint;
+        const FVector PullDirection = (MuzzleLocation - PhysicsPoint).GetSafeNormal();
         if (EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone)
-            && GetPhysicsTargetSurfaceDistance(MuzzleLocation, GrabPoint) <= PhysicsReleaseDistance)
+            && GetPhysicsTargetSurfaceDistance(MuzzleLocation, PhysicsPoint) <= PhysicsReleaseDistance)
         {
             // A close or already-overlapping target should never enter the
             // pendulum-like force pull. Release the body and return only the spear.
@@ -726,10 +751,20 @@ void UJMHarpoonGunComponent::NotifyProjectileImpact(
     ActiveProjectile->EmbedAtHit(Hit, EmbedDepth);
     if (EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone))
     {
-        EmbeddedComponent->AddImpulseAtLocation(
-            ImpactVelocity.GetSafeNormal() * ImpactImpulse,
-            Hit.ImpactPoint,
-            EmbeddedBone);
+        if (IsLightPhysicsTarget())
+        {
+            EmbeddedComponent->AddImpulse(
+                ImpactVelocity.GetSafeNormal() * LightImpactVelocityKick,
+                EmbeddedBone,
+                true);
+        }
+        else
+        {
+            EmbeddedComponent->AddImpulseAtLocation(
+                ImpactVelocity.GetSafeNormal() * ImpactImpulse,
+                Hit.ImpactPoint,
+                EmbeddedBone);
+        }
     }
 
     State = EJMHarpoonGunState::Embedded;
@@ -779,6 +814,70 @@ bool UJMHarpoonGunComponent::GetView(FVector& OutLocation, FVector& OutDirection
     Controller->GetPlayerViewPoint(OutLocation, Rotation);
     OutDirection = Rotation.Vector();
     return true;
+}
+
+FVector UJMHarpoonGunComponent::ResolveAimPoint(
+    const FVector& ViewLocation,
+    const FVector& ViewDirection) const
+{
+    const FVector TraceEnd = ViewLocation + ViewDirection * MaxRange;
+    if (!bUseCrosshairAimTrace || !GetWorld())
+    {
+        return TraceEnd;
+    }
+
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(JMHarpoonCrosshairAim), false, GetOwner());
+    if (IsValid(GunVisualActor))
+    {
+        QueryParams.AddIgnoredActor(GunVisualActor);
+    }
+    FHitResult AimHit;
+    return GetWorld()->LineTraceSingleByChannel(
+        AimHit,
+        ViewLocation,
+        TraceEnd,
+        CrosshairTraceChannel,
+        QueryParams)
+        ? AimHit.ImpactPoint
+        : TraceEnd;
+}
+
+bool UJMHarpoonGunComponent::SweepMuzzleObstruction(
+    const FVector& MuzzleLocation,
+    const FVector& ShotDirection,
+    FHitResult& OutHit) const
+{
+    if (!GetWorld() || MuzzleObstructionProbeDistance <= 0.0f)
+    {
+        return false;
+    }
+
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(JMHarpoonMuzzleSafety), false, GetOwner());
+    if (IsValid(GunVisualActor))
+    {
+        QueryParams.AddIgnoredActor(GunVisualActor);
+    }
+    FCollisionObjectQueryParams ObjectParams;
+    ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
+    ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+    ObjectParams.AddObjectTypesToQuery(ECC_PhysicsBody);
+    const bool bHit = GetWorld()->SweepSingleByObjectType(
+        OutHit,
+        MuzzleLocation,
+        MuzzleLocation + ShotDirection * MuzzleObstructionProbeDistance,
+        FQuat::Identity,
+        ObjectParams,
+        FCollisionShape::MakeSphere(FMath::Max(0.1f, MuzzleObstructionProbeRadius)),
+        QueryParams);
+    if (bHit && OutHit.bStartPenetrating)
+    {
+        OutHit.ImpactPoint = OutHit.Location;
+        if (OutHit.ImpactNormal.IsNearlyZero())
+        {
+            OutHit.ImpactNormal = -ShotDirection;
+        }
+    }
+    return bHit;
 }
 
 FVector UJMHarpoonGunComponent::GetMuzzleLocation() const
@@ -1498,14 +1597,18 @@ void UJMHarpoonGunComponent::UpdateRetracting(float DeltaTime)
     if (bPullingPhysicsTarget && IsValid(EmbeddedComponent))
     {
         const FVector GrabPoint = EmbeddedComponent->GetComponentTransform().TransformPosition(EmbeddedLocalPoint);
-        const FVector Error = MuzzleLocation - GrabPoint;
+        const bool bSimulatesPhysics = EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone);
+        const bool bLightTarget = bSimulatesPhysics && IsLightPhysicsTarget();
+        const FVector PhysicsPoint = bLightTarget
+            ? EmbeddedComponent->GetCenterOfMass(EmbeddedBone)
+            : GrabPoint;
+        const FVector Error = MuzzleLocation - PhysicsPoint;
         const float Distance = Error.Size();
         const FVector PullDirection = Error.GetSafeNormal();
-        const bool bSimulatesPhysics = EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone);
         const FVector PointVelocity = bSimulatesPhysics
             ? EmbeddedComponent->GetPhysicsLinearVelocityAtPoint(GrabPoint, EmbeddedBone)
             : FVector::ZeroVector;
-        const float TargetSurfaceDistance = GetPhysicsTargetSurfaceDistance(MuzzleLocation, GrabPoint);
+        const float TargetSurfaceDistance = GetPhysicsTargetSurfaceDistance(MuzzleLocation, PhysicsPoint);
 
         if (bSimulatesPhysics && TargetSurfaceDistance <= PhysicsReleaseDistance)
         {
@@ -1521,16 +1624,13 @@ void UJMHarpoonGunComponent::UpdateRetracting(float DeltaTime)
         const FVector SoftCatchError = bSimulatesPhysics
             ? PullDirection * (Distance - PhysicsReleaseDistance)
             : Error;
-        const FVector RequestedForce = SoftCatchError * PullStrength - PointVelocity * PullDamping;
-        const float Resistance = IsValid(InteractionTargetObject)
-            ? FMath::Max(ActiveInteractionProfile.PullResistance, 0.01f)
-            : 1.0f;
-        const float ResistantForceBudget = MaxPullForce / FMath::Max(Resistance, 1.0f);
-        const FVector AppliedForce = (RequestedForce / Resistance).GetClampedToMaxSize(ResistantForceBudget);
-        if (bSimulatesPhysics)
-        {
-            EmbeddedComponent->AddForceAtLocation(AppliedForce, GrabPoint, EmbeddedBone);
-        }
+        const FVector AppliedForce = bLightTarget
+            ? UpdateLightPhysicsPull(
+                DeltaTime,
+                MuzzleLocation,
+                PhysicsPoint,
+                FMath::Max(0.0f, Distance - PhysicsReleaseDistance))
+            : UpdateStandardPhysicsPull(GrabPoint, SoftCatchError, PointVelocity);
 
         if (IsValid(InteractionTargetObject))
         {
@@ -1555,7 +1655,8 @@ void UJMHarpoonGunComponent::UpdateRetracting(float DeltaTime)
                 return;
             }
         }
-        SmoothCableLength(Distance, DeltaTime);
+        const float VisualDistance = FVector::Distance(MuzzleLocation, GrabPoint);
+        SmoothCableLength(VisualDistance, DeltaTime);
 
         if (RecallElapsed >= HeavyTargetTimeout && RecallStartDistance - Distance < MinimumRecallProgress)
         {
@@ -1853,6 +1954,104 @@ float UJMHarpoonGunComponent::GetPhysicsTargetSurfaceDistance(
     return Result;
 }
 
+float UJMHarpoonGunComponent::GetEmbeddedTargetMass() const
+{
+    return IsValid(EmbeddedComponent)
+        ? FMath::Max(0.0f, EmbeddedComponent->GetMass())
+        : 0.0f;
+}
+
+bool UJMHarpoonGunComponent::IsLightPhysicsTarget() const
+{
+    return IsValid(EmbeddedComponent)
+        && EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone)
+        && FJMHarpoonLightPullModel::IsLightMass(
+            GetEmbeddedTargetMass(),
+            LightObjectMassThreshold);
+}
+
+FVector UJMHarpoonGunComponent::UpdateLightPhysicsPull(
+    float DeltaTime,
+    const FVector& MuzzleLocation,
+    const FVector& CenterOfMass,
+    float DistanceToRelease)
+{
+    if (!IsValid(EmbeddedComponent)
+        || !EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone))
+    {
+        return FVector::ZeroVector;
+    }
+
+    const FVector PullDirection = (MuzzleLocation - CenterOfMass).GetSafeNormal();
+    const FVector CurrentVelocity = EmbeddedComponent->GetPhysicsLinearVelocity(EmbeddedBone);
+    const float PullRamp = FJMHarpoonLightPullModel::CalculatePullRamp(
+        RecallElapsed,
+        LightPullRampTime);
+    const float Resistance = IsValid(InteractionTargetObject)
+        ? FMath::Max(ActiveInteractionProfile.PullResistance, 0.01f)
+        : 1.0f;
+    FVector DesiredAcceleration = FJMHarpoonLightPullModel::CalculateAcceleration(
+        PullDirection,
+        CurrentVelocity,
+        DistanceToRelease,
+        LightMinPullSpeed,
+        LightMaxPullSpeed,
+        LightApproachSlowDistance,
+        LightTangentialRetention,
+        LightVelocityGain,
+        LightMaxPullAcceleration,
+        PullRamp) / FMath::Max(Resistance, 1.0f);
+    DesiredAcceleration = DesiredAcceleration.GetClampedToMaxSize(LightMaxPullAcceleration);
+
+    const float TargetMass = GetEmbeddedTargetMass();
+    const float ResistantForceBudget = MaxPullForce / FMath::Max(Resistance, 1.0f);
+    const FVector AppliedForce = (DesiredAcceleration * TargetMass)
+        .GetClampedToMaxSize(ResistantForceBudget);
+    EmbeddedComponent->AddForce(AppliedForce, EmbeddedBone);
+    ApplyLightAngularStabilization(DeltaTime);
+    return AppliedForce;
+}
+
+FVector UJMHarpoonGunComponent::UpdateStandardPhysicsPull(
+    const FVector& GrabPoint,
+    const FVector& SoftCatchError,
+    const FVector& PointVelocity)
+{
+    const FVector RequestedForce = SoftCatchError * PullStrength - PointVelocity * PullDamping;
+    const float Resistance = IsValid(InteractionTargetObject)
+        ? FMath::Max(ActiveInteractionProfile.PullResistance, 0.01f)
+        : 1.0f;
+    const float ResistantForceBudget = MaxPullForce / FMath::Max(Resistance, 1.0f);
+    const FVector AppliedForce = (RequestedForce / Resistance)
+        .GetClampedToMaxSize(ResistantForceBudget);
+    if (IsValid(EmbeddedComponent)
+        && EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone))
+    {
+        EmbeddedComponent->AddForceAtLocation(AppliedForce, GrabPoint, EmbeddedBone);
+    }
+    return AppliedForce;
+}
+
+void UJMHarpoonGunComponent::ApplyLightAngularStabilization(float DeltaTime)
+{
+    if (!IsValid(EmbeddedComponent)
+        || !EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone)
+        || DeltaTime <= 0.0f)
+    {
+        return;
+    }
+
+    const FVector AngularVelocity = EmbeddedComponent->GetPhysicsAngularVelocityInRadians(EmbeddedBone);
+    const FVector AngularDeceleration = FJMHarpoonLightPullModel::CalculateAngularDeceleration(
+        AngularVelocity,
+        LightAngularDamping,
+        LightMaxAngularDeceleration);
+    EmbeddedComponent->AddTorqueInRadians(
+        AngularDeceleration,
+        EmbeddedBone,
+        true);
+}
+
 void UJMHarpoonGunComponent::ApplyPhysicsReleaseBraking(
     const FVector& GrabPoint,
     const FVector& PullDirection) const
@@ -1862,10 +2061,22 @@ void UJMHarpoonGunComponent::ApplyPhysicsReleaseBraking(
         return;
     }
 
-    const FVector PointVelocity = EmbeddedComponent->GetPhysicsLinearVelocityAtPoint(GrabPoint, EmbeddedBone);
+    const bool bLightTarget = IsLightPhysicsTarget();
+    const FVector PointVelocity = bLightTarget
+        ? EmbeddedComponent->GetPhysicsLinearVelocity(EmbeddedBone)
+        : EmbeddedComponent->GetPhysicsLinearVelocityAtPoint(GrabPoint, EmbeddedBone);
     const float InwardSpeed = FVector::DotProduct(PointVelocity, PullDirection);
     if (InwardSpeed <= 0.0f)
     {
+        return;
+    }
+
+    if (bLightTarget)
+    {
+        EmbeddedComponent->AddImpulse(
+            -PullDirection * InwardSpeed * ReleaseBraking,
+            EmbeddedBone,
+            true);
         return;
     }
 

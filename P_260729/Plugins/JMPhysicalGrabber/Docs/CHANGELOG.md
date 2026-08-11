@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.8.0
+
+### Added
+
+- Crosshair visibility trace for close-range aim correction before deriving the muzzle shot direction.
+- Short muzzle Sphere Sweep that converts an immediately blocked shot into a safe projectile impact.
+- Dedicated sub-5 kg Light Pull model with distance-based target speed, acceleration clamp, tangential retention, angular damping, pull ramp, and automation coverage.
+- `bUseLegacyKeyPolling` compatibility switch; project-owned Enhanced Input can call the existing Blueprint API without plugin asset dependencies.
+
+### Changed
+
+- `StartPlayerGrapple()` now arms the grapple while the projectile is flying, allowing direct Enhanced Input `Started` bindings.
+- Light targets keep the projectile attached at the actual impact point while pull force and release braking operate at the center of mass.
+- Light-target impact response uses an 80 cm/s center-of-mass velocity kick instead of the standard off-center impulse.
+- Standard targets at or above 5 kg retain the existing impact-point spring pull and release-braking path.
+
+### Fixed
+
+- Prevented sub-5 kg targets from receiving extreme torque at impact, during recall, and at the soft-catch boundary.
+- Reduced close-range crosshair/muzzle disagreement and handled muzzle-inside-geometry firing without relying on projectile movement to escape the overlap.
+
 ## 1.7.0
 
 ### Added

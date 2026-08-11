@@ -36,10 +36,14 @@ The sample project exposes both presentations as editable Blueprint children:
 
 Recommended test objects use `Movable`, `Simulate Physics`, and the `PhysicsActor` collision preset. Compare mass overrides of 5 kg, 75 kg, and 300 kg. Default `Max Pull Force` is 200000 kg*cm/s^2, and targets that make less than 100 cm of progress over 1.5 seconds release the harpoon.
 
+Input can be project-owned without plugin asset dependencies. Bind Enhanced Input actions in the Character or Controller to `FireHarpoon`, `RecallHarpoon`, `StartPlayerGrapple`, and `StopPlayerGrapple`, then disable `Use Legacy Key Polling`. The compatibility option remains enabled by default in 1.8 so existing prototype controls continue to work until those bindings are added.
+
 Important tuning values:
 
 - `Fire Speed` and `Max Range`: projectile speed and automatic recall distance.
 - `Impact Impulse` and `Embed Depth`: impact response.
+- `Crosshair Aim Trace` and muzzle obstruction probe settings: align close targets and safely resolve a blocked muzzle.
+- `Light Object Mass Threshold` and the Light Pull settings: stabilize targets strictly below 5 kg without changing standard cargo behavior.
 - `Max Pull Force`, `Pull Strength`, and `Pull Damping`: mass-aware recall feel.
 - `Physics Release Distance`: soft-catch radius that keeps recalled objects in front of the player.
 - `Release Braking`: removes inward momentum at the soft-catch radius to prevent overshoot behind the player.

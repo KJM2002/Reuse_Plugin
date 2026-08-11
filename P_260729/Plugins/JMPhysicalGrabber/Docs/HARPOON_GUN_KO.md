@@ -149,9 +149,21 @@ stateDiagram-v2
 
 | 속성 | 기본값 | 설명 |
 |---|---:|---|
-| `Fire Key` | `Left Mouse Button` | 발사와 회수에 사용하는 토글 입력 키 |
+| `Use Legacy Key Polling` | `true` | 기존 프로토타입 호환용 직접 키 Polling. 프로젝트 Enhanced Input을 연결한 뒤 끈다. |
+| `Fire Key` | `Left Mouse Button` | Legacy Polling에서만 사용하는 발사/회수 토글 키 |
 
-컴포넌트가 직접 키 입력을 확인하므로, 같은 키를 다른 기능에서도 사용하면 두 기능이 동시에 실행될 수 있다.
+기본 구조에서는 Character 또는 Controller가 Enhanced Input을 받고 공개 함수를 호출한다. 플러그인은 프로젝트의 Input Action 에셋을 직접 참조하지 않는다.
+
+Enhanced Input 연결 순서:
+
+1. 프로젝트에서 Boolean Action `IA_HarpoonFire`, `IA_HarpoonRecall`, `IA_HarpoonGrapple`을 만든다.
+2. 프로젝트의 Input Mapping Context에 원하는 키를 배정한다.
+3. Character Blueprint에서 `IA_HarpoonFire / Started`를 `JMHarpoonGun > FireHarpoon`에 연결한다.
+4. `IA_HarpoonRecall / Started`를 `RecallHarpoon`에 연결한다.
+5. `IA_HarpoonGrapple / Started`를 `StartPlayerGrapple`, `Completed`와 `Canceled`를 `StopPlayerGrapple`에 연결한다.
+6. 연결을 완료한 뒤 `Use Legacy Key Polling`을 꺼서 한 입력이 두 번 처리되지 않게 한다.
+
+`StartPlayerGrapple()`은 비행 중 호출되면 `Armed`로 대기하고, 작살이 박히면 자동으로 당김을 시작한다.
 
 ### Player Grapple > Input
 
@@ -201,6 +213,15 @@ stateDiagram-v2
 | `Impact Impulse` | `30000` | Unreal impulse | 물리 오브젝트에 명중할 때 주는 충격량. 높이면 가벼운 물체가 크게 튕긴다. |
 | `Fire Cooldown` | `0.15` | s | 회수 완료 후 다시 발사할 수 있을 때까지의 대기 시간 |
 
+### Fire > Aim / Muzzle Safety
+
+| 속성 | 기본값 | 단위 | 설명 |
+|---|---:|---:|---|
+| `Use Crosshair Aim Trace` | `true` | - | 카메라 중앙 Trace 명중점을 AimPoint로 사용한다. 미명중 시 최대거리 지점을 사용한다. |
+| `Crosshair Trace Channel` | `Visibility` | - | 조준점 계산에 사용할 Trace 채널 |
+| `Muzzle Obstruction Probe Radius` | `6` | cm | 총구 바로 앞을 검사하는 Sphere 반경 |
+| `Muzzle Obstruction Probe Distance` | `30` | cm | 발사 직전에 검사할 총구 앞 거리. 막혀 있으면 생성된 Projectile에 즉시 실제 명중 처리를 수행한다. |
+
 ### Recall
 
 | 속성 | 기본값 | 단위 | 설명 및 조정 방향 |
@@ -215,6 +236,24 @@ stateDiagram-v2
 | `Heavy Target Timeout` | `1.5` | s | 무거운 물체가 충분히 움직이지 않았다고 판단하기까지 기다리는 시간 |
 | `Minimum Recall Progress` | `100` | cm | 위 시간 동안 이 거리보다 적게 움직이면 물체를 포기하고 작살만 회수한다. |
 | `Return Separation Distance` | `20` | cm | 박힌 표면과 겹친 작살을 발사 반대 방향으로 먼저 빼낸 뒤 회수를 시작하는 거리 |
+
+### Recall > Light
+
+질량 비교는 `Mass < Light Object Mass Threshold`다. 따라서 기본값에서 4.99kg은 Light, 정확히 5kg은 기존 Standard Pull이다. 작살의 시각적 부착점은 실제 명중 위치에 유지하고, 힘만 무게중심에 적용한다.
+
+| 속성 | 기본값 | 단위 | 설명 |
+|---|---:|---:|---|
+| `Light Object Mass Threshold` | `5` | kg | 이 값보다 가벼운 물체에 Light Pull 적용 |
+| `Light Impact Velocity Kick` | `80` | cm/s | 명중점 Torque 없이 무게중심에 주는 작은 속도 변화 |
+| `Light Min Pull Speed` | `220` | cm/s | 해제 반경 근처 목표 속도 |
+| `Light Max Pull Speed` | `1100` | cm/s | 먼 거리 목표 속도 |
+| `Light Approach Slow Distance` | `650` | cm | 거리 기반 감속 구간 |
+| `Light Velocity Gain` | `8` | - | 목표 속도 오차를 가속도로 바꾸는 Gain |
+| `Light Max Pull Acceleration` | `2500` | cm/s² | 순간 이동과 폭발적인 가속을 막는 상한 |
+| `Light Tangential Retention` | `0.15` | 0~1 | 횡방향 관성을 남기는 비율 |
+| `Light Angular Damping` | `9` | - | 현재 각속도의 반대 방향 감쇠 Gain |
+| `Light Max Angular Deceleration` | `80` | rad/s² | 회전을 즉시 고정하지 않는 최대 각감속 |
+| `Light Pull Ramp Time` | `0.10` | s | Recall 시작 후 최대 출력까지 SmoothStep으로 증가하는 시간 |
 
 ### Recall > Safety
 
@@ -466,17 +505,20 @@ stateDiagram-v2
 
 ### 물리 무게 테스트
 
-테스트용 Static Mesh Actor를 세 개 만들고 다음을 설정한다.
+같은 크기의 테스트용 Static Mesh Actor를 일곱 개 만들고 다음을 설정한다.
 
 - `Mobility`: `Movable`
 - `Simulate Physics`: 활성화
 - `Collision Preset`: `PhysicsActor`
-- `Mass Override`: 예시로 `5 kg`, `75 kg`, `300 kg`
+- `Mass Override`: `1`, `3`, `5`, `10`, `30`, `75`, `150 kg`
 
 확인할 내용:
 
-- 가벼운 물체는 빠르게 당겨지는가?
-- 무거운 물체는 같은 힘에서 느리게 움직이는가?
+- 1kg과 3kg을 중앙·가장자리·위쪽에 맞혀도 폭발적으로 회전하지 않고 실제 명중점에 작살이 남는가?
+- 1kg과 3kg은 Recall 직후 약 0.1초에 걸쳐 출력이 증가하고, 약간의 횡방향 흔들림을 남기며 빠르게 당겨지는가?
+- 4.99kg은 Light Pull, 정확히 5kg은 Standard Pull로 동작하는가?
+- 5kg, 10kg, 30kg은 명중점 기준 회전과 기존 바닥 충돌 감각을 유지하는가?
+- 75kg과 150kg은 같은 힘에서 느리게 움직이고, 진행이 부족하면 Heavy Target Timeout으로 작살만 돌아오는가?
 - 물체가 약 `220 cm` 거리에서 풀리고 플레이어 뒤로 심하게 넘어가지 않는가?
 - 큰 물체의 박힌 점은 멀어도 물체 표면이 플레이어와 가까워지면 즉시 힘이 풀리는가?
 - 가까운 물체를 쏜 뒤 회수했을 때 대롱대롱 매달리지 않고 작살만 빠져나오는가?
@@ -491,6 +533,8 @@ stateDiagram-v2
 - 바닥이 없는 공간에서는 `1.5초` 후 안전 호밍으로 전환되는지 확인한다.
 - 박힌 대상을 게임 중 제거해도 크래시 없이 회수 또는 초기화되는지 확인한다.
 - `Draw Debug`를 켜 조준선과 실제 명중 지점을 비교한다.
+- 가까운 작은 표적을 Crosshair로 조준해 카메라 Trace 지점과 Projectile 경로가 일치하는지 확인한다.
+- 총구를 벽에 붙이거나 일부 겹친 상태에서 발사해 Projectile이 벽을 건너뛰거나 영구 유실되지 않는지 확인한다.
 
 ### 타격감 확장 권장 지점
 

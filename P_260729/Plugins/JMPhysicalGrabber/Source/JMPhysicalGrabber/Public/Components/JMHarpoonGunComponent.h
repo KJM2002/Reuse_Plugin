@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Components/ActorComponent.h"
+#include "Engine/EngineTypes.h"
 #include "InputCoreTypes.h"
 #include "Components/JMHarpoonWireRouteComponent.h"
 #include "Types/JMHarpoonCableLengthModel.h"
@@ -128,14 +129,18 @@ public:
     UPROPERTY(BlueprintAssignable, Category="JM|Harpoon Gun|Player Grapple")
     FJMPlayerGrappleEndedEvent OnPlayerGrappleEnded;
 
+    /** Compatibility only. Prefer project-owned Enhanced Input actions calling the public API. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Input")
+    bool bUseLegacyKeyPolling = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Input", meta=(EditCondition="bUseLegacyKeyPolling"))
     FKey FireKey = EKeys::LeftMouseButton;
 
     /** Master switch. Turning it off during a pull immediately restores normal movement. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Input")
     bool bEnablePlayerGrapple = false;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Input")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Player Grapple|Input", meta=(EditCondition="bUseLegacyKeyPolling"))
     FKey PlayerGrappleKey = EKeys::RightMouseButton;
 
     /** Allows the player to follow a projectile embedded in a moving physics body. */
@@ -205,6 +210,20 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Fire", meta=(ClampMin="0.0", Units="s"))
     float FireCooldown = 0.15f;
+
+    /** Traces from the crosshair before deriving the muzzle shot direction. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Fire|Aim")
+    bool bUseCrosshairAimTrace = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Fire|Aim", meta=(EditCondition="bUseCrosshairAimTrace"))
+    TEnumAsByte<ECollisionChannel> CrosshairTraceChannel = ECC_Visibility;
+
+    /** Radius used to detect a blocking surface immediately outside the muzzle. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Fire|Muzzle Safety", meta=(ClampMin="0.1", Units="cm"))
+    float MuzzleObstructionProbeRadius = 6.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Fire|Muzzle Safety", meta=(ClampMin="0.0", Units="cm"))
+    float MuzzleObstructionProbeDistance = 30.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall", meta=(ClampMin="100.0", Units="cm/s"))
     float ReelSpeed = 1800.0f;
@@ -284,6 +303,42 @@ public:
     /** Fraction of velocity toward the player removed when a physics target reaches the release radius. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall", meta=(ClampMin="0.0", ClampMax="1.0"))
     float ReleaseBraking = 0.85f;
+
+    /** Targets strictly below this mass use the stable center-of-mass pull path. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Light", meta=(ClampMin="0.0", Units="kg"))
+    float LightObjectMassThreshold = 5.0f;
+
+    /** Small mass-independent velocity kick used instead of an off-center impact impulse. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Light", meta=(ClampMin="0.0", Units="cm/s"))
+    float LightImpactVelocityKick = 80.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Light", meta=(ClampMin="0.0", Units="cm/s"))
+    float LightMinPullSpeed = 220.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Light", meta=(ClampMin="0.0", Units="cm/s"))
+    float LightMaxPullSpeed = 1100.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Light", meta=(ClampMin="1.0", Units="cm"))
+    float LightApproachSlowDistance = 650.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Light", meta=(ClampMin="0.0"))
+    float LightVelocityGain = 8.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Light", meta=(ClampMin="0.0", Units="cm/s^2"))
+    float LightMaxPullAcceleration = 2500.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Light", meta=(ClampMin="0.0", ClampMax="1.0"))
+    float LightTangentialRetention = 0.15f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Light", meta=(ClampMin="0.0"))
+    float LightAngularDamping = 9.0f;
+
+    /** Maximum angular acceleration change in radians per second squared. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Light", meta=(ClampMin="0.0"))
+    float LightMaxAngularDeceleration = 80.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall|Light", meta=(ClampMin="0.0", Units="s"))
+    float LightPullRampTime = 0.10f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Recall", meta=(ClampMin="0.0", Units="s"))
     float HeavyTargetTimeout = 1.5f;
@@ -424,6 +479,11 @@ public:
 private:
     APlayerController* GetOwningPlayerController() const;
     bool GetView(FVector& OutLocation, FVector& OutDirection) const;
+    FVector ResolveAimPoint(const FVector& ViewLocation, const FVector& ViewDirection) const;
+    bool SweepMuzzleObstruction(
+        const FVector& MuzzleLocation,
+        const FVector& ShotDirection,
+        FHitResult& OutHit) const;
     FVector GetMuzzleLocation() const;
     void EnsurePresentation();
     void DestroyPresentation();
@@ -458,6 +518,18 @@ private:
     bool SweepFreeReturnForGround(const FVector& Start, const FVector& End, FHitResult& OutHit) const;
     bool FindFreeReturnGroundBelow(const FVector& Location, FHitResult& OutHit) const;
     float GetPhysicsTargetSurfaceDistance(const FVector& FromLocation, const FVector& GrabPoint) const;
+    float GetEmbeddedTargetMass() const;
+    bool IsLightPhysicsTarget() const;
+    FVector UpdateLightPhysicsPull(
+        float DeltaTime,
+        const FVector& MuzzleLocation,
+        const FVector& CenterOfMass,
+        float DistanceToRelease);
+    FVector UpdateStandardPhysicsPull(
+        const FVector& GrabPoint,
+        const FVector& SoftCatchError,
+        const FVector& PointVelocity);
+    void ApplyLightAngularStabilization(float DeltaTime);
     void ApplyPhysicsReleaseBraking(const FVector& GrabPoint, const FVector& PullDirection) const;
     UObject* ResolveInteractionTarget(const FHitResult& Hit) const;
     void EndActiveInteraction(EJMHarpoonInteractionEndReason Reason);
