@@ -1,6 +1,6 @@
 # JM Physical Grabber and Harpoon Gun
 
-작살총의 전체 한글 사용 및 튜닝 문서는 [HARPOON_GUN_KO.md](HARPOON_GUN_KO.md)를 참고하세요.
+작살총의 전체 한글 사용 및 튜닝 문서는 [HARPOON_GUN_KO.md](HARPOON_GUN_KO.md)를 참고하세요. 화물, 파손, 추출, 소음, 포탈 코어 설정은 [WORK_TOOL_INTERACTIONS_KO.md](WORK_TOOL_INTERACTIONS_KO.md)에 단계별로 정리되어 있습니다.
 
 ## Harpoon Gun
 
@@ -9,6 +9,23 @@ Add `JM Harpoon Gun Component` to a locally controlled pawn. Left click fires; l
 The optional Player Grapple mode uses right-mouse hold after firing. Pressing it during flight arms the grapple; an embedded projectile then pulls an `ACharacter` toward the anchor through CharacterMovement while retaining sideways momentum. A predictive camera sphere sweep stops inward velocity before ceilings and walls can clip the first-person view. Disable `Enable Player Grapple` to keep the original harpoon-only behavior.
 
 The component creates a prototype gun from the engine Cube, Cylinder, and Cone meshes. It also creates a built-in Cable Component between the muzzle and projectile. No project content is required.
+
+## Data-driven work-tool interactions
+
+Add `JM Harpoon Interactable Component` to a target actor. Configure its `Profile`; the gun discovers it automatically and does not need a target-class branch. The component exposes `On Reaction Completed`, `On Harpoon Noise`, and `On Condition Changed` for game-side Blueprint integration.
+
+Recommended Vertical Slice profiles:
+
+| Target | Reaction and important values |
+| --- | --- |
+| Ordinary cargo | `Pull`, Can Pull; use rigid-body mass for the speed difference |
+| Fragile cargo | `Pull`, Fragile Safe Force > 0; condition falls only above the safe force |
+| Creature resource part | `Extract`, Can Extract, Reaction Force/Hold Time |
+| Removable obstacle | `Break`, Can Break, Reaction Force/Hold Time; static meshes are supported |
+| Metal noise prop | `Pull`, Impact/Pull Noise Loudness; bridge the noise event to AI |
+| Portal core | `Pull`, high physics mass/Pull Resistance, high Pull Noise Loudness |
+
+`Activate` supports levers and valves, `CreaturePart` supports non-lethal creature disruption, and `Anchor` with `Can Pull=false` describes player-movement anchors. Targets can instead implement `IHarpoonInteractable` in C++ or Blueprint when their response needs custom state.
 
 The sample project exposes both presentations as editable Blueprint children:
 
@@ -43,4 +60,4 @@ Important tuning values:
 
 `JM Physical Grabber Component` remains available for short-range direct grabbing. Its fixed force budget is not multiplied by mass, so heavy bodies lag or can only be dragged.
 
-The plugin requires the built-in Unreal Cable Component plugin and has no dependency on project content or other JM plugins. The two sample Blueprints are optional project-side overrides; deleting them and selecting the native classes restores the built-in prototype.
+The plugin requires the built-in Unreal Cable Component plugin and has no dependency on project content or other JM plugins. AI, inventory, objective, monster, door, and portal integration is intentionally event-driven outside this plugin. The two sample Blueprints are optional project-side overrides; deleting them and selecting the native classes restores the built-in prototype.

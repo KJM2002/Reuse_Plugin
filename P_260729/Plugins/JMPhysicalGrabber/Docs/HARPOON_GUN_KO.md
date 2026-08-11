@@ -1,6 +1,6 @@
 # JM 작살총 사용 및 수정 문서
 
-이 문서는 현재 프로젝트에 적용된 `JM Harpoon Gun`의 기능, 수정 위치, 기본값, 외형 파츠, Blueprint API, 테스트 방법을 정리한다.
+이 문서는 현재 프로젝트에 적용된 `JM Harpoon Gun`의 기능, 수정 위치, 기본값, 외형 파츠, Blueprint API, 테스트 방법을 정리한다. 화물·장애물·몬스터 부산물·포탈 코어 반응은 [작살 작업 도구 상호작용 사용법](WORK_TOOL_INTERACTIONS_KO.md)을 참고한다.
 
 ![JM 작살총 파츠 가이드](JM_HARPOON_PARTS_POSTER_KO.png)
 
@@ -472,7 +472,26 @@ stateDiagram-v2
 - `On Harpoon Recall Started`: 윈치 시작음과 반복음
 - `On Harpoon Returned`: 금속 걸림음, 작은 총기 반동, UI 재장전 표시
 
-## 12. 제한 사항
+## 12. 작업 도구 상호작용 설정
+
+대상 액터에 `JM Harpoon Interactable Component`를 추가하면 작살총 코드 수정 없이 반응을 정의할 수 있다. 전체 Profile 설명, Blueprint 이벤트 연결, Vertical Slice 권장값, 자동화 테스트, 문제 해결은 [WORK_TOOL_INTERACTIONS_KO.md](WORK_TOOL_INTERACTIONS_KO.md)에 정리되어 있다.
+
+- 일반 화물: `Reaction=Pull`, `Can Pull=true`; 실제 물리 Mass로 회수 속도를 조절한다.
+- 깨지기 쉬운 화물: `Fragile Safe Force`와 `Fragile Damage Per Second`를 설정하고 `On Condition Changed`에서 외형/가치를 갱신한다.
+- 몬스터 부산물: `Reaction=Extract`, `Can Extract=true`; `On Reaction Completed`에서 아이템을 생성한다.
+- 판자/환풍구: `Reaction=Break`, `Can Break=true`; 고정된 Static Mesh도 장력을 누적할 수 있다.
+- 금속 소음원: `Impact/Pull Noise Loudness`를 설정하고 `On Harpoon Noise`를 게임 AI 소음 API에 연결한다.
+- 포탈 코어: `Reaction=Pull`, 큰 물리 Mass와 Pull Resistance, 높은 Pull Noise Loudness를 사용한다.
+
+`Reaction Force` 이상의 장력을 `Reaction Hold Time` 동안 유지해야 Break/Extract/Activate/CreaturePart가 완료된다. 대상별 고유 로직은 `IHarpoonInteractable`을 Blueprint 또는 C++로 직접 구현한다. 플러그인은 AI, 인벤토리, 몬스터, 포탈 클래스를 직접 참조하지 않는다.
+
+주의 사항:
+
+- Break/Extract 등에는 `Can Pull`과 반응별 `Can ...`이 모두 필요하다.
+- `Pull`은 목적지 도착 완료 이벤트를 발생시키지 않으므로 Trigger 또는 게임별 구현으로 판정한다.
+- Pull Resistance가 커질수록 사용할 수 있는 최대 장력도 낮아진다.
+
+## 13. 제한 사항
 
 - 입력과 Tick은 로컬 플레이어 컨트롤러에서만 처리한다.
 - 플레이어 그래플은 소유자가 `ACharacter`이고 `CharacterMovementComponent`를 가지고 있을 때만 시작된다.

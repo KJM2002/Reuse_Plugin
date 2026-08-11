@@ -2,6 +2,12 @@
 
 The runtime module contains two independent pawn components.
 
+Version 1.5 adds a target-owned interaction layer without changing that ownership. `IJMHarpoonInteractable` exposes an interaction profile and lifecycle callbacks; `UJMHarpoonInteractableComponent` is the reusable data-driven implementation. The gun resolves the interface from the hit primitive, actor, or one of the actor's components in that order. It never casts to cargo, creature, door, portal, or project classes.
+
+The profile controls embed/pull permission, pull resistance, reaction kind, sustained-force threshold, fragile-force budget, and generic impact/pull noise. `Break`, `Extract`, `Activate`, and `CreaturePart` complete only after their force threshold is sustained for the configured time. `Pull` preserves normal rigid-body recall, and `Anchor` can reserve a target for player grappling. Interface-free targets keep the pre-1.5 legacy behavior.
+
+Noise is emitted as a Blueprint multicast signal rather than sent directly to an AI implementation. Inventory rewards, objective progress, monster state, door state, and portal state likewise subscribe to `OnReactionCompleted` in a game-side Blueprint or a separate integration plugin. This keeps the runtime module independent and prevents reverse dependencies.
+
 `UJMPhysicalGrabberComponent` performs short-range direct grabbing. It stores a hit point in component-local space and pulls it toward a view-relative target with a damped spring and fixed force budget.
 
 `UJMHarpoonGunComponent` owns a four-state harpoon lifecycle: `Ready`, `Flying`, `Embedded`, and `Retracting`. It spawns a configurable `AJMHarpoonProjectile` subclass, connects its muzzle to the projectile with Unreal's `UCableComponent`, and spawns a configurable `AJMHarpoonGunVisualActor` subclass for the first-person presentation. Both native actor classes use `/Engine/BasicShapes` defaults and expose their component parts to Blueprint children. No `/Game` content is referenced by the plugin.
@@ -18,4 +24,4 @@ The fixed pull force is intentionally not multiplied by mass, so heavier bodies 
 
 Cable particle counts and solver properties are configured before registration. Runtime cable length changes are interpolated, with reduced cable gravity and a shorter, more strongly solved segment chain to suppress whipping during ground drag.
 
-The module depends only on Unreal runtime modules and the built-in Cable Component plugin. Server-authoritative multiplayer and rope/world collision are outside version 1.3.1.
+The module depends only on Unreal runtime modules and the built-in Cable Component plugin. Interaction state is local and transient; server-authoritative multiplayer, save ownership, and rope/world collision are outside version 1.5.0. Invalid or destroyed targets fall back to guaranteed harpoon recovery.

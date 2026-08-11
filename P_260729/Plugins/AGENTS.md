@@ -62,6 +62,7 @@
 | `JMHideInteractionIntegration` | `JMHideInteractionIntegration` | JMInteraction 명령을 JMHide 진입으로 연결하고 호스트 입력 라우팅 지원 | `JMHide`, `JMInteraction` | Runtime Bridge |
 | `JMHideDoorIntegration` | `JMHideDoorIntegration`, `JMHideDoorIntegrationTests` | JMDoor 공개 Command/상태를 JMHide Mechanism 계약으로 번역 | `JMHide`, `JMDoor` | Runtime Adapter + Editor Tests |
 | `JMRoomGrid` | `JMRoomGridRuntime`, `JMRoomGridEditor`, `JMRoomGridTests` | 편집 가능한 모듈 방, 데이터 기반 결정적 5x5 배치, 에셋 생성·검증 도구 | 없음 | 독립 Runtime + Editor Tools/Tests, Content 가능 |
+| `JMPhysicalGrabber` | `JMPhysicalGrabber`, `JMPhysicalGrabberTests` | 고정 힘 물리 그랩, 회수 가능 작살, 대상 소유형 장력/파손/추출/활성화/소음 반응 계약 | 없음(CableComponent 엔진 플러그인만 사용) | 독립 Runtime + Editor Tests |
 
 현재 허용된 방향은 다음뿐이다.
 
@@ -76,6 +77,8 @@ JMJumpScare ───────────────> JMGameplayEvent
 JMRecon ───────────────────> Unreal Engine 모듈
 
 JMFootstep ────────────────> Unreal Engine 모듈
+
+JMPhysicalGrabber ─────────> Unreal Engine 모듈 / CableComponent
 
 JMHide ────────────────────> Unreal Engine 모듈
 

@@ -1,5 +1,7 @@
 #include "Components/JMHarpoonGunComponent.h"
 
+#include "Interfaces/JMHarpoonInteractable.h"
+
 #include "Actors/JMHarpoonGunVisualActor.h"
 #include "Actors/JMHarpoonProjectile.h"
 #include "CableComponent.h"
@@ -609,17 +611,27 @@ bool UJMHarpoonGunComponent::RecallHarpoon()
     RecallElapsed = 0.0f;
     bDeadlineRecoveryTriggered = false;
     RecallStartDistance = FVector::Distance(GetMuzzleLocation(), ActiveProjectile->GetActorLocation());
+    const bool bCustomTargetCanPull = IsValid(InteractionTargetObject)
+        && ActiveInteractionProfile.bCanPull;
     bPullingPhysicsTarget = State == EJMHarpoonGunState::Embedded
         && IsValid(EmbeddedComponent)
-        && EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone);
+        && (bCustomTargetCanPull || (!IsValid(InteractionTargetObject)
+            && EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone)));
 
     State = EJMHarpoonGunState::Retracting;
     if (bPullingPhysicsTarget)
     {
+        if (IsValid(InteractionTargetObject))
+        {
+            IJMHarpoonInteractable::Execute_OnHarpoonPullStarted(
+                InteractionTargetObject,
+                ActiveInteractionContext);
+        }
         const FVector MuzzleLocation = GetMuzzleLocation();
         const FVector GrabPoint = EmbeddedComponent->GetComponentTransform().TransformPosition(EmbeddedLocalPoint);
         const FVector PullDirection = (MuzzleLocation - GrabPoint).GetSafeNormal();
-        if (GetPhysicsTargetSurfaceDistance(MuzzleLocation, GrabPoint) <= PhysicsReleaseDistance)
+        if (EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone)
+            && GetPhysicsTargetSurfaceDistance(MuzzleLocation, GrabPoint) <= PhysicsReleaseDistance)
         {
             // A close or already-overlapping target should never enter the
             // pendulum-like force pull. Release the body and return only the spear.
@@ -640,6 +652,7 @@ bool UJMHarpoonGunComponent::RecallHarpoon()
 void UJMHarpoonGunComponent::ResetHarpoon()
 {
     EndPlayerGrapple(EJMPlayerGrappleEndReason::InvalidAnchor);
+    EndActiveInteraction(EJMHarpoonInteractionEndReason::Reset);
 
     if (ActiveProjectile)
     {
@@ -679,6 +692,32 @@ void UJMHarpoonGunComponent::NotifyProjectileImpact(
     EmbeddedLocalPoint = EmbeddedComponent->GetComponentTransform().InverseTransformPosition(Hit.ImpactPoint);
     LastImpactVelocity = ImpactVelocity;
 
+    InteractionTargetObject = ResolveInteractionTarget(Hit);
+    ActiveInteractionContext.Gun = this;
+    ActiveInteractionContext.Projectile = ActiveProjectile;
+    ActiveInteractionContext.HitComponent = EmbeddedComponent;
+    ActiveInteractionContext.ImpactPoint = Hit.ImpactPoint;
+    ActiveInteractionContext.ImpactNormal = Hit.ImpactNormal;
+    ActiveInteractionContext.ImpactVelocity = ImpactVelocity;
+    ActiveInteractionContext.BoneName = Hit.BoneName;
+    if (IsValid(InteractionTargetObject))
+    {
+        ActiveInteractionProfile = IJMHarpoonInteractable::Execute_GetHarpoonInteractionProfile(
+            InteractionTargetObject,
+            ActiveInteractionContext);
+        if (!ActiveInteractionProfile.bCanEmbed)
+        {
+            InteractionTargetObject = nullptr;
+            ActiveProjectile->EmbedAtHit(Hit, 0.0f);
+            State = EJMHarpoonGunState::Retracting;
+            RecallElapsed = 0.0f;
+            RecallStartDistance = FVector::Distance(GetMuzzleLocation(), ActiveProjectile->GetActorLocation());
+            DetachForFreeReturn();
+            OnHarpoonRecallStarted.Broadcast(ActiveProjectile);
+            return;
+        }
+    }
+
     ActiveProjectile->EmbedAtHit(Hit, EmbedDepth);
     if (EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone))
     {
@@ -690,6 +729,13 @@ void UJMHarpoonGunComponent::NotifyProjectileImpact(
 
     State = EJMHarpoonGunState::Embedded;
     RecoilAlpha = FMath::Max(RecoilAlpha, 0.45f);
+
+    if (IsValid(InteractionTargetObject))
+    {
+        IJMHarpoonInteractable::Execute_OnHarpoonEmbedded(
+            InteractionTargetObject,
+            ActiveInteractionContext);
+    }
 
     if (PlayerGrappleState == EJMPlayerGrappleState::Armed)
     {
@@ -892,6 +938,7 @@ bool UJMHarpoonGunComponent::HasHarpoonSafetyViolation() const
 void UJMHarpoonGunComponent::BeginEmergencyReturn()
 {
     EndPlayerGrapple(EJMPlayerGrappleEndReason::InvalidAnchor);
+    EndActiveInteraction(EJMHarpoonInteractionEndReason::TargetInvalid);
 
     if (!GetWorld() || !GetOwner() || !ProjectileClass)
     {
@@ -972,6 +1019,7 @@ void UJMHarpoonGunComponent::BeginEmergencyReturn()
 
 void UJMHarpoonGunComponent::ForceCompleteReturnAtDeadline()
 {
+    EndActiveInteraction(EJMHarpoonInteractionEndReason::RecallTimeout);
     EmbeddedComponent = nullptr;
     EmbeddedBone = NAME_None;
     EmbeddedLocalPoint = FVector::ZeroVector;
@@ -1240,16 +1288,19 @@ void UJMHarpoonGunComponent::UpdateRetracting(float DeltaTime)
 
     const FVector MuzzleLocation = GetMuzzleLocation();
 
-    if (bPullingPhysicsTarget && IsValid(EmbeddedComponent) && EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone))
+    if (bPullingPhysicsTarget && IsValid(EmbeddedComponent))
     {
         const FVector GrabPoint = EmbeddedComponent->GetComponentTransform().TransformPosition(EmbeddedLocalPoint);
         const FVector Error = MuzzleLocation - GrabPoint;
         const float Distance = Error.Size();
         const FVector PullDirection = Error.GetSafeNormal();
-        const FVector PointVelocity = EmbeddedComponent->GetPhysicsLinearVelocityAtPoint(GrabPoint, EmbeddedBone);
+        const bool bSimulatesPhysics = EmbeddedComponent->IsSimulatingPhysics(EmbeddedBone);
+        const FVector PointVelocity = bSimulatesPhysics
+            ? EmbeddedComponent->GetPhysicsLinearVelocityAtPoint(GrabPoint, EmbeddedBone)
+            : FVector::ZeroVector;
         const float TargetSurfaceDistance = GetPhysicsTargetSurfaceDistance(MuzzleLocation, GrabPoint);
 
-        if (TargetSurfaceDistance <= PhysicsReleaseDistance)
+        if (bSimulatesPhysics && TargetSurfaceDistance <= PhysicsReleaseDistance)
         {
             ApplyPhysicsReleaseBraking(GrabPoint, PullDirection);
             DetachForFreeReturn();
@@ -1260,9 +1311,43 @@ void UJMHarpoonGunComponent::UpdateRetracting(float DeltaTime)
         // Pull toward a safe sphere in front of the player, not all the way to
         // the muzzle. The spring error approaches zero near the release radius,
         // which creates a natural soft-catch zone instead of an overshoot.
-        const FVector SoftCatchError = PullDirection * (Distance - PhysicsReleaseDistance);
+        const FVector SoftCatchError = bSimulatesPhysics
+            ? PullDirection * (Distance - PhysicsReleaseDistance)
+            : Error;
         const FVector RequestedForce = SoftCatchError * PullStrength - PointVelocity * PullDamping;
-        EmbeddedComponent->AddForceAtLocation(RequestedForce.GetClampedToMaxSize(MaxPullForce), GrabPoint, EmbeddedBone);
+        const float Resistance = IsValid(InteractionTargetObject)
+            ? FMath::Max(ActiveInteractionProfile.PullResistance, 0.01f)
+            : 1.0f;
+        const float ResistantForceBudget = MaxPullForce / FMath::Max(Resistance, 1.0f);
+        const FVector AppliedForce = (RequestedForce / Resistance).GetClampedToMaxSize(ResistantForceBudget);
+        if (bSimulatesPhysics)
+        {
+            EmbeddedComponent->AddForceAtLocation(AppliedForce, GrabPoint, EmbeddedBone);
+        }
+
+        if (IsValid(InteractionTargetObject))
+        {
+            ActiveInteractionContext.ImpactPoint = GrabPoint;
+            FJMHarpoonPullUpdate PullUpdate;
+            PullUpdate.DeltaTime = DeltaTime;
+            PullUpdate.PullElapsed = RecallElapsed;
+            PullUpdate.Distance = Distance;
+            PullUpdate.AppliedForce = AppliedForce.Size();
+            PullUpdate.ReactionProgress = ActiveInteractionProfile.ReactionForce > 0.0f
+                ? FMath::Clamp(PullUpdate.AppliedForce / ActiveInteractionProfile.ReactionForce, 0.0f, 1.0f)
+                : 1.0f;
+            const EJMHarpoonReactionDirective Directive =
+                IJMHarpoonInteractable::Execute_OnHarpoonPullUpdated(
+                    InteractionTargetObject,
+                    ActiveInteractionContext,
+                    PullUpdate);
+            if (Directive == EJMHarpoonReactionDirective::ReleaseHarpoon)
+            {
+                EndActiveInteraction(EJMHarpoonInteractionEndReason::Completed);
+                DetachForFreeReturn();
+                return;
+            }
+        }
         SmoothCableLength(Distance, DeltaTime);
 
         if (RecallElapsed >= HeavyTargetTimeout && RecallStartDistance - Distance < MinimumRecallProgress)
@@ -1430,6 +1515,7 @@ void UJMHarpoonGunComponent::UpdateRetracting(float DeltaTime)
 
 void UJMHarpoonGunComponent::DetachForFreeReturn(bool bPreserveForwardCarry)
 {
+    EndActiveInteraction(EJMHarpoonInteractionEndReason::Released);
     const bool bWasEmbedded = IsValid(EmbeddedComponent);
     const FVector SeparationDirection = ActiveProjectile
         ? -ActiveProjectile->GetTravelDirection()
@@ -1583,6 +1669,7 @@ void UJMHarpoonGunComponent::ApplyPhysicsReleaseBraking(
 
 void UJMHarpoonGunComponent::CompleteReturn()
 {
+    EndActiveInteraction(EJMHarpoonInteractionEndReason::Released);
     AJMHarpoonProjectile* ReturnedProjectile = ActiveProjectile;
     OnHarpoonReturned.Broadcast(ReturnedProjectile);
     if (ReturnedProjectile)
@@ -1606,6 +1693,52 @@ void UJMHarpoonGunComponent::CompleteReturn()
     CooldownRemaining = FireCooldown;
     RecoilAlpha = 0.35f;
     ShowCable(false);
+}
+
+UObject* UJMHarpoonGunComponent::ResolveInteractionTarget(const FHitResult& Hit) const
+{
+    if (UPrimitiveComponent* HitComponent = Hit.GetComponent())
+    {
+        if (HitComponent->GetClass()->ImplementsInterface(UJMHarpoonInteractable::StaticClass()))
+        {
+            return HitComponent;
+        }
+    }
+
+    AActor* HitActor = Hit.GetActor();
+    if (!IsValid(HitActor))
+    {
+        return nullptr;
+    }
+    if (HitActor->GetClass()->ImplementsInterface(UJMHarpoonInteractable::StaticClass()))
+    {
+        return HitActor;
+    }
+
+    TInlineComponentArray<UActorComponent*> Components(HitActor);
+    for (UActorComponent* Component : Components)
+    {
+        if (IsValid(Component)
+            && Component->GetClass()->ImplementsInterface(UJMHarpoonInteractable::StaticClass()))
+        {
+            return Component;
+        }
+    }
+    return nullptr;
+}
+
+void UJMHarpoonGunComponent::EndActiveInteraction(EJMHarpoonInteractionEndReason Reason)
+{
+    if (IsValid(InteractionTargetObject))
+    {
+        IJMHarpoonInteractable::Execute_OnHarpoonInteractionEnded(
+            InteractionTargetObject,
+            ActiveInteractionContext,
+            Reason);
+    }
+    InteractionTargetObject = nullptr;
+    ActiveInteractionContext = FJMHarpoonInteractionContext();
+    ActiveInteractionProfile = FJMHarpoonInteractionProfile();
 }
 
 void UJMHarpoonGunComponent::UpdatePresentation(float DeltaTime)

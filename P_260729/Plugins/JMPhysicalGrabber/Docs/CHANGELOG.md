@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.5.0
+
+### Added
+
+- Target-owned `IHarpoonInteractable` contract with embed, pull, reaction, and end callbacks.
+- Data-driven `UJMHarpoonInteractableComponent` for Pull, Break, Extract, Activate, CreaturePart, and Anchor reactions.
+- Sustained cable-force thresholds, pull resistance, fragile cargo condition, and generic AI-bridge noise events.
+- Static-target tension reactions for removable obstacles without requiring rigid-body simulation.
+- Editor automation coverage for extraction thresholds, fragile breakage, and pull-session reset.
+- Korean step-by-step work-tool interaction guide with Blueprint recipes, test procedure, and troubleshooting.
+
+### Changed
+
+- `UJMHarpoonGunComponent` resolves target behavior through an interface while retaining legacy physics recall for targets that do not implement it.
+- Interaction failure, reset, completion, and emergency recovery now terminate the target lifecycle explicitly.
+
 ## 1.4.1
 
 ### Added

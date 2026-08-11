@@ -2,6 +2,7 @@
 
 #include "Components/ActorComponent.h"
 #include "InputCoreTypes.h"
+#include "Types/JMHarpoonInteractionTypes.h"
 #include "JMHarpoonGunComponent.generated.h"
 
 class AJMHarpoonProjectile;
@@ -82,6 +83,12 @@ public:
 
     UFUNCTION(BlueprintPure, Category="JM|Harpoon Gun")
     AJMHarpoonProjectile* GetActiveHarpoon() const { return ActiveProjectile; }
+
+    UFUNCTION(BlueprintPure, Category="JM|Harpoon Gun|Interaction")
+    bool HasCustomInteractionTarget() const { return IsValid(InteractionTargetObject); }
+
+    UFUNCTION(BlueprintPure, Category="JM|Harpoon Gun|Interaction")
+    FJMHarpoonInteractionProfile GetActiveInteractionProfile() const { return ActiveInteractionProfile; }
 
     UFUNCTION(BlueprintCallable, Category="JM|Harpoon Gun|Player Grapple")
     void SetPlayerGrappleEnabled(bool bEnabled);
@@ -387,6 +394,8 @@ private:
     bool FindFreeReturnGroundBelow(const FVector& Location, FHitResult& OutHit) const;
     float GetPhysicsTargetSurfaceDistance(const FVector& FromLocation, const FVector& GrabPoint) const;
     void ApplyPhysicsReleaseBraking(const FVector& GrabPoint, const FVector& PullDirection) const;
+    UObject* ResolveInteractionTarget(const FHitResult& Hit) const;
+    void EndActiveInteraction(EJMHarpoonInteractionEndReason Reason);
     void CompleteReturn();
     void UpdatePresentation(float DeltaTime);
     UPROPERTY(Transient)
@@ -400,6 +409,12 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UPrimitiveComponent> EmbeddedComponent;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UObject> InteractionTargetObject;
+
+    FJMHarpoonInteractionContext ActiveInteractionContext;
+    FJMHarpoonInteractionProfile ActiveInteractionProfile;
 
     FName EmbeddedBone = NAME_None;
     FVector EmbeddedLocalPoint = FVector::ZeroVector;

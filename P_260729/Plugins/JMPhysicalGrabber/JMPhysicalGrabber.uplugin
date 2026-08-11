@@ -1,9 +1,9 @@
 {
   "FileVersion": 3,
-  "Version": 12,
-  "VersionName": "1.4.1",
+  "Version": 13,
+  "VersionName": "1.5.0",
   "FriendlyName": "JM Physical Grabber",
-  "Description": "Force-limited physical grabbing, retractable harpoon gun, and optional player grappling movement.",
+  "Description": "Force-limited grabbing, retractable harpoon, target-owned work-tool reactions, and optional player grappling.",
   "Category": "JM Gameplay",
   "CreatedBy": "JM",
   "EnabledByDefault": true,
@@ -13,6 +13,11 @@
       "Name": "JMPhysicalGrabber",
       "Type": "Runtime",
       "LoadingPhase": "Default"
+    },
+    {
+      "Name": "JMPhysicalGrabberTests",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit"
     }
   ],
   "Plugins": [
