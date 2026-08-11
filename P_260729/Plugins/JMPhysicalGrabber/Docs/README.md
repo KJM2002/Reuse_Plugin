@@ -8,7 +8,7 @@ Add `JM Harpoon Gun Component` to a locally controlled pawn. Left click fires; l
 
 The optional Player Grapple mode uses right-mouse hold after firing. Pressing it during flight arms the grapple; an embedded projectile then pulls an `ACharacter` toward the anchor through CharacterMovement while retaining sideways momentum. A predictive camera sphere sweep stops inward velocity before ceilings and walls can clip the first-person view. Disable `Enable Player Grapple` to keep the original harpoon-only behavior.
 
-The component creates a prototype gun from the engine Cube, Cylinder, and Cone meshes. It also creates a built-in Cable Component between the muzzle and projectile. No project content is required.
+The component creates a prototype gun from engine basic meshes. Its default wire uses full-span Sphere Sweeps, bounded surface contacts, and Spline Mesh rendering; the built-in Cable Component remains an optional fallback. No project content is required.
 
 ## Data-driven work-tool interactions
 
@@ -49,7 +49,13 @@ Important tuning values:
 - `Return Ground Lift Distance`: controls where the harpoon leaves the floor and lifts into the muzzle.
 - `Return Ground Search Timeout`: guarantees recovery in maps with no floor below the harpoon.
 - `Return Gravity Fade Time` and `Return Homing Responsiveness`: tune the final lift from the floor into the muzzle.
-- `Cable Num Segments`, solver iterations, gravity scale, and length interpolation: tune rope stability without changing Cable settings after registration.
+- `Use Spline Wire`: keep enabled for stable full-span ground and slope routing; disable only to compare the legacy Cable fallback.
+- `Wire Route Settings`: tune collision radius, surface clearance, 25 Hz route updates, contact hysteresis, correction limits, render density, and embedded sag.
+- `Cable Num Segments`, solver iterations, and gravity scale: tune only the legacy Cable fallback.
+- `Cable Start Jitter Dead Zone`, stabilization speed, and maximum lag: filter first-person camera shimmer without visibly disconnecting the line from the muzzle.
+- `Cable Minimum/Maximum Slack`: cap long-range looseness while preserving a small natural sag.
+- `Enable Ground Cable Collision` and collision friction: apply only to the legacy Cable fallback; WorldDynamic collision is optional in both renderers.
+- `Cable Material` and `Cable Width`: shared visual inputs; `Cable Num Sides` and material tile length apply to the legacy Cable fallback.
 - `Player Grapple Camera Clearance` and `Player Grapple Camera Probe Radius`: tune first-person camera clearance near ceilings, walls, and corners.
 - `Return Separation Distance`: pulls the spear out of an overlapped hit surface before recall.
 - `Heavy Target Timeout`: guarantees recovery from immovable targets.

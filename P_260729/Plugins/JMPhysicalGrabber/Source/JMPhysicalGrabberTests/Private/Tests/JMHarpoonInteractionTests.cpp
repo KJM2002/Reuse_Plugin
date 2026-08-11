@@ -1,7 +1,73 @@
 #include "Components/JMHarpoonInteractableComponent.h"
+#include "Components/JMHarpoonWireRouteComponent.h"
 #include "Misc/AutomationTest.h"
+#include "Types/JMHarpoonCableLengthModel.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FJMHarpoonWireSurfaceOffsetTest,
+    "JM.PhysicalGrabber.Wire.SurfaceOffset",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMHarpoonWireSurfaceOffsetTest::RunTest(const FString& Parameters)
+{
+    const FVector Contact = UJMHarpoonWireRouteComponent::MakeSurfaceContactPoint(
+        FVector::ZeroVector,
+        FVector::UpVector,
+        2.5f,
+        0.75f);
+    TestEqual(TEXT("Contact is displaced outside the surface"), Contact, FVector(0.0f, 0.0f, 3.25f));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FJMHarpoonWireSagTest,
+    "JM.PhysicalGrabber.Wire.SagCurve",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMHarpoonWireSagTest::RunTest(const FString& Parameters)
+{
+    const FVector Start(0.0f, 0.0f, 0.0f);
+    const FVector End(100.0f, 0.0f, 0.0f);
+    TestEqual(
+        TEXT("Sag preserves the start endpoint"),
+        UJMHarpoonWireRouteComponent::EvaluateSagPoint(Start, End, 0.0f, 10.0f),
+        Start);
+    TestEqual(
+        TEXT("Sag reaches its requested depth at the midpoint"),
+        UJMHarpoonWireRouteComponent::EvaluateSagPoint(Start, End, 0.5f, 10.0f),
+        FVector(50.0f, 0.0f, -10.0f));
+    TestEqual(
+        TEXT("Sag preserves the end endpoint"),
+        UJMHarpoonWireRouteComponent::EvaluateSagPoint(Start, End, 1.0f, 10.0f),
+        End);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FJMHarpoonCableLengthModelTest,
+    "JM.PhysicalGrabber.Cable.WinchLengthModel",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMHarpoonCableLengthModelTest::RunTest(const FString& Parameters)
+{
+    FJMHarpoonCableLengthModel Model;
+    Model.Reset(10.0f);
+    const float MuzzleLength = Model.Update(0.0f, 1.0f / 60.0f, false, 10.0f, 1.01f, 0.5f, 8.0f, 1.0f, 24.0f);
+    TestEqual(TEXT("Muzzle cable starts without a one-meter loose loop"), MuzzleLength, 10.0f);
+
+    const float FiredLength = Model.Update(1000.0f, 1.0f / 60.0f, false, 10.0f, 1.01f, 2.5f, 8.0f, 1.0f, 24.0f);
+    TestEqual(TEXT("Long-range slack is capped"), FiredLength, 1008.0f);
+
+    const float EmbeddedCloserLength = Model.Update(700.0f, 1.0f / 60.0f, false, 10.0f, 1.01f, 2.5f, 8.0f, 1.0f, 24.0f);
+    TestEqual(TEXT("Flying/embedded cable does not reel inward"), EmbeddedCloserLength, FiredLength);
+
+    const float RetractingLength = Model.Update(700.0f, 1.0f / 60.0f, true, 10.0f, 1.01f, 2.5f, 8.0f, 1.0f, 24.0f);
+    TestTrue(TEXT("Recall reels inward"), RetractingLength < FiredLength);
+    TestTrue(TEXT("Recall never undercuts endpoint span"), RetractingLength >= 707.0f);
+    return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FJMHarpoonExtractThresholdTest,

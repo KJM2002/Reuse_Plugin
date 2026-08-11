@@ -2,6 +2,8 @@
 
 #include "Components/ActorComponent.h"
 #include "InputCoreTypes.h"
+#include "Components/JMHarpoonWireRouteComponent.h"
+#include "Types/JMHarpoonCableLengthModel.h"
 #include "Types/JMHarpoonInteractionTypes.h"
 #include "JMHarpoonGunComponent.generated.h"
 
@@ -12,6 +14,7 @@ class APlayerController;
 class UCableComponent;
 class UCameraComponent;
 class UCharacterMovementComponent;
+class UMaterialInterface;
 class UPrimitiveComponent;
 class USceneComponent;
 
@@ -332,20 +335,32 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation")
     TSubclassOf<AJMHarpoonGunVisualActor> VisualActorClass;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable", meta=(ClampMin="1", ClampMax="64"))
-    int32 CableNumSegments = 12;
-
+    /** Segment count is fixed before registration; 16 is the first-person quality/performance default. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable", meta=(ClampMin="1", ClampMax="32"))
-    int32 CableSolverIterations = 8;
+    int32 CableNumSegments = 16;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable", meta=(ClampMin="1", ClampMax="16"))
+    int32 CableSolverIterations = 12;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable", meta=(ClampMin="0.1", Units="cm"))
-    float CableWidth = 1.8f;
+    float CableWidth = 1.2f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable", meta=(ClampMin="3", ClampMax="12"))
+    int32 CableNumSides = 6;
+
+    /** Optional project material. A tiled opaque braided-wire material is recommended. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable")
+    TObjectPtr<UMaterialInterface> CableMaterial;
+
+    /** World-space length represented by one material repeat. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable", meta=(ClampMin="1.0", Units="cm"))
+    float CableMaterialTileLength = 75.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable", meta=(ClampMin="0.0"))
-    float CableGravityScale = 0.25f;
+    float CableGravityScale = 0.12f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable", meta=(ClampMin="0.005", Units="s"))
-    float CableSubstepTime = 0.01f;
+    float CableSubstepTime = 0.008333f;
 
     /** Smooths changing cable length to prevent slack from being injected in one frame. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable", meta=(ClampMin="0.1"))
@@ -353,6 +368,52 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable", meta=(ClampMin="1.0", ClampMax="1.2"))
     float CableSlackMultiplier = 1.01f;
+
+    /** Short loaded/firing rest length. Keeping this small prevents a one-meter loop from being released at the muzzle. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable|Stability", meta=(ClampMin="1.0", Units="cm"))
+    float CableMinimumLength = 10.0f;
+
+    /** Lower/upper bounds keep percentage slack useful without creating a long loose rope at maximum range. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable", meta=(ClampMin="0.0", Units="cm"))
+    float CableMinimumSlack = 2.5f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable", meta=(ClampMin="0.0", Units="cm"))
+    float CableMaximumSlack = 8.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable|Stability", meta=(ClampMin="0.0", Units="cm"))
+    float CableLengthDeadZone = 1.0f;
+
+    /** Ignores sub-centimeter camera/muzzle jitter before it enters the cable simulation. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable|Stability", meta=(ClampMin="0.0", Units="cm"))
+    float CableStartJitterDeadZone = 0.2f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable|Stability", meta=(ClampMin="0.1"))
+    float CableStartStabilizationSpeed = 55.0f;
+
+    /** Keeps the visual line attached during fast camera turns while still filtering micro jitter. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable|Stability", meta=(ClampMin="0.0", Units="cm"))
+    float CableStartMaximumLag = 1.5f;
+
+    /** Fast endpoint motion resets stale Verlet velocity into a straight, taut cable. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable|Stability", meta=(ClampMin="0.0", Units="cm"))
+    float CableParticleResetDistance = 25.0f;
+
+    /** Experimental CableComponent collision is enabled only during the short recall window. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable|Ground Collision")
+    bool bEnableGroundCableCollision = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable|Ground Collision", meta=(ClampMin="0.0", ClampMax="1.0"))
+    float CableCollisionFriction = 0.55f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Cable|Ground Collision")
+    bool bCableCollideWithWorldDynamic = false;
+
+    /** Uses bounded sphere-sweep contacts and spline meshes instead of particle cable collision. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Wire Route")
+    bool bUseSplineWire = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Presentation|Wire Route", meta=(EditCondition="bUseSplineWire"))
+    FJMHarpoonWireRouteSettings WireRouteSettings;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="JM|Harpoon Gun|Debug")
     bool bDrawDebug = false;
@@ -369,6 +430,10 @@ private:
     void ShowCable(bool bShow);
     void AttachCableToActiveProjectile(float InitialLength);
     void SmoothCableLength(float TargetLength, float DeltaTime);
+    void UpdateCableStartProxy(float DeltaTime);
+    void UpdateCableCollisionMode();
+    void UpdateSplineWire(float DeltaTime);
+    void ResetCablePresentationState();
     void UpdatePlayerGrappleInput(APlayerController* Controller);
     void UpdatePlayerGrapple(float DeltaTime);
     bool SweepPlayerGrappleCamera(
@@ -408,6 +473,12 @@ private:
     TObjectPtr<UCableComponent> Cable;
 
     UPROPERTY(Transient)
+    TObjectPtr<UJMHarpoonWireRouteComponent> WireRoute;
+
+    UPROPERTY(Transient)
+    TObjectPtr<USceneComponent> CableStartProxy;
+
+    UPROPERTY(Transient)
     TObjectPtr<UPrimitiveComponent> EmbeddedComponent;
 
     UPROPERTY(Transient)
@@ -430,6 +501,9 @@ private:
     FVector FreeReturnGroundNormal = FVector::UpVector;
     float RecoilAlpha = 0.0f;
     float WinchAngle = 0.0f;
+    FJMHarpoonCableLengthModel CableLengthModel;
+    bool bCableStartInitialized = false;
+    bool bGroundCableCollisionActive = false;
     bool bPullingPhysicsTarget = false;
     bool bFreeReturnGrounded = false;
     bool bFreeReturnFinalLift = false;

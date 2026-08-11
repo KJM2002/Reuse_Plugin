@@ -15,6 +15,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/WorldSettings.h"
+#include "Materials/MaterialInterface.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 
@@ -59,6 +60,7 @@ void UJMHarpoonGunComponent::TickComponent(float DeltaTime, ELevelTick TickType,
     }
 
     EnsurePresentation();
+    UpdateCableStartProxy(DeltaTime);
     CooldownRemaining = FMath::Max(0.0f, CooldownRemaining - DeltaTime);
 
     if (Controller->WasInputKeyJustPressed(FireKey))
@@ -103,6 +105,8 @@ void UJMHarpoonGunComponent::TickComponent(float DeltaTime, ELevelTick TickType,
     UpdatePlayerGrapple(DeltaTime);
     UpdatePlayerGrappleFOV(DeltaTime);
 
+    UpdateCableCollisionMode();
+    UpdateSplineWire(DeltaTime);
     UpdatePresentation(DeltaTime);
 }
 
@@ -582,7 +586,7 @@ bool UJMHarpoonGunComponent::FireHarpoon()
     State = EJMHarpoonGunState::Flying;
     RecoilAlpha = 1.0f;
     ShowCable(true);
-    AttachCableToActiveProjectile(100.0f);
+    AttachCableToActiveProjectile(CableMinimumLength);
 
     if (APlayerController* Controller = GetOwningPlayerController())
     {
@@ -674,6 +678,7 @@ void UJMHarpoonGunComponent::ResetHarpoon()
     bFreeReturnFinalLift = false;
     bDeadlineRecoveryTriggered = false;
     State = EJMHarpoonGunState::Ready;
+    ResetCablePresentationState();
     ShowCable(false);
 }
 
@@ -827,6 +832,28 @@ void UJMHarpoonGunComponent::EnsurePresentation()
         }
     }
 
+    if (!CableStartProxy)
+    {
+        CableStartProxy = NewObject<USceneComponent>(GetOwner(), TEXT("JMHarpoonCableStartProxy"));
+        GetOwner()->AddInstanceComponent(CableStartProxy);
+        CableStartProxy->RegisterComponent();
+        CableStartProxy->SetWorldLocation(GetMuzzleLocation());
+        bCableStartInitialized = true;
+    }
+
+    if (!WireRoute)
+    {
+        WireRoute = NewObject<UJMHarpoonWireRouteComponent>(GetOwner(), TEXT("JMHarpoonWireRoute"));
+        GetOwner()->AddInstanceComponent(WireRoute);
+        WireRoute->RegisterComponent();
+        WireRoute->InitializeWire(
+            CableStartProxy,
+            nullptr,
+            CableMaterial,
+            CableWidth,
+            WireRouteSettings);
+    }
+
     if (Cable)
     {
         return;
@@ -834,42 +861,70 @@ void UJMHarpoonGunComponent::EnsurePresentation()
 
     Cable = NewObject<UCableComponent>(GetOwner(), TEXT("JMHarpoonCable"));
     GetOwner()->AddInstanceComponent(Cable);
-    if (GunVisualActor && GunVisualActor->GetMuzzlePoint())
-    {
-        Cable->SetupAttachment(GunVisualActor->GetMuzzlePoint());
-    }
-    else
-    {
-        Cable->SetupAttachment(Parent);
-    }
-    Cable->CableLength = 100.0f;
-    Cable->NumSegments = FMath::Clamp(CableNumSegments, 1, 64);
-    Cable->SolverIterations = FMath::Clamp(CableSolverIterations, 1, 32);
+    Cable->SetupAttachment(CableStartProxy);
+    Cable->CableLength = FMath::Max(1.0f, CableMinimumLength);
+    Cable->NumSegments = FMath::Clamp(CableNumSegments, 1, 32);
+    Cable->SolverIterations = FMath::Clamp(CableSolverIterations, 1, 16);
     Cable->CableWidth = CableWidth;
+    Cable->NumSides = FMath::Clamp(CableNumSides, 3, 12);
+    Cable->TileMaterial = FMath::Max(1.0f, Cable->CableLength / FMath::Max(CableMaterialTileLength, 1.0f));
     Cable->CableGravityScale = CableGravityScale;
     Cable->SubstepTime = FMath::Max(CableSubstepTime, 0.005f);
     Cable->bUseSubstepping = true;
     Cable->bEnableStiffness = true;
     Cable->bEnableCollision = false;
+    Cable->CollisionFriction = FMath::Clamp(CableCollisionFriction, 0.0f, 1.0f);
+    Cable->bSkipCableUpdateWhenNotVisible = true;
+    Cable->bSkipCableUpdateWhenNotOwnerRecentlyRendered = false;
+    Cable->bResetAfterTeleport = true;
+    Cable->bTeleportAfterReattach = true;
+    Cable->TeleportDistanceThreshold = FMath::Max(0.0f, CableParticleResetDistance);
     Cable->bAttachStart = true;
     Cable->bAttachEnd = true;
     Cable->EndLocation = FVector::ZeroVector;
+    Cable->SetCollisionObjectType(ECC_WorldDynamic);
+    Cable->SetCollisionResponseToAllChannels(ECR_Ignore);
+    Cable->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+    if (bCableCollideWithWorldDynamic)
+    {
+        Cable->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+    }
     Cable->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     Cable->SetVisibility(false);
+    if (CableMaterial)
+    {
+        Cable->SetMaterial(0, CableMaterial);
+    }
     // Cable allocates NumSegments + 1 simulation particles when it registers.
     // Changing NumSegments after RegisterComponent leaves the particle array at
     // the old size and causes an out-of-bounds access in UCableComponent::TickComponent.
     Cable->RegisterComponent();
-    Cable->SetRelativeLocation(GunVisualActor ? FVector::ZeroVector : MuzzleOffset);
+    Cable->SetRelativeLocation(FVector::ZeroVector);
+    Cable->PrimaryComponentTick.AddPrerequisite(this, PrimaryComponentTick);
+    Cable->SetComponentTickEnabled(false);
 }
 
 void UJMHarpoonGunComponent::DestroyPresentation()
 {
+    if (WireRoute)
+    {
+        WireRoute->DestroyWire();
+        WireRoute->DestroyComponent();
+        WireRoute = nullptr;
+    }
+
     if (Cable)
     {
         Cable->DestroyComponent();
         Cable = nullptr;
     }
+
+    if (CableStartProxy)
+    {
+        CableStartProxy->DestroyComponent();
+        CableStartProxy = nullptr;
+    }
+    ResetCablePresentationState();
 
     if (GunVisualActor)
     {
@@ -882,21 +937,42 @@ void UJMHarpoonGunComponent::ShowCable(bool bShow)
 {
     if (Cable)
     {
-        Cable->SetVisibility(bShow, true);
+        const bool bShowLegacyCable = bShow && !bUseSplineWire;
+        Cable->SetVisibility(bShowLegacyCable, true);
+        Cable->SetComponentTickEnabled(bShowLegacyCable);
+    }
+    if (WireRoute)
+    {
+        WireRoute->SetWireVisible(bShow && bUseSplineWire);
     }
 }
 
 void UJMHarpoonGunComponent::AttachCableToActiveProjectile(float InitialLength)
 {
-    if (!Cable || !IsValid(ActiveProjectile))
+    if (!IsValid(ActiveProjectile))
     {
         return;
     }
 
     USceneComponent* CableEnd = ActiveProjectile->GetCableAnchor();
-    Cable->EndLocation = FVector::ZeroVector;
-    Cable->SetAttachEndToComponent(CableEnd ? CableEnd : ActiveProjectile->GetRootComponent());
-    Cable->CableLength = FMath::Max(100.0f, InitialLength);
+    USceneComponent* EndComponent = CableEnd ? CableEnd : ActiveProjectile->GetRootComponent();
+    if (Cable)
+    {
+        Cable->EndLocation = FVector::ZeroVector;
+        Cable->SetAttachEndToComponent(EndComponent);
+    }
+    if (WireRoute)
+    {
+        WireRoute->SetEndComponent(EndComponent);
+    }
+    CableLengthModel.Initialize(FMath::Max(CableMinimumLength, InitialLength));
+    if (Cable)
+    {
+        Cable->CableLength = CableLengthModel.CurrentLength;
+        Cable->TileMaterial = FMath::Max(
+            1.0f,
+            CableLengthModel.CurrentLength / FMath::Max(CableMaterialTileLength, 1.0f));
+    }
 }
 
 bool UJMHarpoonGunComponent::HasHarpoonSafetyViolation() const
@@ -1207,17 +1283,148 @@ void UJMHarpoonGunComponent::UpdatePlayerGrappleSmoke(float DeltaTime)
 
 void UJMHarpoonGunComponent::SmoothCableLength(float TargetLength, float DeltaTime)
 {
+    if (!Cable && !WireRoute)
+    {
+        return;
+    }
+
+    const float CurrentCableLength = CableLengthModel.Update(
+        TargetLength,
+        DeltaTime,
+        State == EJMHarpoonGunState::Retracting,
+        CableMinimumLength,
+        CableSlackMultiplier,
+        CableMinimumSlack,
+        CableMaximumSlack,
+        CableLengthDeadZone,
+        CableLengthInterpSpeed);
+    if (Cable)
+    {
+        Cable->CableLength = CurrentCableLength;
+        Cable->TileMaterial = FMath::Max(
+            1.0f,
+            CurrentCableLength / FMath::Max(CableMaterialTileLength, 1.0f));
+    }
+}
+
+void UJMHarpoonGunComponent::UpdateCableStartProxy(float DeltaTime)
+{
+    if (!CableStartProxy)
+    {
+        return;
+    }
+
+    const FVector TargetLocation = GetMuzzleLocation();
+    const FVector CurrentLocation = CableStartProxy->GetComponentLocation();
+    const FVector ToTarget = TargetLocation - CurrentLocation;
+    const float Distance = ToTarget.Size();
+    if (!bCableStartInitialized || State == EJMHarpoonGunState::Ready || Distance > 250.0f)
+    {
+        CableStartProxy->SetWorldLocation(TargetLocation);
+        bCableStartInitialized = true;
+        return;
+    }
+
+    if (Distance <= CableStartJitterDeadZone)
+    {
+        return;
+    }
+
+    FVector NewLocation = FMath::VInterpTo(
+        CurrentLocation,
+        TargetLocation,
+        DeltaTime,
+        CableStartStabilizationSpeed);
+    const FVector RemainingOffset = TargetLocation - NewLocation;
+    if (CableStartMaximumLag > 0.0f && RemainingOffset.SizeSquared() > FMath::Square(CableStartMaximumLag))
+    {
+        NewLocation = TargetLocation - RemainingOffset.GetSafeNormal() * CableStartMaximumLag;
+    }
+    CableStartProxy->SetWorldLocation(NewLocation);
+}
+
+void UJMHarpoonGunComponent::UpdateCableCollisionMode()
+{
     if (!Cable)
     {
         return;
     }
 
-    const float SafeTargetLength = FMath::Max(100.0f, TargetLength * CableSlackMultiplier);
-    Cable->CableLength = FMath::FInterpTo(
-        Cable->CableLength,
-        SafeTargetLength,
-        DeltaTime,
-        CableLengthInterpSpeed);
+    const bool bShouldEnableGroundCollision = !bUseSplineWire
+        && bEnableGroundCableCollision
+        && State == EJMHarpoonGunState::Retracting
+        && Cable->IsVisible();
+    if (bShouldEnableGroundCollision == bGroundCableCollisionActive)
+    {
+        return;
+    }
+
+    bGroundCableCollisionActive = bShouldEnableGroundCollision;
+    Cable->bEnableCollision = bGroundCableCollisionActive;
+    Cable->CollisionFriction = FMath::Clamp(CableCollisionFriction, 0.0f, 1.0f);
+    Cable->SetCollisionResponseToAllChannels(ECR_Ignore);
+    Cable->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+    if (bCableCollideWithWorldDynamic)
+    {
+        Cable->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+    }
+    Cable->SetCollisionEnabled(
+        bGroundCableCollisionActive
+            ? ECollisionEnabled::QueryOnly
+            : ECollisionEnabled::NoCollision);
+}
+
+void UJMHarpoonGunComponent::UpdateSplineWire(float DeltaTime)
+{
+    const bool bShouldShowWire = State != EJMHarpoonGunState::Ready && IsValid(ActiveProjectile);
+    if (Cable)
+    {
+        const bool bShowLegacyCable = bShouldShowWire && !bUseSplineWire;
+        Cable->SetVisibility(bShowLegacyCable, true);
+        Cable->SetComponentTickEnabled(bShowLegacyCable);
+    }
+    if (!WireRoute)
+    {
+        return;
+    }
+
+    WireRoute->SetWireVisible(bShouldShowWire && bUseSplineWire);
+    EJMHarpoonWireVisualState VisualState = EJMHarpoonWireVisualState::Hidden;
+    switch (State)
+    {
+    case EJMHarpoonGunState::Flying:
+        VisualState = EJMHarpoonWireVisualState::Flying;
+        break;
+    case EJMHarpoonGunState::Embedded:
+        VisualState = EJMHarpoonWireVisualState::Embedded;
+        break;
+    case EJMHarpoonGunState::Retracting:
+        VisualState = EJMHarpoonWireVisualState::Retracting;
+        break;
+    default:
+        break;
+    }
+    WireRoute->UpdateWire(DeltaTime, VisualState, CableLengthModel.CurrentLength);
+}
+
+void UJMHarpoonGunComponent::ResetCablePresentationState()
+{
+    CableLengthModel.Reset(CableMinimumLength);
+    bCableStartInitialized = false;
+    bGroundCableCollisionActive = false;
+    if (WireRoute)
+    {
+        WireRoute->ResetWireRoute();
+    }
+    if (Cable)
+    {
+        Cable->bEnableCollision = false;
+        Cable->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Cable->CableLength = CableLengthModel.CurrentLength;
+        Cable->TileMaterial = FMath::Max(
+            1.0f,
+            CableLengthModel.CurrentLength / FMath::Max(CableMaterialTileLength, 1.0f));
+    }
 }
 
 void UJMHarpoonGunComponent::UpdateFlying(float DeltaTime)
@@ -1692,6 +1899,7 @@ void UJMHarpoonGunComponent::CompleteReturn()
     State = EJMHarpoonGunState::Ready;
     CooldownRemaining = FireCooldown;
     RecoilAlpha = 0.35f;
+    ResetCablePresentationState();
     ShowCable(false);
 }
 

@@ -43,7 +43,7 @@
 - 빠른 발사체에서도 충돌을 놓치지 않도록 CCD와 서브스테핑을 사용한다.
 - 비행 중 작살은 진행 방향을 바라보도록 자동 회전한다.
 - 발사 시 총이 뒤로 밀리는 반동과 작은 카메라 피치 반동이 적용된다.
-- 작살과 총구 사이에 Unreal 내장 `Cable Component` 줄이 표시된다.
+- 작살과 총구 사이에 접촉점 기반 Spline 와이어가 표시되며, 기존 `Cable Component`도 폴백으로 선택할 수 있다.
 - `Max Range`에 도달하면 자동으로 회수가 시작된다.
 
 ### 명중 및 박힘
@@ -334,27 +334,52 @@ stateDiagram-v2
 
 줄 위치가 작살 외형과 맞지 않으면 `BP_JMHarpoonProjectile > CableAnchor`만 선택해서 꼬리 끝으로 옮긴다. 케이블 끝은 이 컴포넌트의 위치에 오프셋 없이 연결된다.
 
-## 8. 케이블 줄 설정
+## 8. 와이어 설정
 
-케이블은 Blueprint 에셋으로 배치된 파츠가 아니라 `JMHarpoonGunComponent`가 런타임에 생성한다. 설정은 `BP_FirstPersonCharacter > JMHarpoonGun > Presentation > Cable`에서 수정할 수 있다.
+와이어는 `JMHarpoonGunComponent`가 런타임에 생성한다. 1.7 기본값은 Cable 입자 로프가 아니라 접촉점 기반 Spline 경로다. 기존 `CableComponent`는 `Use Spline Wire`를 끌 때만 표시되는 비교·호환용 폴백이다.
 
-| 속성 | 현재값 | 설명 |
+### 기본 Spline 경로
+
+설정 위치는 `BP_FirstPersonCharacter > JMHarpoonGun > Presentation > Wire Route`다.
+
+| 속성 | 기본값 | 설명 |
 |---|---:|---|
-| `Cable Num Segments` | `12` | 줄 시뮬레이션 세그먼트 수. 적을수록 안정적이고 각져 보일 수 있다. |
-| `Cable Solver Iterations` | `8` | 줄 제약 해결 반복 횟수. 높을수록 단단하고 안정적이지만 계산량이 증가한다. |
-| `CableWidth` | `1.8` | 줄 굵기 |
-| `Cable Gravity Scale` | `0.25` | 줄에 적용되는 중력 비율. 낮을수록 바닥 회수 중 덜 출렁인다. |
-| `Cable Substep Time` | `0.01 s` | 줄 시뮬레이션 서브스텝 간격 |
-| `Cable Length Interp Speed` | `24` | 작살 거리 변화에 케이블 길이가 따라가는 보간 속도 |
-| `Cable Slack Multiplier` | `1.01` | 실제 거리보다 추가할 여유 길이 비율 |
-| `bEnableStiffness` | `true` | 줄 강성 사용 |
-| `bEnableCollision` | `false` | 줄과 월드 충돌 비활성화 |
-| `bAttachStart` | `true` | 시작점을 총구에 부착 |
-| `bAttachEnd` | `true` | 끝점을 작살 뒤쪽의 `CableAnchor`에 부착 |
+| `Use Spline Wire` | `true` | 접촉점 기반 와이어 사용. 끄면 기존 Cable 폴백을 사용한다. |
+| `Collision Radius` | `2.5 cm` | 선분 전체 Sphere Sweep 반경. 보이는 1.2cm 두께와 분리되어 있다. |
+| `Surface Offset` | `0.75 cm` | 충돌 표면의 바깥쪽 Normal 방향으로 추가 확보하는 간격 |
+| `Collision Update Rate` | `25 Hz` | 접촉 경로 계산 상한. 화면 보간은 매 프레임 수행한다. |
+| `Max Contact Points` | `3` | 바닥·경사·모서리에 유지할 최대 접촉점 수 |
+| `Minimum Contact Time` | `0.15 s` | 접촉점이 생성 직후 사라지며 떨리는 현상을 막는 최소 수명 |
+| `Contact Release Margin` | `4 cm` | 접촉 해제 검사에 더하는 여유 반경 |
+| `Contact Merge Distance` | `12 cm` | 끝점이나 기존 접촉점과 너무 가까운 중복 접촉을 만들지 않는 거리 |
+| `Contact Position Interp Speed` | `20` | 경사면 위 접촉점 위치 보간 속도 |
+| `Contact Normal Interp Speed` | `14` | 삼각형 경계에서 표면 Normal이 급변하지 않게 하는 속도 |
+| `Maximum Contact Correction Per Update` | `15 cm` | 충돌 한 번이 와이어 전체를 크게 튕기지 않도록 제한하는 보정량 |
+| `Render Segment Length` | `120 cm` | 화면용 Spline Mesh 목표 길이 |
+| `Max Render Segments` | `16` | 화면용 세그먼트 풀 상한 |
+| `Render Point Interp Speed` | `28` | 25Hz 경로 결과를 프레임 사이에서 부드럽게 연결하는 속도 |
+| `Sag Scale` | `0.6` | 박힌 상태의 남는 와이어 길이를 처짐으로 바꾸는 비율 |
+| `Maximum Sag` | `25 cm` | 박힌 상태의 최대 처짐 |
+| `Collide With World Dynamic` | `false` | 당기는 물체와의 피드백을 피하려고 기본적으로 WorldStatic만 검사한다. |
 
-컴포넌트 Details에서 값을 지정하면 다음 PIE 시작 시 `RegisterComponent()` 전에 적용된다. PIE 중에 `NumSegments`를 런타임으로 직접 변경하면 Cable 내부 파티클 배열 크기가 맞지 않아 Array index assertion이 발생할 수 있다.
+상태별 동작은 다음과 같다.
 
-케이블 길이는 현재 상태에 따라 자동 갱신되며, 한 프레임에 즉시 바뀌지 않고 보간되어 줄이 채찍처럼 튀는 현상을 줄인다.
+- `Flying`: 접촉 검사를 생략하고 팽팽한 직선으로 표시한다.
+- `Embedded`: 직선 경로를 검사하며 장애물이 없고 길이가 남을 때만 약하게 처진다.
+- `Retracting`: 각 경로 선분 전체를 Sphere Sweep하고 최대 3개의 접촉점으로 바닥과 경사면을 우회한다.
+- `Ready`: 모든 와이어 Mesh를 숨기고 Trace를 중단한다.
+
+접촉점은 `ImpactPoint + ImpactNormal * (CollisionRadius + SurfaceOffset)`에 둔다. 반드시 더하기 방향이어야 와이어 중심선이 지면 위에 남는다. 접촉점의 수명·해제 여유·Normal 보간·프레임당 보정 제한이 함께 작동하므로 경사면 삼각형 경계에서도 생성/삭제 떨림과 급회전을 줄인다.
+
+### 공통 길이와 시작점
+
+`Presentation > Cable`의 `Cable Width`, `Cable Material`, 길이/Slack, 시작점 안정화 값은 Spline 경로에도 사용한다. 시작점은 월드 공간 Proxy이며 총구의 0.2cm 이하 움직임을 무시하고 최대 1.5cm 안에서 추적한다. 와이어 길이는 발사·박힘 중 필요한 만큼만 풀리고 `Retracting`에서만 감긴다. 여유는 2.5~8cm로 제한된다.
+
+### 기존 Cable 폴백
+
+`Use Spline Wire=false`일 때 `Cable Num Segments`, Solver, Substep, Gravity, Ground Collision 설정이 적용된다. 이 모드는 입자 사이의 긴 선분을 직접 검사하지 않으므로 지면 관통과 충돌 보정에 의한 회전을 완전히 없앨 수 없다. PIE 중 `NumSegments`를 직접 변경하면 내부 파티클 배열과 맞지 않을 수 있으므로 Details 값을 바꾼 뒤 PIE를 다시 시작한다.
+
+기존 Blueprint 컴포넌트가 과거 기본값을 저장했다면 Details의 노란 Reset 화살표로 `Use Spline Wire`와 `Wire Route Settings`를 1.7 기본값으로 되돌린다.
 
 ## 9. Blueprint에서 사용할 수 있는 함수와 이벤트
 
@@ -391,7 +416,9 @@ stateDiagram-v2
 | 파일 | 담당 기능 |
 |---|---|
 | `Public/Components/JMHarpoonGunComponent.h` | Blueprint 노출 파라미터, 상태 Enum, 함수, 이벤트 선언 |
-| `Private/Components/JMHarpoonGunComponent.cpp` | 입력, 발사, 명중 처리, 물리 당김, 바닥 회수와 마지막 총구 호밍, 케이블, 윈치/반동 상태 처리 |
+| `Private/Components/JMHarpoonGunComponent.cpp` | 입력, 발사, 명중 처리, 물리 당김, 바닥 회수와 마지막 총구 호밍, 와이어 상태 연결, 윈치/반동 처리 |
+| `Public/Components/JMHarpoonWireRouteComponent.h` | 접촉 경로 설정, 시각 상태, Spline 와이어 API |
+| `Private/Components/JMHarpoonWireRouteComponent.cpp` | 선분 Sphere Sweep, 접촉점 히스테리시스, 처짐과 Spline Mesh 렌더링 |
 | `Public/Actors/JMHarpoonProjectile.h` | 발사체 파츠 및 클래스 인터페이스 |
 | `Private/Actors/JMHarpoonProjectile.cpp` | 충돌체, 메시 기본값, Projectile Movement, 박힘, 임팩트 라이트 |
 | `Public/Actors/JMHarpoonGunVisualActor.h` | 총 외형 파츠 인터페이스 |
@@ -496,7 +523,7 @@ stateDiagram-v2
 - 입력과 Tick은 로컬 플레이어 컨트롤러에서만 처리한다.
 - 플레이어 그래플은 소유자가 `ACharacter`이고 `CharacterMovementComponent`를 가지고 있을 때만 시작된다.
 - 현재 버전은 서버 권위 멀티플레이 복제를 구현하지 않았다.
-- 케이블은 월드 충돌을 사용하지 않으므로 벽 모서리를 감아 돌아가지 않는다.
+- Spline 와이어는 최대 3개의 접촉점으로 단순한 바닥·경사·모서리를 우회하지만, 매듭·마찰 장력·복잡한 다중 감김을 계산하는 완전한 물리 로프는 아니다.
 - 회수 중인 작살은 절차적 이동이며 완전한 리지드 바디 물리를 사용하지 않는다. WorldStatic, WorldDynamic, PhysicsBody 바닥 감지와 바닥 추종만 수행하므로 벽에 걸리거나 장애물과 복잡하게 충돌하지 않는다.
 - 충돌 반응이 `Overlap` 또는 `Ignore`인 표면에는 박히지 않는다.
 - 총 외형 Blueprint와 발사체 Blueprint는 프로젝트 편의를 위한 오버라이드이며, 플러그인 자체는 `/Game` 에셋에 의존하지 않는다.

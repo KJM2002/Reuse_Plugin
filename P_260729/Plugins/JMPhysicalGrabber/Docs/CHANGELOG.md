@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.7.0
+
+### Added
+
+- Default contact-point Spline wire renderer with full-span Sphere Sweeps, up to three bounded surface contacts, contact lifetime hysteresis, and smoothed contact normals/positions.
+- State-specific wire presentation: a taut flight line, slack-based embedded sag, and collision-routed recall.
+- Automation coverage for outward surface offsets and deterministic sag endpoints/midpoint.
+
+### Changed
+
+- `UJMHarpoonGunComponent` now uses the Spline route by default while retaining `UCableComponent` as the `bUseSplineWire=false` fallback.
+- Collision routing is capped at 25 Hz by default while render-point interpolation remains frame-rate driven.
+- Visual collision radius and surface clearance are independent from the rendered wire width.
+
+### Fixed
+
+- Wire spans no longer depend on sparse Cable particles for ground and slope collision.
+- Removed accumulated Verlet velocity from the default renderer, preventing jump-rope rotation after launch and explosive spinning after slope correction.
+- Contact points are placed along the outward impact normal, keeping the rendered centerline above the surface instead of below it.
+
+## 1.6.0
+
+### Added
+
+- Camera-independent cable-start proxy with a micro-jitter dead zone and bounded visual lag.
+- State-driven visual winch length model with fixed slack limits and automation coverage.
+- Recall-only WorldStatic cable collision, collision friction, tube-side count, world-space material tiling, and optional cable material settings.
+- Hidden-cable tick suspension and tick ordering that updates the gun/proxy before CableComponent simulation.
+
+### Changed
+
+- The visual cable now feeds outward as needed, holds its rest length while flying or embedded, and reels inward only during recall.
+- First-person defaults now use 16 segments, 12 solver iterations, 6 tube sides, reduced gravity, a thinner cable, and a 120 Hz simulation substep.
+- Percentage slack is capped to a small fixed range so maximum-range shots do not become loose ropes.
+
+### Fixed
+
+- Reduced perpetual screen-space cable shimmer caused by camera micro-motion and bidirectional rest-length changes.
+- Returning cable particles now sweep against WorldStatic geometry instead of passing through floors during recall.
+- Prevented the launch-time jump-rope loop by reducing the hidden/initial rest length from 100 cm to 10 cm.
+- Fast projectile endpoint motion now resets stale Verlet particle velocity after 25 cm instead of carrying rotational energy through the shot.
+
 ## 1.5.0
 
 ### Added
