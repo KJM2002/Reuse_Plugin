@@ -97,7 +97,11 @@ void UJMPrototypeHUDWidget::ShowNotification(const FText& Message, bool bSucceed
 FText UJMPrototypeHUDWidget::GetObjectiveText(EJMPrototypeRunState State) const
 {
 	const UJMPrototypeProgressionSubsystem* System = Progression.Get();
-	const bool bSecondQuest = System && System->GetActiveQuestIndex() == 1;
+	if (!System || !System->HasActiveQuest())
+	{
+		return LOCTEXT("NoActiveQuest", "[진행 중인 의뢰가 없습니다]");
+	}
+	const bool bSecondQuest = System->GetActiveQuestIndex() == 1;
 	switch (State)
 	{
 	case EJMPrototypeRunState::AwaitingQuest: return LOCTEXT("Awaiting", "[아직 의뢰가 없습니다]");

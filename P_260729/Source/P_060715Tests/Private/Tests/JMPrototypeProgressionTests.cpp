@@ -222,10 +222,15 @@ bool FJMPrototypeFailureSafetyTest::RunTest(const FString& Parameters)
 	FJMPrototypeConfig ValidConfig;
 	ValidConfig.InitialCurrency = 0;
 	TestTrue(TEXT("Valid configuration succeeds"), Progression->ConfigurePrototype(ValidConfig).bSucceeded);
-	TestFalse(TEXT("Dungeon cannot be entered before quest acceptance"), Progression->EnterDungeon().bSucceeded);
+	TestTrue(TEXT("Dungeon can be entered without accepting a quest"), Progression->CanEnterDungeon());
+	TestTrue(TEXT("Questless dungeon entry succeeds"), Progression->EnterDungeon().bSucceeded);
+	TestEqual(TEXT("Questless dungeon entry starts exploration"), Progression->GetRunState(), EJMPrototypeRunState::Exploring);
+	TestFalse(TEXT("Dungeon cannot be entered twice"), Progression->EnterDungeon().bSucceeded);
+	TestTrue(TEXT("Questless dungeon run can return to base"), Progression->ReturnToBase().bSucceeded);
+	TestTrue(TEXT("Dungeon can be re-entered after returning"), Progression->CanEnterDungeon());
 	TestFalse(TEXT("Missing inventory cannot be upgraded"), Progression->PurchaseInventoryUpgrade(nullptr).bSucceeded);
 	TestEqual(TEXT("Failed operations do not change currency"), Progression->GetCurrency(), 0);
-	TestEqual(TEXT("Failed operations keep initial state"), Progression->GetRunState(), EJMPrototypeRunState::AwaitingQuest);
+	TestEqual(TEXT("Failed operations keep the returned state"), Progression->GetRunState(), EJMPrototypeRunState::Returned);
 	return true;
 }
 

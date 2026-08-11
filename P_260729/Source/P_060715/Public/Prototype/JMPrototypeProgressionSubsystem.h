@@ -116,7 +116,7 @@ public:
 	FJMPrototypeConfig GetPrototypeConfig() const { return Config; }
 
 	UFUNCTION(BlueprintPure, Category = "Base Upgrade Prototype")
-	bool CanEnterDungeon() const { return bConfigured && RunState == EJMPrototypeRunState::QuestAccepted; }
+	bool CanEnterDungeon() const { return bConfigured && RunState != EJMPrototypeRunState::Exploring; }
 
 	UFUNCTION(BlueprintPure, Category = "Base Upgrade Prototype")
 	bool CanReturnToBase() const { return bConfigured && RunState == EJMPrototypeRunState::Exploring; }

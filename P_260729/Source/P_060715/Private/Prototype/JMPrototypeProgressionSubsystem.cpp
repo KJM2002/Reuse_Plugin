@@ -84,7 +84,7 @@ FJMPrototypeOperationResult UJMPrototypeProgressionSubsystem::EnterDungeon()
 {
 	if (!CanEnterDungeon())
 	{
-		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState, LOCTEXT("CannotEnter", "Accept the quest before entering the dungeon."));
+		return FJMPrototypeOperationResult::Failure(EJMPrototypeOperationCode::InvalidState, LOCTEXT("CannotEnter", "The player is already exploring the dungeon."));
 	}
 	SetRunState(EJMPrototypeRunState::Exploring);
 	return FJMPrototypeOperationResult::Success();
@@ -529,12 +529,9 @@ void UJMPrototypeProgressionSubsystem::HandlePreLoadMap(const FString& MapName)
 		const bool bReturningToBase = IsBaseReturnCheckpointTransition(SourceMap, MapName);
 		if (bEnteringDungeon)
 		{
-			// Portals intentionally have no quest gate, but an accepted quest still
-			// needs its lifecycle advanced when the level transition succeeds.
-			if (bConfigured && RunState == EJMPrototypeRunState::QuestAccepted)
-			{
-				SetRunState(EJMPrototypeRunState::Exploring);
-			}
+			// Level portals intentionally have no quest gate. Keep their state
+			// transition on the same policy as every other dungeon entry path.
+			EnterDungeon();
 			bDungeonRunStartedThisSession = true;
 			bCommitInventoryCheckpointOnBaseArrival = false;
 		}
