@@ -1,5 +1,6 @@
 #include "Prototype/JMPrototypePlayerBootstrap.h"
 
+#include "AI/Common/JMPlayerNoiseEmitterComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/InventoryComponent.h"
 #include "Components/InventoryUIComponent.h"
@@ -83,6 +84,7 @@ void AJMPrototypePlayerBootstrap::SetupPlayer()
 	Interaction->SetInteractionEnabled(false);
 	Interaction->SetInteractionEnabled(true);
 	UJMPrototypeRunResetComponent* Reset = FindOrAddRuntimeComponent<UJMPrototypeRunResetComponent>(Pawn, TEXT("PrototypeRunReset"));
+	FindOrAddRuntimeComponent<UJMPlayerNoiseEmitterComponent>(Pawn, TEXT("DungeonNoiseEmitter"));
 	InventoryUI->InventoryComponent = Inventory;
 	InventoryUI->ToggleInventoryAction = InventoryAction;
 	InventoryUI->ToggleInputMappingContext = InputMappingContext;

@@ -10,6 +10,11 @@ public class P_060715Tests : ModuleRules
             "Core",
             "CoreUObject",
             "ApplicationCore",
+			"AIModule",
+			"AIGraph",
+			"AssetRegistry",
+			"BehaviorTreeEditor",
+			"BlueprintGraph",
             "Engine",
             "InputCore",
             "UnrealEd",
@@ -18,10 +23,13 @@ public class P_060715Tests : ModuleRules
             "JMReconGameplayIntegration",
             "JMDoorRuntime",
             "JMDoorReconIntegration",
-            "P_060715",
+			"P_060715",
+			"JMRoomGridRuntime",
             "JMHideRuntime",
 			"JMHideInteractionIntegration",
-			"InventorySystem"
+			"InventorySystem",
+			"KismetCompiler",
+			"Niagara"
         });
     }
 }
