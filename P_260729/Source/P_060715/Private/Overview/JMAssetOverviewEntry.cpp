@@ -60,7 +60,7 @@ AJMAssetOverviewEntry::AJMAssetOverviewEntry()
 
 	SkeletalPreview = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalPreview"));
 	SkeletalPreview->SetupAttachment(OverviewRoot);
-	SkeletalPreview->SetMobility(EComponentMobility::Static);
+	SkeletalPreview->SetMobility(EComponentMobility::Movable);
 	SkeletalPreview->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SkeletalPreview->SetVisibility(false);
 
