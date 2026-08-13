@@ -4,12 +4,14 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Components/AudioComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/JMHideInteractorComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
 #include "Perception/AIPerceptionComponent.h"
@@ -129,6 +131,16 @@ AJMDungeonMonster::AJMDungeonMonster()
 	VoiceAudio->SetupAttachment(BlockoutRoot);
 	VoiceAudio->bAutoActivate = false;
 
+	ContactSensor = CreateDefaultSubobject<UCapsuleComponent>(TEXT("ContactSensor"));
+	ContactSensor->SetupAttachment(GetCapsuleComponent());
+	ContactSensor->InitCapsuleSize(GetCapsuleComponent()->GetUnscaledCapsuleRadius() + PhysicalContactTolerance,
+		GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() + PhysicalContactTolerance);
+	ContactSensor->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	ContactSensor->SetCollisionResponseToAllChannels(ECR_Ignore);
+	ContactSensor->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	ContactSensor->SetGenerateOverlapEvents(true);
+	ContactSensor->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::HandleContactSensorOverlap);
+
 	static ConstructorHelpers::FObjectFinder<USoundBase> DefaultAlert(
 		TEXT("/Engine/EngineSounds/1kSineTonePing.1kSineTonePing"));
 	if (DefaultAlert.Succeeded())
@@ -140,6 +152,11 @@ AJMDungeonMonster::AJMDungeonMonster()
 void AJMDungeonMonster::BeginPlay()
 {
 	Super::BeginPlay();
+	if (ContactSensor && GetCapsuleComponent())
+	{
+		ContactSensor->SetCapsuleSize(GetCapsuleComponent()->GetUnscaledCapsuleRadius() + PhysicalContactTolerance,
+			GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() + PhysicalContactTolerance);
+	}
 	SpawnLocation = GetActorLocation();
 	SpawnRotation = GetActorRotation();
 	LastKnownLocation = SpawnLocation;
@@ -365,6 +382,7 @@ void AJMDungeonMonster::UpdateDecision()
 	{
 		return;
 	}
+	RefreshDirectPlayerAwareness(MonsterController);
 	const double Now = GetWorld()->GetTimeSeconds();
 	if (MonsterState == EJMDungeonMonsterState::Suspicious)
 	{
@@ -473,6 +491,11 @@ void AJMDungeonMonster::UpdateChase(AJMDungeonMonsterAIController* MonsterContro
 		return;
 	}
 	const double Now = GetWorld()->GetTimeSeconds();
+	if (IsTargetInPhysicalContact(Target))
+	{
+		CatchPlayer(Target);
+		return;
+	}
 	if (UsesSightStimulus() && MonsterController->IsTargetSeen(Target))
 	{
 		LastKnownLocation = Target->GetActorLocation();
@@ -483,21 +506,29 @@ void AJMDungeonMonster::UpdateChase(AJMDungeonMonsterAIController* MonsterContro
 		BeginSearch(LastKnownLocation);
 		return;
 	}
-	GetCharacterMovement()->MaxWalkSpeed = ChaseSpeed;
-	MoveToward(MonsterController, LastKnownLocation, CatchDistance * 0.7f);
-	if (FVector::DistSquared(GetActorLocation(), Target->GetActorLocation()) <= FMath::Square(CatchDistance))
+	if (IsTargetWithinAttackRange(Target))
 	{
 		SetMonsterState(EJMDungeonMonsterState::AttackWarning);
 		MonsterController->StopMovement();
+		return;
 	}
+	GetCharacterMovement()->MaxWalkSpeed = ChaseSpeed;
+	// Do not include either agent's collision radius here. The explicit contact test above owns attack range.
+	MoveToward(MonsterController, LastKnownLocation, 5.0f, false);
 }
 
 void AJMDungeonMonster::UpdateAttackWarning(AJMDungeonMonsterAIController* MonsterController)
 {
 	MonsterController->StopMovement();
 	APawn* Target = TargetPawn.Get();
+	if (Target && CanCatchTarget(Target) && IsTargetInPhysicalContact(Target))
+	{
+		CatchPlayer(Target);
+		return;
+	}
+	const float EscapeDistance = GetAttackTriggerDistance(Target) * 1.35f;
 	if (!Target || !CanCatchTarget(Target) ||
-		FVector::DistSquared(GetActorLocation(), Target->GetActorLocation()) > FMath::Square(CatchDistance * 1.3f))
+		FVector::DistSquared2D(GetActorLocation(), Target->GetActorLocation()) > FMath::Square(EscapeDistance))
 	{
 		SetMonsterState(EJMDungeonMonsterState::Chase);
 		return;
@@ -511,6 +542,75 @@ void AJMDungeonMonster::UpdateAttackWarning(AJMDungeonMonsterAIController* Monst
 	{
 		CatchPlayer(Target);
 	}
+}
+
+void AJMDungeonMonster::RefreshDirectPlayerAwareness(AJMDungeonMonsterAIController* MonsterController)
+{
+	APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	APawn* Player = PlayerController ? PlayerController->GetPawn() : nullptr;
+	if (!Player || IsTargetHidden(Player) || !CanPursueTarget(Player))
+	{
+		return;
+	}
+
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (IsTargetInPhysicalContact(Player))
+	{
+		TargetPawn = Player;
+		LastKnownLocation = Player->GetActorLocation();
+		LastEvidenceTime = Now;
+		CatchPlayer(Player);
+		return;
+	}
+	if (IsTargetWithinAttackRange(Player))
+	{
+		// Near-contact still keeps the authored warning/dodge window; confirmed body contact above is already lethal.
+		TargetPawn = Player;
+		LastKnownLocation = Player->GetActorLocation();
+		LastEvidenceTime = Now;
+		if (MonsterState != EJMDungeonMonsterState::AttackWarning)
+		{
+			SetMonsterState(EJMDungeonMonsterState::AttackWarning);
+			MonsterController->StopMovement();
+		}
+		return;
+	}
+
+	if (!UsesSightStimulus() || !HasDirectSightTo(Player, MonsterController))
+	{
+		return;
+	}
+
+	TargetPawn = Player;
+	LastKnownLocation = Player->GetActorLocation();
+	LastEvidenceTime = Now;
+	if (MonsterState != EJMDungeonMonsterState::Chase && MonsterState != EJMDungeonMonsterState::AttackWarning &&
+		MonsterState != EJMDungeonMonsterState::Suspicious)
+	{
+		BeginSuspicion(Player, LastKnownLocation);
+	}
+}
+
+bool AJMDungeonMonster::HasDirectSightTo(const APawn* Target,
+	const AJMDungeonMonsterAIController* MonsterController) const
+{
+	if (!Target || !MonsterController)
+	{
+		return false;
+	}
+	const FVector ToTarget = Target->GetActorLocation() - GetActorLocation();
+	const FVector ToTarget2D(ToTarget.X, ToTarget.Y, 0.0f);
+	if (ToTarget2D.SizeSquared() > FMath::Square(DirectSightRange))
+	{
+		return false;
+	}
+	const FVector Forward2D = GetActorForwardVector().GetSafeNormal2D();
+	if (!ToTarget2D.IsNearlyZero() && FVector::DotProduct(Forward2D, ToTarget2D.GetSafeNormal()) <
+		FMath::Cos(FMath::DegreesToRadians(DirectSightHalfAngle)))
+	{
+		return false;
+	}
+	return MonsterController->LineOfSightTo(Target, FVector::ZeroVector, true);
 }
 
 void AJMDungeonMonster::UpdateSearch(AJMDungeonMonsterAIController* MonsterController)
@@ -574,6 +674,65 @@ bool AJMDungeonMonster::CanPursueTarget(const APawn* Target) const
 bool AJMDungeonMonster::CanCatchTarget(const APawn* Target) const
 {
 	return CanPursueTarget(Target) && GetWorld() && GetWorld()->GetTimeSeconds() - LastEvidenceTime <= LoseTargetDelay + AttackWarningDuration;
+}
+
+float AJMDungeonMonster::GetAttackTriggerDistance(const APawn* Target) const
+{
+	float ContactDistance = 0.0f;
+	if (const UCapsuleComponent* MonsterCapsule = GetCapsuleComponent())
+	{
+		ContactDistance += MonsterCapsule->GetScaledCapsuleRadius();
+	}
+	if (const ACharacter* TargetCharacter = Cast<ACharacter>(Target))
+	{
+		if (const UCapsuleComponent* TargetCapsule = TargetCharacter->GetCapsuleComponent())
+		{
+			ContactDistance += TargetCapsule->GetScaledCapsuleRadius();
+		}
+	}
+	return FMath::Max(CatchDistance, ContactDistance + ContactAttackPadding);
+}
+
+bool AJMDungeonMonster::IsTargetWithinAttackRange(const APawn* Target) const
+{
+	return IsValid(Target) && FVector::DistSquared2D(GetActorLocation(), Target->GetActorLocation()) <=
+		FMath::Square(GetAttackTriggerDistance(Target));
+}
+
+bool AJMDungeonMonster::IsTargetInPhysicalContact(const APawn* Target) const
+{
+	if (!IsValid(Target))
+	{
+		return false;
+	}
+	const UCapsuleComponent* MonsterCapsule = GetCapsuleComponent();
+	const ACharacter* TargetCharacter = Cast<ACharacter>(Target);
+	const UCapsuleComponent* TargetCapsule = TargetCharacter ? TargetCharacter->GetCapsuleComponent() : nullptr;
+	if (!MonsterCapsule || !TargetCapsule)
+	{
+		return false;
+	}
+	const float HorizontalContactDistance = MonsterCapsule->GetScaledCapsuleRadius() +
+		TargetCapsule->GetScaledCapsuleRadius() + PhysicalContactTolerance;
+	const float VerticalContactDistance = MonsterCapsule->GetScaledCapsuleHalfHeight() +
+		TargetCapsule->GetScaledCapsuleHalfHeight() + PhysicalContactTolerance;
+	return FVector::DistSquared2D(GetActorLocation(), Target->GetActorLocation()) <=
+		FMath::Square(HorizontalContactDistance) &&
+		FMath::Abs(GetActorLocation().Z - Target->GetActorLocation().Z) <= VerticalContactDistance;
+}
+
+void AJMDungeonMonster::HandleContactSensorOverlap(UPrimitiveComponent*, AActor* OtherActor,
+	UPrimitiveComponent*, int32, bool, const FHitResult&)
+{
+	APawn* Player = Cast<APawn>(OtherActor);
+	if (!bMonsterEnabled || Player == this || !Player || !Player->IsPlayerControlled() || !CanPursueTarget(Player))
+	{
+		return;
+	}
+	TargetPawn = Player;
+	LastKnownLocation = Player->GetActorLocation();
+	LastEvidenceTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	CatchPlayer(Player);
 }
 
 bool AJMDungeonMonster::IsTargetHidden(const AActor* Target) const

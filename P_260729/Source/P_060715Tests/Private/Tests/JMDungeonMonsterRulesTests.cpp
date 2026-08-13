@@ -6,6 +6,8 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardData.h"
 #include "Components/StaticMeshComponent.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/PlayerState.h"
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationEditorCommon.h"
@@ -23,6 +25,7 @@ bool FJMDungeonMonsterBlockoutDefaultsTest::RunTest(const FString&)
 	const AJMBlackoutMonster* Blackout = GetDefault<AJMBlackoutMonster>();
 
 	TestNotNull(TEXT("Listener has a torso blockout mesh"), Listener->Torso.Get());
+	TestNotNull(TEXT("Every monster owns a physical contact sensor"), Listener->ContactSensor.Get());
 	TestNotNull(TEXT("Listener has readable ear silhouettes"), Listener->LeftEar.Get());
 	TestNotNull(TEXT("Hoarder has a heavy body blockout mesh"), Hoarder->Body.Get());
 	TestNotNull(TEXT("Blackout has a tall upper body blockout mesh"), Blackout->UpperBody.Get());
@@ -41,8 +44,133 @@ bool FJMDungeonMonsterBlockoutDefaultsTest::RunTest(const FString&)
 	TestEqual(TEXT("Listener chases slightly faster than the player's 600 run speed"), Listener->ChaseSpeed, 650.0f);
 	TestEqual(TEXT("Hoarder chases slightly faster than the player's 600 run speed"), Hoarder->ChaseSpeed, 620.0f);
 	TestEqual(TEXT("Blackout chases slightly faster than the player's 600 run speed"), Blackout->ChaseSpeed, 640.0f);
+	TestTrue(TEXT("Hoarder hears nearby walking instead of only sprinting"), Hoarder->MinimumNoiseLoudness <= 0.32f);
+	TestTrue(TEXT("Blackout hears nearby walking instead of only sprinting"), Blackout->MinimumNoiseLoudness <= 0.32f);
+	TestTrue(TEXT("Hoarder defends itself outside a misplaced territory center"), Hoarder->PersonalDefenseRadius > 0.0f);
+	TestTrue(TEXT("Hoarder has long-room sight range"), Hoarder->DirectSightRange >= 2400.0f);
+	TestTrue(TEXT("Hoarder keeps chasing after a brief line-of-sight break"), Hoarder->LoseTargetDelay >= 5.0f);
+	TestTrue(TEXT("Hoarder searches the last known area after losing sight"), Hoarder->SearchDuration >= 8.0f);
+	TestTrue(TEXT("Hoarder territory leash does not truncate its sight range"),
+		Hoarder->WarningRadius + Hoarder->LeashExtraDistance >= Hoarder->DirectSightRange);
 	TestTrue(TEXT("Patrol advance radius is larger than path acceptance radius"),
 		Listener->PatrolPointAdvanceRadius > Listener->PatrolMoveAcceptanceRadius);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FJMDungeonMonsterContactRangeTest,
+	"JM.AI.DungeonMonster.EffectiveAttackRangeIncludesCapsules",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMDungeonMonsterContactRangeTest::RunTest(const FString&)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	AJMHoarderMonster* Hoarder = World
+		? World->SpawnActor<AJMHoarderMonster>(FVector::ZeroVector, FRotator::ZeroRotator) : nullptr;
+	ACharacter* Player = World
+		? World->SpawnActor<ACharacter>(FVector(105.0f, 0.0f, 0.0f), FRotator::ZeroRotator) : nullptr;
+	TestNotNull(TEXT("Hoarder spawns for contact check"), Hoarder);
+	TestNotNull(TEXT("Player capsule spawns for contact check"), Player);
+	if (Hoarder && Player)
+	{
+		TestTrue(TEXT("Touching character capsules are inside the effective attack range"),
+			Hoarder->IsTargetWithinAttackRange(Player));
+		TestTrue(TEXT("Effective attack range includes both capsule radii"),
+			Hoarder->GetAttackTriggerDistance(Player) >= 105.0f);
+	}
+	if (World)
+	{
+		World->DestroyWorld(false);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FJMDungeonMonsterMovingContactCatchTest,
+	"JM.AI.DungeonMonster.PhysicalContactCatchesWithoutSustainedOverlap",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMDungeonMonsterMovingContactCatchTest::RunTest(const FString&)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	AJMHoarderMonster* Hoarder = World
+		? World->SpawnActor<AJMHoarderMonster>(FVector::ZeroVector, FRotator::ZeroRotator) : nullptr;
+	ACharacter* Player = World
+		? World->SpawnActor<ACharacter>(FVector(400.0f, 0.0f, 0.0f), FRotator::ZeroRotator) : nullptr;
+	APlayerState* PlayerState = World ? World->SpawnActor<APlayerState>() : nullptr;
+	AJMDungeonMonsterAIController* MonsterController = World
+		? World->SpawnActor<AJMDungeonMonsterAIController>() : nullptr;
+	TestNotNull(TEXT("Hoarder spawns for moving contact check"), Hoarder);
+	TestNotNull(TEXT("Player spawns for moving contact check"), Player);
+	if (Hoarder && Player && PlayerState && MonsterController)
+	{
+		Player->SetPlayerState(PlayerState);
+		MonsterController->Possess(Hoarder);
+		Hoarder->SetTerritoryCenter(Hoarder->GetActorLocation());
+		Hoarder->AlertDelay = 0.0f;
+		Hoarder->HandleSightStimulus(Player, true, Player->GetActorLocation());
+		Hoarder->TickBehaviorTreeDecision(EJMDungeonMonsterState::Suspicious);
+		TestEqual(TEXT("Precondition enters chase"), Hoarder->GetMonsterState(), EJMDungeonMonsterState::Chase);
+		Player->SetActorEnableCollision(false);
+		Player->SetActorLocation(FVector(75.0f, 0.0f, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
+		TestTrue(TEXT("Single capsule contact is detected"), Hoarder->IsTargetInPhysicalContact(Player));
+		Hoarder->TickBehaviorTreeDecision(EJMDungeonMonsterState::Chase);
+		TestEqual(TEXT("One contact catches immediately and resets without sustained overlap"),
+			Hoarder->GetMonsterState(), EJMDungeonMonsterState::Patrol);
+	}
+	if (World)
+	{
+		World->DestroyWorld(false);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FJMDungeonMonsterSightChaseAttackTest,
+	"JM.AI.DungeonMonster.SightCommitsToChaseAndContactAttack",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMDungeonMonsterSightChaseAttackTest::RunTest(const FString&)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	AJMHoarderMonster* Hoarder = World
+		? World->SpawnActor<AJMHoarderMonster>(FVector::ZeroVector, FRotator::ZeroRotator) : nullptr;
+	ACharacter* Player = World
+		? World->SpawnActor<ACharacter>(FVector(400.0f, 0.0f, 0.0f), FRotator::ZeroRotator) : nullptr;
+	APlayerState* PlayerState = World ? World->SpawnActor<APlayerState>() : nullptr;
+	AJMDungeonMonsterAIController* MonsterController = World
+		? World->SpawnActor<AJMDungeonMonsterAIController>() : nullptr;
+	TestNotNull(TEXT("Hoarder spawns for sight transition check"), Hoarder);
+	TestNotNull(TEXT("Player spawns for sight transition check"), Player);
+	TestNotNull(TEXT("Player state spawns for sight transition check"), PlayerState);
+	TestNotNull(TEXT("Monster controller spawns for sight transition check"), MonsterController);
+
+	if (Hoarder && Player && PlayerState && MonsterController)
+	{
+		Player->SetPlayerState(PlayerState);
+		MonsterController->Possess(Hoarder);
+		Hoarder->SetTerritoryCenter(Hoarder->GetActorLocation());
+		Hoarder->AlertDelay = 0.0f;
+		Hoarder->AttackWarningDuration = 0.0f;
+
+		Hoarder->HandleSightStimulus(Player, true, Player->GetActorLocation());
+		TestEqual(TEXT("Seeing a player enters the readable suspicious state"),
+			Hoarder->GetMonsterState(), EJMDungeonMonsterState::Suspicious);
+		Hoarder->TickBehaviorTreeDecision(EJMDungeonMonsterState::Suspicious);
+		TestEqual(TEXT("Visible player becomes a committed chase target after the alert"),
+			Hoarder->GetMonsterState(), EJMDungeonMonsterState::Chase);
+
+		Player->SetActorLocation(FVector(105.0f, 0.0f, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
+		Hoarder->HandleSightStimulus(Player, true, Player->GetActorLocation());
+		Hoarder->TickBehaviorTreeDecision(EJMDungeonMonsterState::Chase);
+		TestEqual(TEXT("Capsule contact enters attack warning instead of a harmless movement stop"),
+			Hoarder->GetMonsterState(), EJMDungeonMonsterState::AttackWarning);
+		Hoarder->TickBehaviorTreeDecision(EJMDungeonMonsterState::AttackWarning);
+		TestEqual(TEXT("Standing inside contact range through the warning catches and resets the monster"),
+			Hoarder->GetMonsterState(), EJMDungeonMonsterState::Patrol);
+	}
+
+	if (World)
+	{
+		World->DestroyWorld(false);
+	}
 	return true;
 }
 

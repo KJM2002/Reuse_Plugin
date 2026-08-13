@@ -10,11 +10,14 @@ AJMHoarderMonster::AJMHoarderMonster()
 	PatrolSpeed = 315.0f;
 	InvestigateSpeed = 380.0f;
 	ChaseSpeed = 620.0f;
-	MinimumNoiseLoudness = 0.55f;
+	MinimumNoiseLoudness = 0.30f;
 	AlertDelay = 1.25f;
 	AttackWarningDuration = 1.35f;
-	LoseTargetDelay = 2.5f;
-	SearchDuration = 4.5f;
+	DirectSightRange = 2400.0f;
+	DirectSightHalfAngle = 70.0f;
+	LoseTargetDelay = 5.0f;
+	SearchDuration = 8.0f;
+	SearchRadius = 800.0f;
 	AlertSoundPitch = 0.5f;
 
 	Body = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Body"));
@@ -62,8 +65,10 @@ void AJMHoarderMonster::UpdateSpecialRules()
 		return;
 	}
 	const float Distance = FVector::Dist2D(Player->GetActorLocation(), TerritoryCenter);
+	const float DistanceToHoarder = FVector::Dist2D(Player->GetActorLocation(), GetActorLocation());
 	if ((GetMonsterState() == EJMDungeonMonsterState::Chase ||
-		GetMonsterState() == EJMDungeonMonsterState::AttackWarning) && Distance > WarningRadius + LeashExtraDistance)
+		GetMonsterState() == EJMDungeonMonsterState::AttackWarning) && Distance > WarningRadius + LeashExtraDistance &&
+		DistanceToHoarder > PersonalDefenseRadius)
 	{
 		ClearTargetAndReturn();
 		return;
@@ -78,7 +83,8 @@ void AJMHoarderMonster::UpdateSpecialRules()
 bool AJMHoarderMonster::CanPursueTarget(const APawn* Target) const
 {
 	return Super::CanPursueTarget(Target) &&
-		FVector::Dist2D(Target->GetActorLocation(), TerritoryCenter) <= WarningRadius + LeashExtraDistance;
+		(FVector::Dist2D(Target->GetActorLocation(), TerritoryCenter) <= WarningRadius + LeashExtraDistance ||
+		 FVector::Dist2D(Target->GetActorLocation(), GetActorLocation()) <= PersonalDefenseRadius);
 }
 
 FVector AJMHoarderMonster::GetReturnLocation() const

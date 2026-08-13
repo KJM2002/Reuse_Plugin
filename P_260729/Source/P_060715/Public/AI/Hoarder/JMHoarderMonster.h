@@ -24,13 +24,17 @@ public:
 	TObjectPtr<UStaticMeshComponent> GuardBar;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|Territory", meta=(ClampMin="100.0"))
-	float WarningRadius = 850.0f;
+	float WarningRadius = 1750.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|Territory", meta=(ClampMin="50.0"))
 	float AggressionRadius = 430.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|Territory", meta=(ClampMin="0.0"))
-	float LeashExtraDistance = 350.0f;
+	float LeashExtraDistance = 750.0f;
+
+	/** Nearby players are always treated as a threat, even if a room-authored patrol point lies outside the territory radius. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|Territory", meta=(ClampMin="100.0"))
+	float PersonalDefenseRadius = 1000.0f;
 
 	UFUNCTION(BlueprintCallable, Category="AI|Territory")
 	void SetTerritoryCenter(FVector NewCenter);

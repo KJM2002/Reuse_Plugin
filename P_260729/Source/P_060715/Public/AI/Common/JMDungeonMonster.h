@@ -12,7 +12,9 @@ class UAISenseConfig_Sight;
 class UAudioComponent;
 class UBehaviorTree;
 class UBlackboardComponent;
+class UCapsuleComponent;
 class UPointLightComponent;
+class UPrimitiveComponent;
 class USceneComponent;
 class USoundBase;
 class UStaticMeshComponent;
@@ -91,6 +93,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="AI|Audio")
 	TObjectPtr<UAudioComponent> VoiceAudio;
 
+	/** Query-only capsule that turns one confirmed body contact into a catch without requiring sustained overlap. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="AI|Fairness")
+	TObjectPtr<UCapsuleComponent> ContactSensor;
+
 	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category="AI|Patrol")
 	TArray<TObjectPtr<AActor>> PatrolPoints;
 
@@ -122,6 +128,21 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|Fairness", meta=(ClampMin="1.0"))
 	float CatchDistance = 115.0f;
+
+	/** Extra room around the two collision capsules that counts as physical contact. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|Fairness", meta=(ClampMin="0.0"))
+	float ContactAttackPadding = 20.0f;
+
+	/** Small tolerance for swept character movement at the exact capsule contact boundary. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|Fairness", meta=(ClampMin="0.0"))
+	float PhysicalContactTolerance = 8.0f;
+
+	/** Fallback visual acquisition used when perception registration is late after runtime room generation. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|Sight", meta=(ClampMin="100.0"))
+	float DirectSightRange = 1350.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|Sight", meta=(ClampMin="1.0", ClampMax="180.0"))
+	float DirectSightHalfAngle = 55.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|Memory", meta=(ClampMin="0.0"))
 	float LoseTargetDelay = 2.0f;
@@ -182,6 +203,16 @@ public:
 	UFUNCTION(BlueprintPure, Category="AI")
 	AActor* GetCurrentTargetActor() const { return TargetPawn.Get(); }
 
+	/** Uses capsule contact as well as the authored catch distance, so path following cannot stop just outside attack range. */
+	UFUNCTION(BlueprintPure, Category="AI|Fairness")
+	float GetAttackTriggerDistance(const APawn* Target) const;
+
+	UFUNCTION(BlueprintPure, Category="AI|Fairness")
+	bool IsTargetWithinAttackRange(const APawn* Target) const;
+
+	UFUNCTION(BlueprintPure, Category="AI|Fairness")
+	bool IsTargetInPhysicalContact(const APawn* Target) const;
+
 	/** Called by the active BT task. The expected state prevents stale tasks from executing another branch. */
 	void TickBehaviorTreeDecision(EJMDungeonMonsterState ExpectedState);
 	void SyncBehaviorTreeBlackboard(UBlackboardComponent& Blackboard) const;
@@ -235,9 +266,15 @@ private:
 	void UpdateAttackWarning(AJMDungeonMonsterAIController* MonsterController);
 	void UpdateSearch(AJMDungeonMonsterAIController* MonsterController);
 	void UpdateReturn(AJMDungeonMonsterAIController* MonsterController);
+	void RefreshDirectPlayerAwareness(AJMDungeonMonsterAIController* MonsterController);
+	bool HasDirectSightTo(const APawn* Target, const AJMDungeonMonsterAIController* MonsterController) const;
 	void MoveToward(AJMDungeonMonsterAIController* MonsterController, const FVector& Destination,
 		float AcceptanceRadius, bool bStopOnOverlap = true);
 	void CatchPlayer(APawn* Player);
+
+	UFUNCTION()
+	void HandleContactSensorOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+		UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 	void PlayAlertCue();
 	void RefreshStateFeedback();
 

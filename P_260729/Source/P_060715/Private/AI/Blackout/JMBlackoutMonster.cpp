@@ -14,7 +14,7 @@ AJMBlackoutMonster::AJMBlackoutMonster()
 	AttackWarningDuration = 1.5f;
 	LoseTargetDelay = 1.8f;
 	SearchDuration = 6.0f;
-	MinimumNoiseLoudness = 0.65f;
+	MinimumNoiseLoudness = 0.30f;
 	AlertSoundPitch = 0.35f;
 
 	Core = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Core"));
