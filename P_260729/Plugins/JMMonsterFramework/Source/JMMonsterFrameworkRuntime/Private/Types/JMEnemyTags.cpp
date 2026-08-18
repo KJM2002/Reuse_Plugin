@@ -14,6 +14,7 @@ namespace JMEnemyTags
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Enraged, "JM.Enemy.State.Enraged", "Enemy is enraged.");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Stunned, "JM.Enemy.State.Stunned", "Enemy is stunned.");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Dead, "JM.Enemy.State.Dead", "Enemy is dead.");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Watcher_Frozen, "JM.Enemy.State.Watcher.Frozen", "Watcher is frozen while observed.");
 
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Action, "JM.Enemy.Action", "Root tag for reusable enemy actions.");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Action_Melee, "JM.Enemy.Action.Melee", "Standard melee action.");

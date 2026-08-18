@@ -21,6 +21,18 @@ namespace JMStateTree
     }
 }
 
+FJMStateTreeWaitForTransitionTask::FJMStateTreeWaitForTransitionTask()
+{
+    bShouldCallTick = false;
+    bShouldCopyBoundPropertiesOnTick = false;
+}
+
+EStateTreeRunStatus FJMStateTreeWaitForTransitionTask::EnterState(
+    FStateTreeExecutionContext&, const FStateTreeTransitionResult&) const
+{
+    return EStateTreeRunStatus::Running;
+}
+
 bool FJMStateTreeSetStateTask::Link(FStateTreeLinker& Linker)
 {
     Linker.LinkExternalData(StateHandle);

@@ -29,6 +29,12 @@ public:
     bool CanCurrentlySeeTarget() const { return bCanCurrentlySeeTarget; }
 
     UFUNCTION(BlueprintPure, Category="JM Enemy|Memory")
+    bool CanCurrentlySeeActor(const AActor* Actor) const
+    {
+        return IsValid(Actor) && LastSeenSource.Get() == Actor && bLastVisionActive;
+    }
+
+    UFUNCTION(BlueprintPure, Category="JM Enemy|Memory")
     bool HasLastKnownTargetLocation() const { return LastKnownTargetTime >= 0.0; }
 
     UFUNCTION(BlueprintPure, Category="JM Enemy|Memory")
@@ -45,6 +51,9 @@ public:
 
     UFUNCTION(BlueprintPure, Category="JM Enemy|Memory")
     double GetTimeSinceLastSeen() const;
+
+    UFUNCTION(BlueprintPure, Category="JM Enemy|Memory")
+    AActor* GetLastSeenSource() const { return LastSeenSource.Get(); }
 
     UFUNCTION(BlueprintPure, Category="JM Enemy|Memory")
     FVector GetLastHeardLocation() const { return LastHeardLocation; }

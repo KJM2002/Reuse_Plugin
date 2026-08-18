@@ -31,6 +31,7 @@ namespace JMEnemyStateTreeConditions
     JMMONSTERFRAMEWORKRUNTIME_API bool Compare(int32 Value, int32 Threshold, EJMStateTreeCompare Operation);
     JMMONSTERFRAMEWORKRUNTIME_API bool HasTarget(const UJMEnemyMemoryComponent& Memory);
     JMMONSTERFRAMEWORKRUNTIME_API bool HasRecentHearing(const UJMEnemyMemoryComponent& Memory, float MaximumAge);
+    JMMONSTERFRAMEWORKRUNTIME_API bool HasRecentVision(const UJMEnemyMemoryComponent& Memory, float MaximumAge);
     JMMONSTERFRAMEWORKRUNTIME_API bool HasGaze(const UJMEnemyPerceptionComponent& Perception,
         float MinimumStrength, float MinimumDuration);
 }
@@ -51,6 +52,24 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeCanSeeTargetCondition : public 
 {
     GENERATED_BODY()
     using FInstanceDataType = FJMStateTreeEmptyConditionInstanceData;
+    virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
+    virtual bool Link(FStateTreeLinker& Linker) override;
+    virtual bool TestCondition(FStateTreeExecutionContext& Context) const override;
+    TStateTreeExternalDataHandle<UJMEnemyMemoryComponent> MemoryHandle;
+};
+
+USTRUCT()
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeActorVisionInstanceData
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, Category=Parameter) TObjectPtr<AActor> Actor;
+};
+
+USTRUCT(meta=(DisplayName="Can See Actor", Category="JM Monster Framework|Perception"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeActorVisionCondition : public FStateTreeConditionCommonBase
+{
+    GENERATED_BODY()
+    using FInstanceDataType = FJMStateTreeActorVisionInstanceData;
     virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
     virtual bool Link(FStateTreeLinker& Linker) override;
     virtual bool TestCondition(FStateTreeExecutionContext& Context) const override;
@@ -82,6 +101,26 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeGazeInstanceData
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0.0", ClampMax="1.0")) float MinimumStrength = 0.0f;
     UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0.0")) float MinimumDuration = 0.0f;
+    UPROPERTY(EditAnywhere, Category=Parameter) bool bInvert = false;
+};
+
+USTRUCT()
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeRecentVisionInstanceData
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0.0")) float MaximumAge = 1.5f;
+    UPROPERTY(EditAnywhere, Category=Parameter) bool bInvert = false;
+};
+
+USTRUCT(meta=(DisplayName="Has Seen Current Target Recently", Category="JM Monster Framework|Memory"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeRecentVisionCondition : public FStateTreeConditionCommonBase
+{
+    GENERATED_BODY()
+    using FInstanceDataType = FJMStateTreeRecentVisionInstanceData;
+    virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
+    virtual bool Link(FStateTreeLinker& Linker) override;
+    virtual bool TestCondition(FStateTreeExecutionContext& Context) const override;
+    TStateTreeExternalDataHandle<UJMEnemyMemoryComponent> MemoryHandle;
 };
 
 USTRUCT(meta=(DisplayName="Player Looking At Enemy", Category="JM Monster Framework|Perception"))
@@ -159,6 +198,7 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeContextInstanceData
     GENERATED_BODY()
     UPROPERTY(VisibleAnywhere, Category=Output) TObjectPtr<AActor> CurrentTarget;
     UPROPERTY(VisibleAnywhere, Category=Output) TObjectPtr<AActor> LastHeardSource;
+    UPROPERTY(VisibleAnywhere, Category=Output) TObjectPtr<AActor> LastSeenSource;
     UPROPERTY(VisibleAnywhere, Category=Output) FVector LastKnownLocation = FVector::ZeroVector;
     UPROPERTY(VisibleAnywhere, Category=Output) FVector LastSeenLocation = FVector::ZeroVector;
     UPROPERTY(VisibleAnywhere, Category=Output) FVector LastHeardLocation = FVector::ZeroVector;
@@ -167,6 +207,7 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeContextInstanceData
     UPROPERTY(VisibleAnywhere, Category=Output) float GazeDuration = 0.0f;
     UPROPERTY(VisibleAnywhere, Category=Output) int32 EncounterCount = 0;
     UPROPERTY(VisibleAnywhere, Category=Output) float TimeSinceLastHeard = -1.0f;
+    UPROPERTY(VisibleAnywhere, Category=Output) float TimeSinceLastSeen = -1.0f;
 };
 
 USTRUCT(meta=(DisplayName="JM Enemy Context", Category="JM Monster Framework|Context"))

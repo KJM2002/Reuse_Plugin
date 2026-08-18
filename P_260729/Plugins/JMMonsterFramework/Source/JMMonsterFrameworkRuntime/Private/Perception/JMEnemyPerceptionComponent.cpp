@@ -86,6 +86,18 @@ bool UJMEnemyPerceptionComponent::SubmitStimulus(FJMStimulus Stimulus)
     return true;
 }
 
+bool UJMEnemyPerceptionComponent::SubmitPlayerGazeObservation(
+    const bool bLooking, const float Strength, AActor* SourceActor)
+{
+    if (!ActiveConfig.PlayerGaze.bEnabled || (bLooking && !IsValid(SourceActor)))
+    {
+        return false;
+    }
+    UpdateGazeState(bLooking, FMath::Clamp(Strength, 0.0f, 1.0f),
+        bLooking ? SourceActor : nullptr, GetCurrentTime());
+    return true;
+}
+
 bool UJMEnemyPerceptionComponent::IsSenseEnabled(const EJMStimulusType Type) const
 {
     switch (Type)
@@ -214,7 +226,8 @@ void UJMEnemyPerceptionComponent::UpdateGazeState(
 
     if (bNewLooking)
     {
-        if (bIsPlayerLookingAtMe && !bSourceChanged && LastGazeEvaluationTime >= 0.0)
+        // A hand-off between local players is still one continuous observation interval.
+        if (bIsPlayerLookingAtMe && LastGazeEvaluationTime >= 0.0)
         {
             GazeDuration += static_cast<float>(FMath::Max(0.0, CurrentTime - LastGazeEvaluationTime));
         }

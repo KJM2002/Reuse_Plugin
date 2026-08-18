@@ -20,6 +20,17 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeEmptyTaskInstanceData
     GENERATED_BODY()
 };
 
+/** Keeps a state active until one of its transitions fires. */
+USTRUCT(meta=(DisplayName="Wait For Transition", Category="JM Monster Framework|Flow"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeWaitForTransitionTask : public FStateTreeTaskCommonBase
+{
+    GENERATED_BODY()
+    using FInstanceDataType = FJMStateTreeEmptyTaskInstanceData;
+    FJMStateTreeWaitForTransitionTask();
+    virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
+    virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext&, const FStateTreeTransitionResult&) const override;
+};
+
 USTRUCT()
 struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeSetStateInstanceData
 {

@@ -94,6 +94,17 @@ bool FJMEnemyStateTreeConditionDataTest::RunTest(const FString& Parameters)
     Memory->SetCurrentTarget(Target.Get());
     TestTrue(TEXT("Valid generic actor is a target"), JMEnemyStateTreeConditions::HasTarget(*Memory));
 
+    FJMStimulus Vision;
+    Vision.Type = EJMStimulusType::Vision;
+    Vision.SourceActor = Target.Get();
+    Vision.Timestamp = FPlatformTime::Seconds();
+    Vision.bSuccessfullySensed = true;
+    Memory->HandleStimulus(Vision);
+    TestTrue(TEXT("Visible actor query is independent from target selection"),
+        Memory->CanCurrentlySeeActor(Target.Get()));
+    TestTrue(TEXT("Recent target vision uses existing memory timestamps"),
+        JMEnemyStateTreeConditions::HasRecentVision(*Memory, 1.0f));
+
     FJMStimulus Hearing;
     Hearing.Type = EJMStimulusType::Hearing;
     Hearing.SourceActor = Target.Get();

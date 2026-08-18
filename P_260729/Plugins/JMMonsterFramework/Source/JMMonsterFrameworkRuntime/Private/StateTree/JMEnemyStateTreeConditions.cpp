@@ -41,6 +41,10 @@ namespace JMEnemyStateTreeConditions
     {
         return MaximumAge >= 0.0f && Memory.HasHeardStimulusRecently(MaximumAge);
     }
+    bool HasRecentVision(const UJMEnemyMemoryComponent& Memory, const float MaximumAge)
+    {
+        return MaximumAge >= 0.0f && Memory.HasSeenTargetRecently(MaximumAge);
+    }
     bool HasGaze(const UJMEnemyPerceptionComponent& Perception,
         const float MinimumStrength, const float MinimumDuration)
     {
@@ -59,6 +63,12 @@ bool FJMStateTreeCanSeeTargetCondition::TestCondition(FStateTreeExecutionContext
 {
     return Context.GetExternalData(MemoryHandle).CanCurrentlySeeTarget();
 }
+bool FJMStateTreeActorVisionCondition::Link(FStateTreeLinker& Linker) { Linker.LinkExternalData(MemoryHandle); return true; }
+bool FJMStateTreeActorVisionCondition::TestCondition(FStateTreeExecutionContext& Context) const
+{
+    const FInstanceDataType& Data = Context.GetInstanceData(*this);
+    return Context.GetExternalData(MemoryHandle).CanCurrentlySeeActor(Data.Actor);
+}
 bool FJMStateTreeRecentHearingCondition::Link(FStateTreeLinker& Linker) { Linker.LinkExternalData(MemoryHandle); return true; }
 bool FJMStateTreeRecentHearingCondition::TestCondition(FStateTreeExecutionContext& Context) const
 {
@@ -70,8 +80,16 @@ bool FJMStateTreeGazeCondition::Link(FStateTreeLinker& Linker) { Linker.LinkExte
 bool FJMStateTreeGazeCondition::TestCondition(FStateTreeExecutionContext& Context) const
 {
     const FInstanceDataType& Data = Context.GetInstanceData(*this);
-    return JMEnemyStateTreeConditions::HasGaze(Context.GetExternalData(PerceptionHandle),
+    const bool bHasGaze = JMEnemyStateTreeConditions::HasGaze(Context.GetExternalData(PerceptionHandle),
         Data.MinimumStrength, Data.MinimumDuration);
+    return Data.bInvert != bHasGaze;
+}
+bool FJMStateTreeRecentVisionCondition::Link(FStateTreeLinker& Linker) { Linker.LinkExternalData(MemoryHandle); return true; }
+bool FJMStateTreeRecentVisionCondition::TestCondition(FStateTreeExecutionContext& Context) const
+{
+    const FInstanceDataType& Data = Context.GetInstanceData(*this);
+    return Data.bInvert != JMEnemyStateTreeConditions::HasRecentVision(
+        Context.GetExternalData(MemoryHandle), Data.MaximumAge);
 }
 bool FJMStateTreeDistanceCondition::Link(FStateTreeLinker& Linker) { Linker.LinkExternalData(MemoryHandle); return true; }
 bool FJMStateTreeDistanceCondition::TestCondition(FStateTreeExecutionContext& Context) const
@@ -109,6 +127,7 @@ void FJMStateTreeContextEvaluator::Tick(FStateTreeExecutionContext& Context, flo
     const UJMEnemyPerceptionComponent& Perception = Context.GetExternalData(PerceptionHandle);
     Data.CurrentTarget = Memory.GetCurrentTarget();
     Data.LastHeardSource = Memory.GetLastHeardSource();
+    Data.LastSeenSource = Memory.GetLastSeenSource();
     Data.LastKnownLocation = Memory.GetLastKnownTargetLocation();
     Data.LastSeenLocation = Memory.GetLastSeenLocation();
     Data.LastHeardLocation = Memory.GetLastHeardLocation();
@@ -117,6 +136,7 @@ void FJMStateTreeContextEvaluator::Tick(FStateTreeExecutionContext& Context, flo
     Data.GazeDuration = Perception.GetGazeDuration();
     Data.EncounterCount = Memory.GetEncounterCount();
     Data.TimeSinceLastHeard = static_cast<float>(Memory.GetTimeSinceLastHeard());
+    Data.TimeSinceLastSeen = static_cast<float>(Memory.GetTimeSinceLastSeen());
 }
 
 bool FJMStateTreeCombatTargetCondition::TestCondition(FStateTreeExecutionContext& Context) const

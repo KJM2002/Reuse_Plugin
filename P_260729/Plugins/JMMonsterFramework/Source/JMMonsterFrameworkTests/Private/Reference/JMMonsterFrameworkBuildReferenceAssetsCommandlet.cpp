@@ -280,6 +280,296 @@ namespace JMListenerAssets
     }
 }
 
+namespace JMWatcherAssets
+{
+    constexpr TCHAR RootPath[] = TEXT("/JMMonsterFramework/Reference/Watcher");
+
+    template<typename T>
+    T* CreateAsset(const TCHAR* Name)
+    {
+        const FString PackageName = FString::Printf(TEXT("%s/%s"), RootPath, Name);
+        const FString ObjectPath = FString::Printf(TEXT("%s.%s"), *PackageName, Name);
+        if (T* Existing = LoadObject<T>(nullptr, *ObjectPath)) return Existing;
+        UPackage* Package = CreatePackage(*PackageName);
+        if (T* Existing = FindObject<T>(Package, Name)) return Existing;
+        T* Asset = NewObject<T>(Package, T::StaticClass(), Name, RF_Public | RF_Standalone | RF_Transactional);
+        FAssetRegistryModule::AssetCreated(Asset);
+        return Asset;
+    }
+
+    bool SaveAsset(UObject* Asset)
+    {
+        if (!Asset) return false;
+        UPackage* Package = Asset->GetOutermost();
+        Package->MarkPackageDirty();
+        const FString Filename = FPackageName::LongPackageNameToFilename(
+            Package->GetName(), FPackageName::GetAssetPackageExtension());
+        FSavePackageArgs Args;
+        Args.TopLevelFlags = RF_Public | RF_Standalone;
+        Args.SaveFlags = SAVE_NoError;
+        return UPackage::SavePackage(Package, Asset, *Filename, Args);
+    }
+
+    template<typename T>
+    void SetStateTask(UStateTreeState& State, const FGameplayTag Tag)
+    {
+        State.AddTask<T>().GetInstanceData().State = Tag;
+    }
+
+    void SetProfileTask(UStateTreeState& State, const FName Profile)
+    {
+        State.AddTask<FJMStateTreeMovementProfileTask>().GetInstanceData().ProfileName = Profile;
+    }
+
+    FStateTreeTransition& TickTo(UStateTreeState& From, UStateTreeState& To,
+        const EStateTreeTransitionPriority Priority = EStateTreeTransitionPriority::Normal)
+    {
+        FStateTreeTransition& Transition = From.AddTransition(
+            EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &To);
+        Transition.Priority = Priority;
+        return Transition;
+    }
+
+    FStateTreeTransition& StimulusTo(UStateTreeState& From, UStateTreeState& To,
+        const EStateTreeTransitionPriority Priority = EStateTreeTransitionPriority::Normal)
+    {
+        FStateTreeTransition& Transition = From.AddTransition(
+            EStateTreeTransitionTrigger::OnEvent, JMEnemyTags::Event_Stimulus,
+            EStateTreeTransitionType::GotoState, &To);
+        Transition.Priority = Priority;
+        return Transition;
+    }
+
+    FStateTreeTransition& CompletedTo(UStateTreeState& From, UStateTreeState& To,
+        const EStateTreeTransitionTrigger Trigger = EStateTreeTransitionTrigger::OnStateSucceeded)
+    {
+        return From.AddTransition(Trigger, EStateTreeTransitionType::GotoState, &To);
+    }
+
+    void ConfigureGaze(FJMStateTreeGazeInstanceData& Data, const bool bInvert = false)
+    {
+        Data.MinimumStrength = 0.90f;
+        Data.MinimumDuration = 0.05f;
+        Data.bInvert = bInvert;
+    }
+
+    UStateTree* BuildStateTree()
+    {
+        const FName AssetName(TEXT("ST_Watcher"));
+        const FString PackageName = FString::Printf(TEXT("%s/%s"), RootPath, *AssetName.ToString());
+        const FString ObjectPath = FString::Printf(TEXT("%s.%s"), *PackageName, *AssetName.ToString());
+        UStateTree* Tree = LoadObject<UStateTree>(nullptr, *ObjectPath);
+        UPackage* Package = Tree ? Tree->GetOutermost() : CreatePackage(*PackageName);
+        if (!Tree)
+        {
+            UStateTreeFactory* Factory = NewObject<UStateTreeFactory>();
+            Factory->SetSchemaClass(UStateTreeAIComponentSchema::StaticClass());
+            Tree = Cast<UStateTree>(Factory->FactoryCreateNew(UStateTree::StaticClass(), Package, AssetName,
+                RF_Public | RF_Standalone | RF_Transactional, nullptr, GWarn));
+            if (!Tree) return nullptr;
+            FAssetRegistryModule::AssetCreated(Tree);
+        }
+
+        UStateTreeEditorData* EditorData = CastChecked<UStateTreeEditorData>(Tree->EditorData);
+        UStateTreeState& Root = *EditorData->SubTrees[0];
+        EditorData->Evaluators.Reset();
+        EditorData->GlobalTasks.Reset();
+        Root.EnterConditions.Reset();
+        Root.Tasks.Reset();
+        Root.Transitions.Reset();
+        Root.Children.Reset();
+        Root.Name = TEXT("Root");
+        Root.SelectionBehavior = EStateTreeStateSelectionBehavior::TrySelectChildrenInOrder;
+        auto& Context = EditorData->AddEvaluator<FJMStateTreeContextEvaluator>();
+
+        UStateTreeState& Patrol = Root.AddChildState(TEXT("Patrol"));
+        UStateTreeState& Acquire = Root.AddChildState(TEXT("AcquireTarget"));
+        UStateTreeState& Chase = Root.AddChildState(TEXT("Chase"));
+        UStateTreeState& Frozen = Root.AddChildState(TEXT("Frozen"));
+        UStateTreeState& Attack = Root.AddChildState(TEXT("Attack"));
+        for (UStateTreeState* State : {&Patrol, &Acquire, &Chase, &Frozen, &Attack})
+        {
+            State->TasksCompletion = EStateTreeTaskCompletionType::All;
+        }
+
+        SetStateTask<FJMStateTreeSetStateTask>(Patrol, JMEnemyTags::State_Patrol);
+        SetProfileTask(Patrol, TEXT("Patrol"));
+        Patrol.AddTask<FJMStateTreeClearTargetTask>();
+        auto& PatrolMove = Patrol.AddTask<FJMStateTreeMoveRandomTask>();
+        PatrolMove.GetInstanceData().Radius = 900.0f;
+        FStateTreeTransition& AcquireTransition = StimulusTo(Patrol, Acquire, EStateTreeTransitionPriority::Critical);
+        auto& VisibleCandidate = AcquireTransition.AddCondition<FJMStateTreeActorVisionCondition>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastSeenSource"), VisibleCandidate, TEXT("Actor"));
+        auto& CombatCandidate = AcquireTransition.AddCondition<FJMStateTreeCombatTargetCondition>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastSeenSource"), CombatCandidate, TEXT("Actor"));
+        CompletedTo(Patrol, Patrol);
+        CompletedTo(Patrol, Patrol, EStateTreeTransitionTrigger::OnStateFailed);
+
+        auto& SetTarget = Acquire.AddTask<FJMStateTreeSetTargetTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastSeenSource"), SetTarget, TEXT("TargetActor"));
+        CompletedTo(Acquire, Chase);
+        CompletedTo(Acquire, Patrol, EStateTreeTransitionTrigger::OnStateFailed);
+
+        SetStateTask<FJMStateTreeSetStateTask>(Chase, JMEnemyTags::State_Chase);
+        SetProfileTask(Chase, TEXT("Chase"));
+        auto& ChaseMove = Chase.AddTask<FJMStateTreeMoveToActorTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), ChaseMove, TEXT("TargetActor"));
+        auto& FreezeFromChase = TickTo(Chase, Frozen, EStateTreeTransitionPriority::Critical)
+            .AddCondition<FJMStateTreeGazeCondition>();
+        ConfigureGaze(FreezeFromChase.GetInstanceData());
+        auto& AttackReady = TickTo(Chase, Attack, EStateTreeTransitionPriority::High)
+            .AddCondition<FJMStateTreeActionReadyCondition>();
+        AttackReady.GetInstanceData().ActionId = JMEnemyTags::Action_Melee;
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), AttackReady, TEXT("TargetActor"));
+        auto& ChaseLost = TickTo(Chase, Patrol, EStateTreeTransitionPriority::Normal)
+            .AddCondition<FJMStateTreeRecentVisionCondition>();
+        ChaseLost.GetInstanceData().MaximumAge = 1.5f;
+        ChaseLost.GetInstanceData().bInvert = true;
+        CompletedTo(Chase, Chase);
+        CompletedTo(Chase, Patrol, EStateTreeTransitionTrigger::OnStateFailed);
+
+        SetStateTask<FJMStateTreeSetStateTask>(Frozen, JMEnemyTags::State_Watcher_Frozen);
+        Frozen.AddTask<FJMStateTreeStopMovementTask>();
+        auto& FrozenFace = Frozen.AddTask<FJMStateTreeFaceActorTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), FrozenFace, TEXT("TargetActor"));
+        Frozen.AddTask<FJMStateTreeWaitForTransitionTask>();
+        auto& FrozenLost = TickTo(Frozen, Patrol, EStateTreeTransitionPriority::Critical)
+            .AddCondition<FJMStateTreeRecentVisionCondition>();
+        FrozenLost.GetInstanceData().MaximumAge = 1.5f;
+        FrozenLost.GetInstanceData().bInvert = true;
+        auto& GazeReleased = TickTo(Frozen, Chase, EStateTreeTransitionPriority::High)
+            .AddCondition<FJMStateTreeGazeCondition>();
+        ConfigureGaze(GazeReleased.GetInstanceData(), true);
+
+        SetStateTask<FJMStateTreeSetStateTask>(Attack, JMEnemyTags::State_Attack);
+        Attack.AddTask<FJMStateTreeStopMovementTask>();
+        auto& AttackFace = Attack.AddTask<FJMStateTreeFaceActorTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), AttackFace, TEXT("TargetActor"));
+        auto& Execute = Attack.AddTask<FJMStateTreeExecuteActionTask>();
+        Execute.GetInstanceData().ActionId = JMEnemyTags::Action_Melee;
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), Execute, TEXT("TargetActor"));
+        auto& FreezeAttack = TickTo(Attack, Frozen, EStateTreeTransitionPriority::Critical)
+            .AddCondition<FJMStateTreeGazeCondition>();
+        ConfigureGaze(FreezeAttack.GetInstanceData());
+        auto& AttackLost = TickTo(Attack, Patrol, EStateTreeTransitionPriority::High)
+            .AddCondition<FJMStateTreeRecentVisionCondition>();
+        AttackLost.GetInstanceData().MaximumAge = 1.5f;
+        AttackLost.GetInstanceData().bInvert = true;
+        auto& FrozenAfterAttack = CompletedTo(Attack, Frozen, EStateTreeTransitionTrigger::OnStateCompleted)
+            .AddCondition<FJMStateTreeGazeCondition>();
+        ConfigureGaze(FrozenAfterAttack.GetInstanceData());
+        CompletedTo(Attack, Chase, EStateTreeTransitionTrigger::OnStateCompleted);
+        CompletedTo(Attack, Chase, EStateTreeTransitionTrigger::OnStateFailed);
+
+        FStateTreeCompilerLog Log;
+        if (!UStateTreeEditingSubsystem::CompileStateTree(Tree, Log))
+        {
+            UE_LOG(LogTemp, Error, TEXT("Failed to compile ST_Watcher"));
+            return nullptr;
+        }
+        return Tree;
+    }
+
+    UBlueprint* BuildBlueprint(UJMEnemyDefinition* Definition)
+    {
+        const FName AssetName(TEXT("BP_Enemy_Watcher"));
+        const FString PackageName = FString::Printf(TEXT("%s/%s"), RootPath, *AssetName.ToString());
+        const FString ObjectPath = FString::Printf(TEXT("%s.%s"), *PackageName, *AssetName.ToString());
+        UPackage* Package = CreatePackage(*PackageName);
+        UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *ObjectPath);
+        if (!Blueprint) Blueprint = FindObject<UBlueprint>(Package, AssetName.ToString());
+        if (!Blueprint)
+        {
+            Blueprint = FKismetEditorUtilities::CreateBlueprint(AJMEnemyBase::StaticClass(), Package, AssetName,
+                BPTYPE_Normal, UBlueprint::StaticClass(), UBlueprintGeneratedClass::StaticClass(),
+                FName(TEXT("JMWatcherReferenceBuilder")));
+            FAssetRegistryModule::AssetCreated(Blueprint);
+        }
+        if (!Blueprint || !Blueprint->GeneratedClass) return nullptr;
+        if (Blueprint->SimpleConstructionScript && Blueprint->SimpleConstructionScript->GetAllNodes().IsEmpty())
+        {
+            USCS_Node* Node = Blueprint->SimpleConstructionScript->CreateNode(
+                UStaticMeshComponent::StaticClass(), TEXT("WatcherPlaceholder"));
+            if (UStaticMeshComponent* Mesh = Cast<UStaticMeshComponent>(Node->ComponentTemplate))
+            {
+                Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cone.Cone")));
+                Mesh->SetRelativeScale3D(FVector(0.8f, 0.8f, 1.8f));
+            }
+            Blueprint->SimpleConstructionScript->AddNode(Node);
+        }
+        FObjectProperty* DefinitionProperty = FindFProperty<FObjectProperty>(AJMEnemyBase::StaticClass(), TEXT("EnemyDefinition"));
+        AJMEnemyBase* CDO = Cast<AJMEnemyBase>(Blueprint->GeneratedClass->GetDefaultObject());
+        if (CDO && DefinitionProperty)
+        {
+            Blueprint->Modify();
+            CDO->Modify();
+            DefinitionProperty->SetObjectPropertyValue_InContainer(CDO, Definition);
+        }
+        FKismetEditorUtilities::CompileBlueprint(Blueprint);
+        CDO = Blueprint->GeneratedClass
+            ? Cast<AJMEnemyBase>(Blueprint->GeneratedClass->GetDefaultObject()) : nullptr;
+        if (CDO && DefinitionProperty)
+        {
+            CDO->Modify();
+            DefinitionProperty->SetObjectPropertyValue_InContainer(CDO, Definition);
+        }
+        return Blueprint;
+    }
+
+    bool BuildAndSave()
+    {
+        UJMEnemyMovementSet* Movement = CreateAsset<UJMEnemyMovementSet>(TEXT("DA_Watcher_Movement"));
+        Movement->Profiles.Reset();
+        auto AddProfile = [Movement](const FName Name, const float Speed)
+        {
+            FJMEnemyMovementProfile Profile;
+            Profile.ProfileName = Name;
+            Profile.MaxSpeed = Speed;
+            Profile.MaxAcceleration = 2200.0f;
+            Profile.AcceptanceRadius = 70.0f;
+            Movement->Profiles.Add(Profile);
+        };
+        AddProfile(TEXT("Patrol"), 250.0f);
+        AddProfile(TEXT("Chase"), 750.0f);
+
+        UJMEnemyActionDefinition_Melee* Melee = CreateAsset<UJMEnemyActionDefinition_Melee>(TEXT("DA_Watcher_Melee"));
+        Melee->Damage = 25.0f;
+        Melee->AttackRange = 170.0f;
+        Melee->WindupDuration = 0.3f;
+        Melee->ActiveDuration = 0.1f;
+        Melee->RecoveryDuration = 0.35f;
+        Melee->Cooldown = 0.6f;
+
+        UStateTree* StateTree = BuildStateTree();
+        UJMEnemyDefinition* Definition = CreateAsset<UJMEnemyDefinition>(TEXT("DA_Enemy_Watcher"));
+        Definition->EnemyId = TEXT("Watcher.Reference");
+        Definition->DisplayName = FText::FromString(TEXT("Watcher Reference Enemy"));
+        Definition->MaxHealth = 100.0f;
+        Definition->BaseDamage = 25.0f;
+        Definition->InitialState = JMEnemyTags::State_Patrol;
+        Definition->Perception.Vision.bEnabled = true;
+        Definition->Perception.Vision.SightRadius = 2200.0f;
+        Definition->Perception.Vision.LoseSightRadius = 2500.0f;
+        Definition->Perception.Vision.PeripheralVisionAngle = 75.0f;
+        Definition->Perception.Hearing.bEnabled = false;
+        Definition->Perception.PlayerGaze.bEnabled = true;
+        Definition->Perception.PlayerGaze.UpdateInterval = 0.05f;
+        Definition->Perception.PlayerGaze.MaximumDistance = 2500.0f;
+        Definition->Perception.PlayerGaze.DotThreshold = 0.90f;
+        Definition->Perception.PlayerGaze.bRequireLineOfSight = true;
+        Definition->MovementSet = Movement;
+        Definition->DefaultMovementProfile = TEXT("Patrol");
+        Definition->Actions = {Melee};
+        Definition->StateTree = StateTree;
+        UBlueprint* Blueprint = BuildBlueprint(Definition);
+
+        const bool bSaved = SaveAsset(Movement) && SaveAsset(Melee) && SaveAsset(StateTree) &&
+            SaveAsset(Definition) && SaveAsset(Blueprint);
+        UE_LOG(LogTemp, Display, TEXT("JM_WATCHER_REFERENCE_ASSETS=%s"), bSaved ? TEXT("SUCCESS") : TEXT("FAILED"));
+        return bSaved;
+    }
+}
+
 UJMMonsterFrameworkBuildReferenceAssetsCommandlet::UJMMonsterFrameworkBuildReferenceAssetsCommandlet()
 {
     IsClient = false;
@@ -342,5 +632,6 @@ int32 UJMMonsterFrameworkBuildReferenceAssetsCommandlet::Main(const FString& Par
         bMovementSaved, bMeleeSaved, bTreeSaved, bDefinitionSaved, bBlueprintSaved);
     const bool bSaved = bMovementSaved && bMeleeSaved && bTreeSaved && bDefinitionSaved && bBlueprintSaved;
     UE_LOG(LogTemp, Display, TEXT("JM_LISTENER_REFERENCE_ASSETS=%s"), bSaved ? TEXT("SUCCESS") : TEXT("FAILED"));
-    return bSaved ? 0 : 1;
+    const bool bWatcherSaved = JMWatcherAssets::BuildAndSave();
+    return bSaved && bWatcherSaved ? 0 : 1;
 }

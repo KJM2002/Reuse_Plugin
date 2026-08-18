@@ -28,6 +28,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="JM Enemy|Perception")
     bool SubmitStimulus(FJMStimulus Stimulus);
 
+    /** Optional adapter boundary for VR, remote cameras, tests, or other external gaze providers. */
+    UFUNCTION(BlueprintCallable, Category="JM Enemy|Perception|Gaze")
+    bool SubmitPlayerGazeObservation(bool bLooking, float Strength, AActor* SourceActor);
+
     UFUNCTION(BlueprintPure, Category="JM Enemy|Perception")
     bool IsSenseEnabled(EJMStimulusType Type) const;
 
