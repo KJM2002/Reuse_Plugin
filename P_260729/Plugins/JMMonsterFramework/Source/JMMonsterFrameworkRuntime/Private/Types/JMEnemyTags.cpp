@@ -15,6 +15,9 @@ namespace JMEnemyTags
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Stunned, "JM.Enemy.State.Stunned", "Enemy is stunned.");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Dead, "JM.Enemy.State.Dead", "Enemy is dead.");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Watcher_Frozen, "JM.Enemy.State.Watcher.Frozen", "Watcher is frozen while observed.");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Crawler_Stalk, "JM.Enemy.State.Crawler.Stalk", "Crawler is stalking its target.");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Crawler_ReApproach, "JM.Enemy.State.Crawler.ReApproach", "Crawler is returning after hiding.");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Crawler_FrenzyChase, "JM.Enemy.State.Crawler.FrenzyChase", "Crawler is pursuing while enraged.");
 
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Action, "JM.Enemy.Action", "Root tag for reusable enemy actions.");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Action_Melee, "JM.Enemy.Action.Melee", "Standard melee action.");

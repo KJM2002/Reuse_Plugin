@@ -32,6 +32,24 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeWaitForTransitionTask : public 
 };
 
 USTRUCT()
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeWaitInstanceData
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0.0")) float Duration = 3.0f;
+    float Elapsed = 0.0f;
+};
+
+USTRUCT(meta=(DisplayName="Wait", Category="JM Monster Framework|Flow"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeWaitTask : public FStateTreeTaskCommonBase
+{
+    GENERATED_BODY()
+    using FInstanceDataType = FJMStateTreeWaitInstanceData;
+    virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
+    virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext&, const FStateTreeTransitionResult&) const override;
+    virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext&, float DeltaTime) const override;
+};
+
+USTRUCT()
 struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeSetStateInstanceData
 {
     GENERATED_BODY()

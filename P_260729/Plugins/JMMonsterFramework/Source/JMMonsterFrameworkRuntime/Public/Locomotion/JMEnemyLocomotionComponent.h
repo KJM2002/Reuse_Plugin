@@ -39,6 +39,10 @@ public:
     UFUNCTION(BlueprintPure, Category="JM Enemy|Locomotion")
     virtual bool FindEscapeLocation(AActor* ThreatActor, float EscapeDistance, FVector& OutLocation) const;
 
+    /** Backend-specific reachable-point query used by generic roam/search behavior. */
+    UFUNCTION(BlueprintPure, Category="JM Enemy|Locomotion")
+    virtual bool FindRandomReachableLocation(FVector Center, float Radius, FVector& OutLocation) const;
+
     UFUNCTION(BlueprintCallable, Category="JM Enemy|Locomotion")
     virtual void StopMovement();
 
@@ -89,6 +93,8 @@ protected:
     void BindController(AAIController* Controller);
     void FinishActiveMove(EJMEnemyMoveStatus Result);
     float ResolveAcceptanceRadius(const FJMEnemyMoveOptions& Options) const;
+    FAIRequestID BeginBackendMove(AActor* TargetActor, const FVector& Destination);
+    void UpdateBackendDestination(const FVector& Destination) { CurrentDestination = Destination; }
 
 private:
 

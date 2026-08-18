@@ -133,6 +133,22 @@ bool UJMEnemyLocomotionComponent::FindEscapeLocation(
     return bFound;
 }
 
+bool UJMEnemyLocomotionComponent::FindRandomReachableLocation(
+    const FVector Center, const float Radius, FVector& OutLocation) const
+{
+    const UWorld* World = GetWorld();
+    UNavigationSystemV1* Navigation = World
+        ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(const_cast<UWorld*>(World)) : nullptr;
+    FNavLocation RandomLocation;
+    if (!Navigation || Radius <= 0.0f ||
+        !Navigation->GetRandomReachablePointInRadius(Center, Radius, RandomLocation))
+    {
+        return false;
+    }
+    OutLocation = RandomLocation.Location;
+    return true;
+}
+
 void UJMEnemyLocomotionComponent::StopMovement()
 {
     AAIController* Controller = BoundController.Get();
@@ -296,6 +312,24 @@ void UJMEnemyLocomotionComponent::FinishActiveMove(const EJMEnemyMoveStatus Resu
     OnMoveFinished.Broadcast(FinishedID, Result, FinishedTarget, FinishedDestination);
     OnMoveFinishedNative.Broadcast(FinishedID, Result, FinishedTarget, FinishedDestination);
     CurrentMoveTarget.Reset();
+}
+
+FAIRequestID UJMEnemyLocomotionComponent::BeginBackendMove(
+    AActor* TargetActor, const FVector& Destination)
+{
+    if (MoveStatus == EJMEnemyMoveStatus::Moving)
+    {
+        StopMovement();
+    }
+    static uint32 NextBackendRequest = 0x80000000u;
+    ++NextBackendRequest;
+    if (NextBackendRequest == MAX_uint32) NextBackendRequest = 0x80000001u;
+    ActiveRequestID = FAIRequestID(NextBackendRequest);
+    CurrentMoveTarget = TargetActor;
+    CurrentDestination = Destination;
+    MoveStatus = EJMEnemyMoveStatus::Moving;
+    OnMoveStarted.Broadcast(ActiveRequestID, TargetActor, Destination);
+    return ActiveRequestID;
 }
 
 float UJMEnemyLocomotionComponent::ResolveAcceptanceRadius(const FJMEnemyMoveOptions& Options) const

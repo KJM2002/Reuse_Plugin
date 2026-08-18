@@ -2,7 +2,7 @@
 
 `JMMonsterFramework` is a standalone Unreal Engine 5.7 runtime plugin for composing data-driven enemy AI.
 
-## Phase 8 surface
+## Phase 9 surface
 
 - `AJMEnemyBase`: minimal framework container
 - `UJMEnemyDefinition`: identity, baseline stats, and initial state
@@ -25,6 +25,7 @@
 - `JM.Enemy.Event.Stimulus`: event-driven wake-up bridge from normalized perception to StateTree
 - `BP_Enemy_Listener`, `DA_Enemy_Listener`, `ST_Listener`, and definition-local movement/melee assets under Plugin Content
 - `BP_Enemy_Watcher`, `DA_Enemy_Watcher`, `ST_Watcher`, and definition-local movement/melee assets under Plugin Content
+- `BP_Enemy_Crawler`, `DA_Enemy_Crawler`, `ST_Crawler`, and definition-local movement/melee/scream assets under Plugin Content
 
 The plugin does not depend on the host game's `P_060715` module or any other JM gameplay plugin. It does not modify or replace existing monsters, controllers, Behavior Trees, or `/Game` assets.
 
@@ -50,3 +51,18 @@ explicitly, sustained gaze cancels the owned move (or current melee) and enters 
 gaze release starts a fresh Chase request, and a 1.5 second LastSeen grace returns the enemy to Patrol. Gaze source
 hand-off remains one continuous observation interval. The framework only exposes sensory facts and generic commands;
 the freeze response exists exclusively in `ST_Watcher`.
+
+## Phase 9 Surface Crawler
+
+`UJMEnemyLocomotion_SurfaceCrawler` is a geometry-driven locomotion backend that preserves the existing movement
+intent API and StateTree tasks. It projects movement onto the attached plane, uses a forward transition trace plus
+one attachment trace during normal movement, aligns Actor Up through interpolated rotation toward the surface normal, and issues the same
+Started/Succeeded/Failed/Aborted request lifecycle as ground movement. Surface loss keeps the last normal for a
+short grace interval, tries bounded radial reacquisition, then fails the request and falls safely.
+
+`AJMSurfaceCrawlerEnemyBase` is a locomotion-only shell required to replace the native default subobject class; it
+contains no behavior rules. `ST_Crawler` owns Roam, Stalk, Flee, Hide, ReApproach, Enrage, FrenzyChase, and Attack.
+Encounter zero plus Gaze selects Flee, while Encounter one or greater plus the same Gaze selects Enrage. Encounter
+count persists after target loss, so rediscovery remains aggressive. Phase 9 supports connected static floor, wall,
+and ceiling geometry in the single-player reference; moving surfaces, arbitrary large-world surface path planning,
+network smoothing, and production collision/animation polish remain out of scope.

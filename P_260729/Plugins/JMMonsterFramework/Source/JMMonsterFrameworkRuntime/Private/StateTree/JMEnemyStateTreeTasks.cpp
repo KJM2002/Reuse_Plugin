@@ -33,6 +33,22 @@ EStateTreeRunStatus FJMStateTreeWaitForTransitionTask::EnterState(
     return EStateTreeRunStatus::Running;
 }
 
+EStateTreeRunStatus FJMStateTreeWaitTask::EnterState(
+    FStateTreeExecutionContext& Context, const FStateTreeTransitionResult&) const
+{
+    FInstanceDataType& Data = Context.GetInstanceData(*this);
+    Data.Elapsed = 0.0f;
+    return Data.Duration <= 0.0f ? EStateTreeRunStatus::Succeeded : EStateTreeRunStatus::Running;
+}
+
+EStateTreeRunStatus FJMStateTreeWaitTask::Tick(
+    FStateTreeExecutionContext& Context, const float DeltaTime) const
+{
+    FInstanceDataType& Data = Context.GetInstanceData(*this);
+    Data.Elapsed += FMath::Max(DeltaTime, 0.0f);
+    return Data.Elapsed >= Data.Duration ? EStateTreeRunStatus::Succeeded : EStateTreeRunStatus::Running;
+}
+
 bool FJMStateTreeSetStateTask::Link(FStateTreeLinker& Linker)
 {
     Linker.LinkExternalData(StateHandle);
@@ -434,15 +450,12 @@ EStateTreeRunStatus FJMStateTreeMoveRandomTask::EnterState(
     UJMEnemyLocomotionComponent& Locomotion = Context.GetExternalData(LocomotionHandle);
     const AActor* Owner = Locomotion.GetOwner();
     UWorld* World = Owner ? Owner->GetWorld() : nullptr;
-    UNavigationSystemV1* Navigation = World ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(World) : nullptr;
-    FNavLocation RandomLocation;
     const FVector Origin = Data.bUseOwnerAsCenter && Owner ? Owner->GetActorLocation() : Data.Center;
-    if (!Navigation || Data.Radius <= 0.0f ||
-        !Navigation->GetRandomReachablePointInRadius(Origin, Data.Radius, RandomLocation))
+    if (!World || Data.Radius <= 0.0f ||
+        !Locomotion.FindRandomReachableLocation(Origin, Data.Radius, Data.ChosenLocation))
     {
         return EStateTreeRunStatus::Failed;
     }
-    Data.ChosenLocation = RandomLocation.Location;
     Data.RequestID = FAIRequestID::InvalidRequest;
     Data.bEntering = true;
     Data.bCompletedDuringEnter = false;

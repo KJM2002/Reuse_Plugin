@@ -6,6 +6,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Core/JMEnemyBase.h"
 #include "Core/JMEnemyDefinition.h"
+#include "Core/JMSurfaceCrawlerEnemyBase.h"
 #include "Engine/Blueprint.h"
 #include "Engine/SimpleConstructionScript.h"
 #include "Engine/SCS_Node.h"
@@ -570,6 +571,343 @@ namespace JMWatcherAssets
     }
 }
 
+namespace JMCrawlerAssets
+{
+    constexpr TCHAR RootPath[] = TEXT("/JMMonsterFramework/Reference/Crawler");
+
+    template<typename T>
+    T* CreateAsset(const TCHAR* Name)
+    {
+        const FString PackageName = FString::Printf(TEXT("%s/%s"), RootPath, Name);
+        const FString ObjectPath = FString::Printf(TEXT("%s.%s"), *PackageName, Name);
+        if (T* Existing = LoadObject<T>(nullptr, *ObjectPath)) return Existing;
+        UPackage* Package = CreatePackage(*PackageName);
+        if (T* Existing = FindObject<T>(Package, Name)) return Existing;
+        T* Asset = NewObject<T>(Package, T::StaticClass(), Name, RF_Public | RF_Standalone | RF_Transactional);
+        FAssetRegistryModule::AssetCreated(Asset);
+        return Asset;
+    }
+
+    bool SaveAsset(UObject* Asset)
+    {
+        if (!Asset) return false;
+        UPackage* Package = Asset->GetOutermost();
+        Package->MarkPackageDirty();
+        const FString Filename = FPackageName::LongPackageNameToFilename(
+            Package->GetName(), FPackageName::GetAssetPackageExtension());
+        FSavePackageArgs Args;
+        Args.TopLevelFlags = RF_Public | RF_Standalone;
+        Args.SaveFlags = SAVE_NoError;
+        return UPackage::SavePackage(Package, Asset, *Filename, Args);
+    }
+
+    template<typename T>
+    void SetState(UStateTreeState& State, const FGameplayTag Tag)
+    {
+        State.AddTask<T>().GetInstanceData().State = Tag;
+    }
+
+    void SetProfile(UStateTreeState& State, const FName Profile)
+    {
+        State.AddTask<FJMStateTreeMovementProfileTask>().GetInstanceData().ProfileName = Profile;
+    }
+
+    FStateTreeTransition& TickTo(UStateTreeState& From, UStateTreeState& To,
+        const EStateTreeTransitionPriority Priority = EStateTreeTransitionPriority::Normal)
+    {
+        FStateTreeTransition& Transition = From.AddTransition(
+            EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &To);
+        Transition.Priority = Priority;
+        return Transition;
+    }
+
+    FStateTreeTransition& StimulusTo(UStateTreeState& From, UStateTreeState& To,
+        const EStateTreeTransitionPriority Priority = EStateTreeTransitionPriority::Normal)
+    {
+        FStateTreeTransition& Transition = From.AddTransition(
+            EStateTreeTransitionTrigger::OnEvent, JMEnemyTags::Event_Stimulus,
+            EStateTreeTransitionType::GotoState, &To);
+        Transition.Priority = Priority;
+        return Transition;
+    }
+
+    FStateTreeTransition& CompletedTo(UStateTreeState& From, UStateTreeState& To,
+        const EStateTreeTransitionTrigger Trigger = EStateTreeTransitionTrigger::OnStateSucceeded)
+    {
+        return From.AddTransition(Trigger, EStateTreeTransitionType::GotoState, &To);
+    }
+
+    void ConfigureGaze(FJMStateTreeGazeInstanceData& Data)
+    {
+        Data.MinimumStrength = 0.85f;
+        Data.MinimumDuration = 0.05f;
+    }
+
+    void AddTargetLost(UStateTreeState& From, UStateTreeState& Roam,
+        const EStateTreeTransitionPriority Priority = EStateTreeTransitionPriority::Normal)
+    {
+        auto& Lost = TickTo(From, Roam, Priority).AddCondition<FJMStateTreeRecentVisionCondition>();
+        Lost.GetInstanceData().MaximumAge = 2.0f;
+        Lost.GetInstanceData().bInvert = true;
+    }
+
+    void AddEncounterGaze(UStateTreeEditorData& EditorData, UStateTreeState& From,
+        UStateTreeState& Destination, const EJMStateTreeCompare Comparison, const int32 Threshold,
+        const EStateTreeTransitionPriority Priority)
+    {
+        FStateTreeTransition& Transition = TickTo(From, Destination, Priority);
+        auto& Gaze = Transition.AddCondition<FJMStateTreeGazeCondition>();
+        ConfigureGaze(Gaze.GetInstanceData());
+        auto& Encounter = Transition.AddCondition<FJMStateTreeEncounterCondition>();
+        Encounter.GetInstanceData().Comparison = Comparison;
+        Encounter.GetInstanceData().Threshold = Threshold;
+    }
+
+    UStateTree* BuildStateTree()
+    {
+        const FName AssetName(TEXT("ST_Crawler"));
+        const FString PackageName = FString::Printf(TEXT("%s/%s"), RootPath, *AssetName.ToString());
+        const FString ObjectPath = FString::Printf(TEXT("%s.%s"), *PackageName, *AssetName.ToString());
+        UStateTree* Tree = LoadObject<UStateTree>(nullptr, *ObjectPath);
+        UPackage* Package = Tree ? Tree->GetOutermost() : CreatePackage(*PackageName);
+        if (!Tree)
+        {
+            UStateTreeFactory* Factory = NewObject<UStateTreeFactory>();
+            Factory->SetSchemaClass(UStateTreeAIComponentSchema::StaticClass());
+            Tree = Cast<UStateTree>(Factory->FactoryCreateNew(UStateTree::StaticClass(), Package, AssetName,
+                RF_Public | RF_Standalone | RF_Transactional, nullptr, GWarn));
+            if (!Tree) return nullptr;
+            FAssetRegistryModule::AssetCreated(Tree);
+        }
+
+        UStateTreeEditorData* EditorData = CastChecked<UStateTreeEditorData>(Tree->EditorData);
+        UStateTreeState& Root = *EditorData->SubTrees[0];
+        EditorData->Evaluators.Reset();
+        EditorData->GlobalTasks.Reset();
+        Root.EnterConditions.Reset();
+        Root.Tasks.Reset();
+        Root.Transitions.Reset();
+        Root.Children.Reset();
+        Root.Name = TEXT("Root");
+        Root.SelectionBehavior = EStateTreeStateSelectionBehavior::TrySelectChildrenInOrder;
+        auto& Context = EditorData->AddEvaluator<FJMStateTreeContextEvaluator>();
+
+        UStateTreeState& Roam = Root.AddChildState(TEXT("Roam"));
+        UStateTreeState& Acquire = Root.AddChildState(TEXT("AcquireTarget"));
+        UStateTreeState& Stalk = Root.AddChildState(TEXT("Stalk"));
+        UStateTreeState& Flee = Root.AddChildState(TEXT("Flee"));
+        UStateTreeState& Hide = Root.AddChildState(TEXT("Hide"));
+        UStateTreeState& ReApproach = Root.AddChildState(TEXT("ReApproach"));
+        UStateTreeState& Enrage = Root.AddChildState(TEXT("Enrage"));
+        UStateTreeState& Frenzy = Root.AddChildState(TEXT("FrenzyChase"));
+        UStateTreeState& Attack = Root.AddChildState(TEXT("Attack"));
+        for (UStateTreeState* State : {&Roam, &Acquire, &Stalk, &Flee, &Hide,
+            &ReApproach, &Enrage, &Frenzy, &Attack})
+        {
+            State->TasksCompletion = EStateTreeTaskCompletionType::All;
+        }
+
+        SetState<FJMStateTreeSetStateTask>(Roam, JMEnemyTags::State_Patrol);
+        SetProfile(Roam, TEXT("Roam"));
+        Roam.AddTask<FJMStateTreeClearTargetTask>();
+        auto& RoamMove = Roam.AddTask<FJMStateTreeMoveRandomTask>();
+        RoamMove.GetInstanceData().Radius = 700.0f;
+        FStateTreeTransition& AcquireTransition = StimulusTo(Roam, Acquire, EStateTreeTransitionPriority::Critical);
+        auto& Visible = AcquireTransition.AddCondition<FJMStateTreeActorVisionCondition>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastSeenSource"), Visible, TEXT("Actor"));
+        auto& Combat = AcquireTransition.AddCondition<FJMStateTreeCombatTargetCondition>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastSeenSource"), Combat, TEXT("Actor"));
+        CompletedTo(Roam, Roam);
+        CompletedTo(Roam, Roam, EStateTreeTransitionTrigger::OnStateFailed);
+
+        auto& SetTarget = Acquire.AddTask<FJMStateTreeSetTargetTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastSeenSource"), SetTarget, TEXT("TargetActor"));
+        CompletedTo(Acquire, Stalk);
+        CompletedTo(Acquire, Roam, EStateTreeTransitionTrigger::OnStateFailed);
+
+        SetState<FJMStateTreeSetStateTask>(Stalk, JMEnemyTags::State_Crawler_Stalk);
+        SetProfile(Stalk, TEXT("Stalk"));
+        auto& StalkMove = Stalk.AddTask<FJMStateTreeMoveToActorTask>();
+        StalkMove.GetInstanceData().Options.AcceptanceRadius = 900.0f;
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), StalkMove, TEXT("TargetActor"));
+        AddEncounterGaze(*EditorData, Stalk, Enrage, EJMStateTreeCompare::GreaterOrEqual, 1,
+            EStateTreeTransitionPriority::Critical);
+        AddEncounterGaze(*EditorData, Stalk, Flee, EJMStateTreeCompare::Equal, 0,
+            EStateTreeTransitionPriority::High);
+        AddTargetLost(Stalk, Roam);
+        CompletedTo(Stalk, Stalk);
+        CompletedTo(Stalk, Roam, EStateTreeTransitionTrigger::OnStateFailed);
+
+        SetState<FJMStateTreeSetStateTask>(Flee, JMEnemyTags::State_Flee);
+        SetProfile(Flee, TEXT("Flee"));
+        auto& Escape = Flee.AddTask<FJMStateTreeFindEscapeTask>();
+        Escape.GetInstanceData().EscapeDistance = 1200.0f;
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), Escape, TEXT("ThreatActor"));
+        auto& EscapeMove = Flee.AddTask<FJMStateTreeMoveToLocationTask>();
+        EditorData->AddPropertyBinding(Escape, TEXT("EscapeLocation"), EscapeMove, TEXT("Location"));
+        CompletedTo(Flee, Hide, EStateTreeTransitionTrigger::OnStateCompleted);
+        CompletedTo(Flee, Hide, EStateTreeTransitionTrigger::OnStateFailed);
+
+        SetState<FJMStateTreeSetStateTask>(Hide, JMEnemyTags::State_Hide);
+        Hide.AddTask<FJMStateTreeStopMovementTask>();
+        Hide.AddTask<FJMStateTreeIncrementEncounterTask>();
+        auto& HideWait = Hide.AddTask<FJMStateTreeWaitTask>();
+        HideWait.GetInstanceData().Duration = 3.0f;
+        CompletedTo(Hide, ReApproach, EStateTreeTransitionTrigger::OnStateCompleted);
+
+        SetState<FJMStateTreeSetStateTask>(ReApproach, JMEnemyTags::State_Crawler_ReApproach);
+        SetProfile(ReApproach, TEXT("ReApproach"));
+        auto& ReturnMove = ReApproach.AddTask<FJMStateTreeMoveToActorTask>();
+        ReturnMove.GetInstanceData().Options.AcceptanceRadius = 900.0f;
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), ReturnMove, TEXT("TargetActor"));
+        AddEncounterGaze(*EditorData, ReApproach, Enrage, EJMStateTreeCompare::GreaterOrEqual, 1,
+            EStateTreeTransitionPriority::Critical);
+        AddTargetLost(ReApproach, Roam);
+        CompletedTo(ReApproach, ReApproach);
+        CompletedTo(ReApproach, Roam, EStateTreeTransitionTrigger::OnStateFailed);
+
+        SetState<FJMStateTreeSetStateTask>(Enrage, JMEnemyTags::State_Enraged);
+        Enrage.AddTask<FJMStateTreeStopMovementTask>();
+        SetProfile(Enrage, TEXT("Frenzy"));
+        auto& Scream = Enrage.AddTask<FJMStateTreeExecuteActionTask>();
+        Scream.GetInstanceData().ActionId = JMEnemyTags::Action_Scream;
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), Scream, TEXT("TargetActor"));
+        CompletedTo(Enrage, Frenzy, EStateTreeTransitionTrigger::OnStateCompleted);
+        CompletedTo(Enrage, Frenzy, EStateTreeTransitionTrigger::OnStateFailed);
+
+        SetState<FJMStateTreeSetStateTask>(Frenzy, JMEnemyTags::State_Crawler_FrenzyChase);
+        SetProfile(Frenzy, TEXT("Frenzy"));
+        auto& FrenzyMove = Frenzy.AddTask<FJMStateTreeMoveToActorTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), FrenzyMove, TEXT("TargetActor"));
+        auto& AttackReady = TickTo(Frenzy, Attack, EStateTreeTransitionPriority::Critical)
+            .AddCondition<FJMStateTreeActionReadyCondition>();
+        AttackReady.GetInstanceData().ActionId = JMEnemyTags::Action_Melee;
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), AttackReady, TEXT("TargetActor"));
+        AddTargetLost(Frenzy, Roam, EStateTreeTransitionPriority::High);
+        CompletedTo(Frenzy, Frenzy);
+        CompletedTo(Frenzy, Roam, EStateTreeTransitionTrigger::OnStateFailed);
+
+        SetState<FJMStateTreeSetStateTask>(Attack, JMEnemyTags::State_Attack);
+        Attack.AddTask<FJMStateTreeStopMovementTask>();
+        auto& Face = Attack.AddTask<FJMStateTreeFaceActorTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), Face, TEXT("TargetActor"));
+        auto& Melee = Attack.AddTask<FJMStateTreeExecuteActionTask>();
+        Melee.GetInstanceData().ActionId = JMEnemyTags::Action_Melee;
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), Melee, TEXT("TargetActor"));
+        AddTargetLost(Attack, Roam, EStateTreeTransitionPriority::Critical);
+        CompletedTo(Attack, Frenzy, EStateTreeTransitionTrigger::OnStateCompleted);
+        CompletedTo(Attack, Frenzy, EStateTreeTransitionTrigger::OnStateFailed);
+
+        FStateTreeCompilerLog Log;
+        if (!UStateTreeEditingSubsystem::CompileStateTree(Tree, Log))
+        {
+            UE_LOG(LogTemp, Error, TEXT("Failed to compile ST_Crawler"));
+            return nullptr;
+        }
+        return Tree;
+    }
+
+    UBlueprint* BuildBlueprint(UJMEnemyDefinition* Definition)
+    {
+        const FName AssetName(TEXT("BP_Enemy_Crawler"));
+        const FString PackageName = FString::Printf(TEXT("%s/%s"), RootPath, *AssetName.ToString());
+        const FString ObjectPath = FString::Printf(TEXT("%s.%s"), *PackageName, *AssetName.ToString());
+        UPackage* Package = CreatePackage(*PackageName);
+        UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *ObjectPath);
+        if (!Blueprint) Blueprint = FindObject<UBlueprint>(Package, AssetName.ToString());
+        if (!Blueprint)
+        {
+            Blueprint = FKismetEditorUtilities::CreateBlueprint(AJMSurfaceCrawlerEnemyBase::StaticClass(), Package,
+                AssetName, BPTYPE_Normal, UBlueprint::StaticClass(), UBlueprintGeneratedClass::StaticClass(),
+                FName(TEXT("JMCrawlerReferenceBuilder")));
+            FAssetRegistryModule::AssetCreated(Blueprint);
+        }
+        if (!Blueprint || !Blueprint->GeneratedClass) return nullptr;
+        if (Blueprint->SimpleConstructionScript && Blueprint->SimpleConstructionScript->GetAllNodes().IsEmpty())
+        {
+            USCS_Node* Node = Blueprint->SimpleConstructionScript->CreateNode(
+                UStaticMeshComponent::StaticClass(), TEXT("CrawlerPlaceholder"));
+            if (UStaticMeshComponent* Mesh = Cast<UStaticMeshComponent>(Node->ComponentTemplate))
+            {
+                Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere")));
+                Mesh->SetRelativeScale3D(FVector(1.1f, 0.55f, 0.35f));
+            }
+            Blueprint->SimpleConstructionScript->AddNode(Node);
+        }
+        FObjectProperty* DefinitionProperty = FindFProperty<FObjectProperty>(AJMEnemyBase::StaticClass(), TEXT("EnemyDefinition"));
+        AJMEnemyBase* CDO = Cast<AJMEnemyBase>(Blueprint->GeneratedClass->GetDefaultObject());
+        if (CDO && DefinitionProperty)
+        {
+            Blueprint->Modify();
+            CDO->Modify();
+            DefinitionProperty->SetObjectPropertyValue_InContainer(CDO, Definition);
+        }
+        FKismetEditorUtilities::CompileBlueprint(Blueprint);
+        CDO = Blueprint->GeneratedClass ? Cast<AJMEnemyBase>(Blueprint->GeneratedClass->GetDefaultObject()) : nullptr;
+        if (CDO && DefinitionProperty) DefinitionProperty->SetObjectPropertyValue_InContainer(CDO, Definition);
+        return Blueprint;
+    }
+
+    bool BuildAndSave()
+    {
+        UJMEnemyMovementSet* Movement = CreateAsset<UJMEnemyMovementSet>(TEXT("DA_Crawler_Movement"));
+        Movement->Profiles.Reset();
+        auto AddProfile = [Movement](const FName Name, const float Speed)
+        {
+            FJMEnemyMovementProfile Profile;
+            Profile.ProfileName = Name;
+            Profile.MaxSpeed = Speed;
+            Profile.MaxAcceleration = 2400.0f;
+            Profile.AcceptanceRadius = 75.0f;
+            Movement->Profiles.Add(Profile);
+        };
+        AddProfile(TEXT("Roam"), 220.0f);
+        AddProfile(TEXT("Stalk"), 300.0f);
+        AddProfile(TEXT("Flee"), 650.0f);
+        AddProfile(TEXT("ReApproach"), 350.0f);
+        AddProfile(TEXT("Frenzy"), 1000.0f);
+
+        UJMEnemyActionDefinition_Melee* Melee = CreateAsset<UJMEnemyActionDefinition_Melee>(TEXT("DA_Crawler_Melee"));
+        Melee->Damage = 30.0f;
+        Melee->AttackRange = 175.0f;
+        Melee->WindupDuration = 0.25f;
+        Melee->ActiveDuration = 0.1f;
+        Melee->RecoveryDuration = 0.3f;
+        Melee->Cooldown = 0.5f;
+        UJMEnemyActionDefinition_Scream* Scream = CreateAsset<UJMEnemyActionDefinition_Scream>(TEXT("DA_Crawler_Scream"));
+        Scream->WindupDuration = 0.2f;
+        Scream->ActiveDuration = 0.5f;
+        Scream->RecoveryDuration = 0.3f;
+        Scream->Cooldown = 1.0f;
+
+        UStateTree* StateTree = BuildStateTree();
+        UJMEnemyDefinition* Definition = CreateAsset<UJMEnemyDefinition>(TEXT("DA_Enemy_Crawler"));
+        Definition->EnemyId = TEXT("Crawler.Reference");
+        Definition->DisplayName = FText::FromString(TEXT("Crawler Reference Enemy"));
+        Definition->MaxHealth = 90.0f;
+        Definition->BaseDamage = 30.0f;
+        Definition->InitialState = JMEnemyTags::State_Patrol;
+        Definition->Perception.Vision.bEnabled = true;
+        Definition->Perception.Vision.SightRadius = 2400.0f;
+        Definition->Perception.Vision.LoseSightRadius = 2800.0f;
+        Definition->Perception.Hearing.bEnabled = false;
+        Definition->Perception.PlayerGaze.bEnabled = true;
+        Definition->Perception.PlayerGaze.UpdateInterval = 0.05f;
+        Definition->Perception.PlayerGaze.MaximumDistance = 2800.0f;
+        Definition->Perception.PlayerGaze.DotThreshold = 0.85f;
+        Definition->MovementSet = Movement;
+        Definition->DefaultMovementProfile = TEXT("Roam");
+        Definition->Actions = {Melee, Scream};
+        Definition->StateTree = StateTree;
+        UBlueprint* Blueprint = BuildBlueprint(Definition);
+
+        const bool bSaved = SaveAsset(Movement) && SaveAsset(Melee) && SaveAsset(Scream) &&
+            SaveAsset(StateTree) && SaveAsset(Definition) && SaveAsset(Blueprint);
+        UE_LOG(LogTemp, Display, TEXT("JM_CRAWLER_REFERENCE_ASSETS=%s"), bSaved ? TEXT("SUCCESS") : TEXT("FAILED"));
+        return bSaved;
+    }
+}
+
 UJMMonsterFrameworkBuildReferenceAssetsCommandlet::UJMMonsterFrameworkBuildReferenceAssetsCommandlet()
 {
     IsClient = false;
@@ -633,5 +971,6 @@ int32 UJMMonsterFrameworkBuildReferenceAssetsCommandlet::Main(const FString& Par
     const bool bSaved = bMovementSaved && bMeleeSaved && bTreeSaved && bDefinitionSaved && bBlueprintSaved;
     UE_LOG(LogTemp, Display, TEXT("JM_LISTENER_REFERENCE_ASSETS=%s"), bSaved ? TEXT("SUCCESS") : TEXT("FAILED"));
     const bool bWatcherSaved = JMWatcherAssets::BuildAndSave();
-    return bSaved && bWatcherSaved ? 0 : 1;
+    const bool bCrawlerSaved = JMCrawlerAssets::BuildAndSave();
+    return bSaved && bWatcherSaved && bCrawlerSaved ? 0 : 1;
 }
