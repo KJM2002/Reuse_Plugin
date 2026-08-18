@@ -1,0 +1,346 @@
+#include "Reference/JMMonsterFrameworkBuildReferenceAssetsCommandlet.h"
+
+#include "Action/JMEnemyActionDefinition.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Components/StateTreeAIComponentSchema.h"
+#include "Components/StaticMeshComponent.h"
+#include "Core/JMEnemyBase.h"
+#include "Core/JMEnemyDefinition.h"
+#include "Engine/Blueprint.h"
+#include "Engine/SimpleConstructionScript.h"
+#include "Engine/SCS_Node.h"
+#include "Engine/StaticMesh.h"
+#include "Kismet2/KismetEditorUtilities.h"
+#include "Locomotion/JMEnemyMovementSet.h"
+#include "StateTree.h"
+#include "StateTreeCompilerLog.h"
+#include "StateTreeEditingSubsystem.h"
+#include "StateTreeEditorData.h"
+#include "StateTreeFactory.h"
+#include "StateTree/JMEnemyStateTreeConditions.h"
+#include "StateTree/JMEnemyStateTreeTasks.h"
+#include "Types/JMEnemyTags.h"
+#include "UObject/SavePackage.h"
+
+namespace JMListenerAssets
+{
+    constexpr TCHAR RootPath[] = TEXT("/JMMonsterFramework/Reference/Listener");
+
+    template<typename T>
+    T* CreateAsset(const TCHAR* Name)
+    {
+        const FString PackageName = FString::Printf(TEXT("%s/%s"), RootPath, Name);
+        const FString ObjectPath = FString::Printf(TEXT("%s.%s"), *PackageName, Name);
+        if (T* Existing = LoadObject<T>(nullptr, *ObjectPath))
+        {
+            return Existing;
+        }
+        UPackage* Package = CreatePackage(*PackageName);
+        if (T* Existing = FindObject<T>(Package, Name))
+        {
+            return Existing;
+        }
+        T* Asset = NewObject<T>(Package, T::StaticClass(), Name, RF_Public | RF_Standalone | RF_Transactional);
+        FAssetRegistryModule::AssetCreated(Asset);
+        return Asset;
+    }
+
+    bool SaveAsset(UObject* Asset)
+    {
+        if (!Asset) return false;
+        UPackage* Package = Asset->GetOutermost();
+        Package->MarkPackageDirty();
+        const FString Filename = FPackageName::LongPackageNameToFilename(
+            Package->GetName(), FPackageName::GetAssetPackageExtension());
+        FSavePackageArgs Args;
+        Args.TopLevelFlags = RF_Public | RF_Standalone;
+        Args.SaveFlags = SAVE_NoError;
+        return UPackage::SavePackage(Package, Asset, *Filename, Args);
+    }
+
+    template<typename T>
+    void SetStateTask(UStateTreeState& State, const FGameplayTag Tag)
+    {
+        auto& Node = State.AddTask<T>();
+        Node.GetInstanceData().State = Tag;
+    }
+
+    void SetProfileTask(UStateTreeState& State, const FName Profile)
+    {
+        auto& Node = State.AddTask<FJMStateTreeMovementProfileTask>();
+        Node.GetInstanceData().ProfileName = Profile;
+    }
+
+    FStateTreeTransition& TickTo(UStateTreeState& From, UStateTreeState& To,
+        const EStateTreeTransitionPriority Priority = EStateTreeTransitionPriority::Normal)
+    {
+        FStateTreeTransition& Transition = From.AddTransition(
+            EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &To);
+        Transition.Priority = Priority;
+        return Transition;
+    }
+
+    FStateTreeTransition& StimulusTo(UStateTreeState& From, UStateTreeState& To,
+        const EStateTreeTransitionPriority Priority = EStateTreeTransitionPriority::Normal)
+    {
+        FStateTreeTransition& Transition = From.AddTransition(
+            EStateTreeTransitionTrigger::OnEvent, JMEnemyTags::Event_Stimulus,
+            EStateTreeTransitionType::GotoState, &To);
+        Transition.Priority = Priority;
+        return Transition;
+    }
+
+    FStateTreeTransition& CompletedTo(UStateTreeState& From, UStateTreeState& To,
+        const EStateTreeTransitionTrigger Trigger = EStateTreeTransitionTrigger::OnStateSucceeded)
+    {
+        return From.AddTransition(Trigger, EStateTreeTransitionType::GotoState, &To);
+    }
+
+    UStateTree* BuildStateTree()
+    {
+        const FName AssetName(TEXT("ST_Listener"));
+        const FString PackageName = FString::Printf(TEXT("%s/%s"), RootPath, *AssetName.ToString());
+        const FString ObjectPath = FString::Printf(TEXT("%s.%s"), *PackageName, *AssetName.ToString());
+        UStateTree* Tree = LoadObject<UStateTree>(nullptr, *ObjectPath);
+        UPackage* Package = Tree ? Tree->GetOutermost() : CreatePackage(*PackageName);
+        if (!Tree)
+        {
+            UStateTreeFactory* Factory = NewObject<UStateTreeFactory>();
+            Factory->SetSchemaClass(UStateTreeAIComponentSchema::StaticClass());
+            Tree = Cast<UStateTree>(Factory->FactoryCreateNew(
+                UStateTree::StaticClass(), Package, AssetName, RF_Public | RF_Standalone | RF_Transactional,
+                nullptr, GWarn));
+            if (!Tree) return nullptr;
+            FAssetRegistryModule::AssetCreated(Tree);
+        }
+
+        UStateTreeEditorData* EditorData = CastChecked<UStateTreeEditorData>(Tree->EditorData);
+        UStateTreeState& Root = *EditorData->SubTrees[0];
+        EditorData->Evaluators.Reset();
+        EditorData->GlobalTasks.Reset();
+        Root.EnterConditions.Reset();
+        Root.Tasks.Reset();
+        Root.Transitions.Reset();
+        Root.Children.Reset();
+        Root.Name = TEXT("Root");
+        Root.SelectionBehavior = EStateTreeStateSelectionBehavior::TrySelectChildrenInOrder;
+        auto& Context = EditorData->AddEvaluator<FJMStateTreeContextEvaluator>();
+
+        UStateTreeState& Patrol = Root.AddChildState(TEXT("Patrol"));
+        UStateTreeState& Investigate = Root.AddChildState(TEXT("Investigate"));
+        UStateTreeState& Confirm = Root.AddChildState(TEXT("ConfirmTarget"));
+        UStateTreeState& Chase = Root.AddChildState(TEXT("Chase"));
+        UStateTreeState& Attack = Root.AddChildState(TEXT("Attack"));
+        UStateTreeState& Search = Root.AddChildState(TEXT("Search"));
+        UStateTreeState& SearchAround = Root.AddChildState(TEXT("SearchAround"));
+        for (UStateTreeState* State : {&Patrol, &Investigate, &Confirm, &Chase, &Attack, &Search, &SearchAround})
+        {
+            State->TasksCompletion = EStateTreeTaskCompletionType::All;
+        }
+
+        SetStateTask<FJMStateTreeSetStateTask>(Patrol, JMEnemyTags::State_Patrol);
+        SetProfileTask(Patrol, TEXT("Patrol"));
+        Patrol.AddTask<FJMStateTreeClearTargetTask>();
+        auto& PatrolMove = Patrol.AddTask<FJMStateTreeMoveRandomTask>();
+        PatrolMove.GetInstanceData().Radius = 900.0f;
+        PatrolMove.GetInstanceData().bUseOwnerAsCenter = true;
+        auto& PatrolHearing = StimulusTo(Patrol, Investigate, EStateTreeTransitionPriority::High)
+            .AddCondition<FJMStateTreeRecentHearingCondition>();
+        PatrolHearing.GetInstanceData().MaximumAge = 1.5f;
+        CompletedTo(Patrol, Patrol);
+        CompletedTo(Patrol, Patrol, EStateTreeTransitionTrigger::OnStateFailed);
+
+        SetStateTask<FJMStateTreeSetStateTask>(Investigate, JMEnemyTags::State_Investigate);
+        SetProfileTask(Investigate, TEXT("Investigate"));
+        auto& InvestigateMove = Investigate.AddTask<FJMStateTreeMoveToLocationTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastHeardLocation"), InvestigateMove, TEXT("Location"));
+        FStateTreeTransition& ConfirmTransition = StimulusTo(Investigate, Confirm, EStateTreeTransitionPriority::High);
+        auto& ConfirmRecent = ConfirmTransition.AddCondition<FJMStateTreeRecentHearingCondition>();
+        ConfirmRecent.GetInstanceData().MaximumAge = 2.0f;
+        auto& CombatTarget = ConfirmTransition.AddCondition<FJMStateTreeCombatTargetCondition>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastHeardSource"), CombatTarget, TEXT("Actor"));
+        auto& ConfirmDistance = ConfirmTransition.AddCondition<FJMStateTreeDistanceCondition>();
+        ConfirmDistance.GetInstanceData().Distance = 900.0f;
+        ConfirmDistance.GetInstanceData().Comparison = EJMStateTreeCompare::LessOrEqual;
+        EditorData->AddPropertyBinding(Context, TEXT("LastHeardSource"), ConfirmDistance, TEXT("TargetActor"));
+        auto& Reinvestigate = CompletedTo(Investigate, Investigate)
+            .AddCondition<FJMStateTreeRecentHearingCondition>();
+        Reinvestigate.GetInstanceData().MaximumAge = 1.5f;
+        CompletedTo(Investigate, Patrol, EStateTreeTransitionTrigger::OnStateCompleted);
+
+        auto& SetTarget = Confirm.AddTask<FJMStateTreeSetTargetTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastHeardSource"), SetTarget, TEXT("TargetActor"));
+        CompletedTo(Confirm, Chase);
+        CompletedTo(Confirm, Investigate, EStateTreeTransitionTrigger::OnStateFailed);
+
+        SetStateTask<FJMStateTreeSetStateTask>(Chase, JMEnemyTags::State_Chase);
+        SetProfileTask(Chase, TEXT("Chase"));
+        auto& ChaseMove = Chase.AddTask<FJMStateTreeMoveToActorTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), ChaseMove, TEXT("TargetActor"));
+        FStateTreeTransition& AttackTransition = TickTo(Chase, Attack, EStateTreeTransitionPriority::Critical);
+        auto& AttackReady = AttackTransition.AddCondition<FJMStateTreeActionReadyCondition>();
+        AttackReady.GetInstanceData().ActionId = JMEnemyTags::Action_Melee;
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), AttackReady, TEXT("TargetActor"));
+        auto& LostTarget = TickTo(Chase, Search, EStateTreeTransitionPriority::High)
+            .AddCondition<FJMStateTreeTargetHearingCondition>();
+        LostTarget.GetInstanceData().MaximumAge = 4.0f;
+        LostTarget.GetInstanceData().bInvert = true;
+        CompletedTo(Chase, Search, EStateTreeTransitionTrigger::OnStateFailed);
+        auto& CompletedAttack = CompletedTo(Chase, Attack)
+            .AddCondition<FJMStateTreeActionReadyCondition>();
+        CompletedAttack.GetInstanceData().ActionId = JMEnemyTags::Action_Melee;
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), CompletedAttack, TEXT("TargetActor"));
+        CompletedTo(Chase, Chase);
+
+        SetStateTask<FJMStateTreeSetStateTask>(Attack, JMEnemyTags::State_Attack);
+        Attack.AddTask<FJMStateTreeStopMovementTask>();
+        auto& Face = Attack.AddTask<FJMStateTreeFaceActorTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), Face, TEXT("TargetActor"));
+        auto& Execute = Attack.AddTask<FJMStateTreeExecuteActionTask>();
+        Execute.GetInstanceData().ActionId = JMEnemyTags::Action_Melee;
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), Execute, TEXT("TargetActor"));
+        CompletedTo(Attack, Chase, EStateTreeTransitionTrigger::OnStateCompleted);
+
+        SetStateTask<FJMStateTreeSetStateTask>(Search, JMEnemyTags::State_Search);
+        SetProfileTask(Search, TEXT("Investigate"));
+        auto& SearchMove = Search.AddTask<FJMStateTreeMoveToLocationTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastKnownLocation"), SearchMove, TEXT("Location"));
+        CompletedTo(Search, SearchAround, EStateTreeTransitionTrigger::OnStateCompleted);
+
+        SetStateTask<FJMStateTreeSetStateTask>(SearchAround, JMEnemyTags::State_Search);
+        SetProfileTask(SearchAround, TEXT("Investigate"));
+        auto& RandomSearch = SearchAround.AddTask<FJMStateTreeMoveRandomTask>();
+        RandomSearch.GetInstanceData().bUseOwnerAsCenter = false;
+        RandomSearch.GetInstanceData().Radius = 650.0f;
+        EditorData->AddPropertyBinding(Context, TEXT("LastKnownLocation"), RandomSearch, TEXT("Center"));
+        auto& SearchTargetSound = StimulusTo(SearchAround, Chase, EStateTreeTransitionPriority::Critical)
+            .AddCondition<FJMStateTreeTargetHearingCondition>();
+        SearchTargetSound.GetInstanceData().MaximumAge = 1.5f;
+        auto& SearchAnySound = StimulusTo(SearchAround, Investigate, EStateTreeTransitionPriority::High)
+            .AddCondition<FJMStateTreeRecentHearingCondition>();
+        SearchAnySound.GetInstanceData().MaximumAge = 1.5f;
+        auto& SearchTimeout = TickTo(SearchAround, Patrol, EStateTreeTransitionPriority::Normal)
+            .AddCondition<FJMStateTreeTargetHearingCondition>();
+        SearchTimeout.GetInstanceData().MaximumAge = 12.0f;
+        SearchTimeout.GetInstanceData().bInvert = true;
+        CompletedTo(SearchAround, SearchAround);
+        CompletedTo(SearchAround, SearchAround, EStateTreeTransitionTrigger::OnStateFailed);
+
+        FStateTreeCompilerLog Log;
+        if (!UStateTreeEditingSubsystem::CompileStateTree(Tree, Log))
+        {
+            UE_LOG(LogTemp, Error, TEXT("Failed to compile ST_Listener"));
+            return nullptr;
+        }
+        return Tree;
+    }
+
+    UBlueprint* BuildBlueprint(UJMEnemyDefinition* Definition)
+    {
+        const FName AssetName(TEXT("BP_Enemy_Listener"));
+        const FString PackageName = FString::Printf(TEXT("%s/%s"), RootPath, *AssetName.ToString());
+        const FString ObjectPath = FString::Printf(TEXT("%s.%s"), *PackageName, *AssetName.ToString());
+        UPackage* Package = CreatePackage(*PackageName);
+        UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *ObjectPath);
+        if (!Blueprint)
+        {
+            Blueprint = FindObject<UBlueprint>(Package, AssetName.ToString());
+        }
+        if (!Blueprint)
+        {
+            Blueprint = FKismetEditorUtilities::CreateBlueprint(AJMEnemyBase::StaticClass(), Package,
+                AssetName, BPTYPE_Normal, UBlueprint::StaticClass(), UBlueprintGeneratedClass::StaticClass(),
+                FName(TEXT("JMListenerReferenceBuilder")));
+            FAssetRegistryModule::AssetCreated(Blueprint);
+        }
+        if (!Blueprint || !Blueprint->GeneratedClass) return nullptr;
+        if (Blueprint->SimpleConstructionScript && Blueprint->SimpleConstructionScript->GetAllNodes().IsEmpty())
+        {
+            USCS_Node* Node = Blueprint->SimpleConstructionScript->CreateNode(
+                UStaticMeshComponent::StaticClass(), TEXT("ListenerPlaceholder"));
+            if (UStaticMeshComponent* Mesh = Cast<UStaticMeshComponent>(Node->ComponentTemplate))
+            {
+                Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")));
+                Mesh->SetRelativeScale3D(FVector(0.65f, 0.65f, 1.6f));
+                Mesh->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
+            }
+            Blueprint->SimpleConstructionScript->AddNode(Node);
+        }
+        FKismetEditorUtilities::CompileBlueprint(Blueprint);
+        AJMEnemyBase* CDO = Cast<AJMEnemyBase>(Blueprint->GeneratedClass->GetDefaultObject());
+        FObjectProperty* DefinitionProperty = FindFProperty<FObjectProperty>(
+            AJMEnemyBase::StaticClass(), TEXT("EnemyDefinition"));
+        if (CDO && DefinitionProperty)
+        {
+            Blueprint->Modify();
+            CDO->Modify();
+            DefinitionProperty->SetObjectPropertyValue_InContainer(CDO, Definition);
+        }
+        return Blueprint;
+    }
+}
+
+UJMMonsterFrameworkBuildReferenceAssetsCommandlet::UJMMonsterFrameworkBuildReferenceAssetsCommandlet()
+{
+    IsClient = false;
+    IsEditor = true;
+    IsServer = false;
+    LogToConsole = true;
+}
+
+int32 UJMMonsterFrameworkBuildReferenceAssetsCommandlet::Main(const FString& Params)
+{
+    using namespace JMListenerAssets;
+    UJMEnemyMovementSet* Movement = CreateAsset<UJMEnemyMovementSet>(TEXT("DA_Listener_Movement"));
+    Movement->Profiles.Reset();
+    auto AddProfile = [Movement](const FName Name, const float Speed)
+    {
+        FJMEnemyMovementProfile Profile;
+        Profile.ProfileName = Name;
+        Profile.MaxSpeed = Speed;
+        Profile.MaxAcceleration = 1600.0f;
+        Profile.AcceptanceRadius = 75.0f;
+        Movement->Profiles.Add(Profile);
+    };
+    AddProfile(TEXT("Patrol"), 350.0f);
+    AddProfile(TEXT("Investigate"), 450.0f);
+    AddProfile(TEXT("Chase"), 650.0f);
+
+    UJMEnemyActionDefinition_Melee* Melee = CreateAsset<UJMEnemyActionDefinition_Melee>(TEXT("DA_Listener_Melee"));
+    Melee->Damage = 25.0f;
+    Melee->AttackRange = 165.0f;
+    Melee->WindupDuration = 0.35f;
+    Melee->ActiveDuration = 0.1f;
+    Melee->RecoveryDuration = 0.4f;
+    Melee->Cooldown = 0.6f;
+
+    UStateTree* StateTree = BuildStateTree();
+    UJMEnemyDefinition* Definition = CreateAsset<UJMEnemyDefinition>(TEXT("DA_Enemy_Listener"));
+    Definition->EnemyId = TEXT("Listener.Reference");
+    Definition->DisplayName = FText::FromString(TEXT("Listener Reference Enemy"));
+    Definition->MaxHealth = 100.0f;
+    Definition->BaseDamage = 25.0f;
+    Definition->InitialState = JMEnemyTags::State_Patrol;
+    Definition->Perception.Vision.bEnabled = false;
+    Definition->Perception.Hearing.bEnabled = true;
+    Definition->Perception.Hearing.HearingRange = 2200.0f;
+    Definition->Perception.Hearing.StimulusMaxAge = 8.0f;
+    Definition->Perception.Hearing.MinimumStrength = 0.2f;
+    Definition->Perception.PlayerGaze.bEnabled = false;
+    Definition->MovementSet = Movement;
+    Definition->DefaultMovementProfile = TEXT("Patrol");
+    Definition->Actions = {Melee};
+    Definition->StateTree = StateTree;
+    UBlueprint* Blueprint = BuildBlueprint(Definition);
+
+    const bool bMovementSaved = SaveAsset(Movement);
+    const bool bMeleeSaved = SaveAsset(Melee);
+    const bool bTreeSaved = SaveAsset(StateTree);
+    const bool bDefinitionSaved = SaveAsset(Definition);
+    const bool bBlueprintSaved = SaveAsset(Blueprint);
+    UE_LOG(LogTemp, Display, TEXT("JM_LISTENER_SAVE Movement=%d Melee=%d Tree=%d Definition=%d Blueprint=%d"),
+        bMovementSaved, bMeleeSaved, bTreeSaved, bDefinitionSaved, bBlueprintSaved);
+    const bool bSaved = bMovementSaved && bMeleeSaved && bTreeSaved && bDefinitionSaved && bBlueprintSaved;
+    UE_LOG(LogTemp, Display, TEXT("JM_LISTENER_REFERENCE_ASSETS=%s"), bSaved ? TEXT("SUCCESS") : TEXT("FAILED"));
+    return bSaved ? 0 : 1;
+}
