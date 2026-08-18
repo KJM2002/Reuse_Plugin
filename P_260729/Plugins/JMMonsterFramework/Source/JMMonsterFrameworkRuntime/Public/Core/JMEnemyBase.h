@@ -5,6 +5,8 @@
 #include "JMEnemyBase.generated.h"
 
 class UJMEnemyDefinition;
+class UJMEnemyAudioComponent;
+class UJMEnemyDebugComponent;
 class UJMEnemyActionComponent;
 class UJMEnemyMemoryComponent;
 class UJMEnemyLocomotionComponent;
@@ -38,6 +40,12 @@ public:
     UFUNCTION(BlueprintPure, Category="JM Enemy|Core")
     UJMEnemyActionComponent* GetEnemyActionComponent() const { return ActionComponent; }
 
+    UFUNCTION(BlueprintPure, Category="JM Enemy|Core")
+    UJMEnemyAudioComponent* GetEnemyAudioComponent() const { return AudioComponent; }
+
+    UFUNCTION(BlueprintPure, Category="JM Enemy|Core")
+    UJMEnemyDebugComponent* GetEnemyDebugComponent() const { return DebugComponent; }
+
     virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent,
         AController* EventInstigator, AActor* DamageCauser) override;
 
@@ -68,6 +76,12 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="JM Enemy|Core")
     TObjectPtr<UJMEnemyActionComponent> ActionComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="JM Monster|Audio")
+    TObjectPtr<UJMEnemyAudioComponent> AudioComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="JM Monster|Debug")
+    TObjectPtr<UJMEnemyDebugComponent> DebugComponent;
 
 #if WITH_EDITOR
     virtual EDataValidationResult IsDataValid(class FDataValidationContext& Context) const override;

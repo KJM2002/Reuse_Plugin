@@ -4,6 +4,7 @@
 #include "Builders/CubeBuilder.h"
 #include "AIController.h"
 #include "Action/JMEnemyActionDefinition.h"
+#include "Audio/JMEnemyAudioSet.h"
 #include "Action/JMEnemyActionComponent.h"
 #include "Core/JMEnemyBase.h"
 #include "Core/JMEnemyAIController.h"
@@ -106,6 +107,10 @@ bool FJMEnemyListenerAssetCompositionTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Listener action is Melee"), Definition->Actions[0] &&
         Definition->Actions[0]->ActionId == JMEnemyTags::Action_Melee);
     TestNotNull(TEXT("Listener StateTree is assigned"), Definition->StateTree.Get());
+    TestTrue(TEXT("Listener audio contract covers Investigate, Chase, and Attack"),
+        Definition->AudioSet && Definition->AudioSet->FindEvent(EJMEnemyAudioEvent::Investigate) &&
+        Definition->AudioSet->FindEvent(EJMEnemyAudioEvent::Chase) &&
+        Definition->AudioSet->FindEvent(EJMEnemyAudioEvent::Attack));
     TestTrue(TEXT("Listener StateTree is compiled and ready"),
         Definition->StateTree && Definition->StateTree->IsReadyToRun());
     TestTrue(TEXT("Reference Blueprint derives from AJMEnemyBase"),

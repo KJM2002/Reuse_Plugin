@@ -2,6 +2,7 @@
 
 #include "Action/JMEnemyActionComponent.h"
 #include "Action/JMEnemyActionDefinition.h"
+#include "Audio/JMEnemyAudioSet.h"
 #include "Builders/CubeBuilder.h"
 #include "Components/BrushComponent.h"
 #include "Core/JMEnemyBase.h"
@@ -87,6 +88,9 @@ bool FJMEnemyWatcherAssetCompositionTest::RunTest(const FString& Parameters)
         Definition->Actions[0]->ActionId == JMEnemyTags::Action_Melee);
     TestTrue(TEXT("Watcher StateTree is compiled and ready"),
         Definition->StateTree && Definition->StateTree->IsReadyToRun());
+    TestTrue(TEXT("Watcher audio contract covers Frozen and Attack"),
+        Definition->AudioSet && Definition->AudioSet->FindEvent(EJMEnemyAudioEvent::Frozen) &&
+        Definition->AudioSet->FindEvent(EJMEnemyAudioEvent::Attack));
     TestTrue(TEXT("Watcher Blueprint directly derives from AJMEnemyBase"),
         Blueprint->GeneratedClass && Blueprint->GeneratedClass->GetSuperClass() == AJMEnemyBase::StaticClass());
     const AJMEnemyBase* CDO = Blueprint->GeneratedClass

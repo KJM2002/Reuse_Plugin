@@ -1,9 +1,11 @@
 #include "Core/JMEnemyBase.h"
 
 #include "Action/JMEnemyActionComponent.h"
+#include "Audio/JMEnemyAudioComponent.h"
 #include "Core/JMEnemyDefinition.h"
 #include "Core/JMEnemyAIController.h"
 #include "JMMonsterFrameworkRuntime.h"
+#include "Debug/JMEnemyDebugComponent.h"
 #include "Locomotion/JMEnemyLocomotionComponent.h"
 #include "Memory/JMEnemyMemoryComponent.h"
 #include "Perception/JMEnemyPerceptionComponent.h"
@@ -25,6 +27,8 @@ AJMEnemyBase::AJMEnemyBase(const FObjectInitializer& ObjectInitializer)
     MemoryComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyMemoryComponent>(this, TEXT("EnemyMemory"));
     LocomotionComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyLocomotionComponent>(this, TEXT("EnemyLocomotion"));
     ActionComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyActionComponent>(this, TEXT("EnemyActions"));
+    AudioComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyAudioComponent>(this, TEXT("EnemyAudio"));
+    DebugComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyDebugComponent>(this, TEXT("EnemyDebug"));
     AIControllerClass = AJMEnemyAIController::StaticClass();
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 }
@@ -62,6 +66,12 @@ void AJMEnemyBase::InitializeEnemy()
     if (EnemyDefinition)
     {
         ApplyDefinition(*EnemyDefinition);
+    }
+
+    if (AudioComponent)
+    {
+        AudioComponent->InitializeAudio(EnemyDefinition ? EnemyDefinition->AudioSet.Get() : nullptr,
+            StateComponent, ActionComponent);
     }
 
     if (PerceptionComponent && MemoryComponent)

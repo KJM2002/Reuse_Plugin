@@ -1,6 +1,7 @@
 #include "Reference/JMMonsterFrameworkBuildReferenceAssetsCommandlet.h"
 
 #include "Action/JMEnemyActionDefinition.h"
+#include "Audio/JMEnemyAudioSet.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Components/StateTreeAIComponentSchema.h"
 #include "Components/StaticMeshComponent.h"
@@ -542,6 +543,14 @@ namespace JMWatcherAssets
         Melee->Cooldown = 0.6f;
 
         UStateTree* StateTree = BuildStateTree();
+        UJMEnemyAudioSet* Audio = CreateAsset<UJMEnemyAudioSet>(TEXT("DA_Watcher_Audio"));
+        Audio->Events.Reset();
+        for (const EJMEnemyAudioEvent Event : {EJMEnemyAudioEvent::Chase, EJMEnemyAudioEvent::Frozen,
+            EJMEnemyAudioEvent::AttackWindup, EJMEnemyAudioEvent::Attack})
+        {
+            FJMEnemyAudioEventEntry& Entry = Audio->Events.AddDefaulted_GetRef();
+            Entry.Event = Event;
+        }
         UJMEnemyDefinition* Definition = CreateAsset<UJMEnemyDefinition>(TEXT("DA_Enemy_Watcher"));
         Definition->EnemyId = TEXT("Watcher.Reference");
         Definition->DisplayName = FText::FromString(TEXT("Watcher Reference Enemy"));
@@ -562,9 +571,10 @@ namespace JMWatcherAssets
         Definition->DefaultMovementProfile = TEXT("Patrol");
         Definition->Actions = {Melee};
         Definition->StateTree = StateTree;
+        Definition->AudioSet = Audio;
         UBlueprint* Blueprint = BuildBlueprint(Definition);
 
-        const bool bSaved = SaveAsset(Movement) && SaveAsset(Melee) && SaveAsset(StateTree) &&
+        const bool bSaved = SaveAsset(Movement) && SaveAsset(Melee) && SaveAsset(Audio) && SaveAsset(StateTree) &&
             SaveAsset(Definition) && SaveAsset(Blueprint);
         UE_LOG(LogTemp, Display, TEXT("JM_WATCHER_REFERENCE_ASSETS=%s"), bSaved ? TEXT("SUCCESS") : TEXT("FAILED"));
         return bSaved;
@@ -881,6 +891,15 @@ namespace JMCrawlerAssets
         Scream->Cooldown = 1.0f;
 
         UStateTree* StateTree = BuildStateTree();
+        UJMEnemyAudioSet* Audio = CreateAsset<UJMEnemyAudioSet>(TEXT("DA_Crawler_Audio"));
+        Audio->Events.Reset();
+        for (const EJMEnemyAudioEvent Event : {EJMEnemyAudioEvent::Flee, EJMEnemyAudioEvent::Enrage,
+            EJMEnemyAudioEvent::Frenzy, EJMEnemyAudioEvent::AttackWindup,
+            EJMEnemyAudioEvent::Attack, EJMEnemyAudioEvent::Scream})
+        {
+            FJMEnemyAudioEventEntry& Entry = Audio->Events.AddDefaulted_GetRef();
+            Entry.Event = Event;
+        }
         UJMEnemyDefinition* Definition = CreateAsset<UJMEnemyDefinition>(TEXT("DA_Enemy_Crawler"));
         Definition->EnemyId = TEXT("Crawler.Reference");
         Definition->DisplayName = FText::FromString(TEXT("Crawler Reference Enemy"));
@@ -899,9 +918,10 @@ namespace JMCrawlerAssets
         Definition->DefaultMovementProfile = TEXT("Roam");
         Definition->Actions = {Melee, Scream};
         Definition->StateTree = StateTree;
+        Definition->AudioSet = Audio;
         UBlueprint* Blueprint = BuildBlueprint(Definition);
 
-        const bool bSaved = SaveAsset(Movement) && SaveAsset(Melee) && SaveAsset(Scream) &&
+        const bool bSaved = SaveAsset(Movement) && SaveAsset(Melee) && SaveAsset(Scream) && SaveAsset(Audio) &&
             SaveAsset(StateTree) && SaveAsset(Definition) && SaveAsset(Blueprint);
         UE_LOG(LogTemp, Display, TEXT("JM_CRAWLER_REFERENCE_ASSETS=%s"), bSaved ? TEXT("SUCCESS") : TEXT("FAILED"));
         return bSaved;
@@ -943,6 +963,14 @@ int32 UJMMonsterFrameworkBuildReferenceAssetsCommandlet::Main(const FString& Par
     Melee->Cooldown = 0.6f;
 
     UStateTree* StateTree = BuildStateTree();
+    UJMEnemyAudioSet* Audio = CreateAsset<UJMEnemyAudioSet>(TEXT("DA_Listener_Audio"));
+    Audio->Events.Reset();
+    for (const EJMEnemyAudioEvent Event : {EJMEnemyAudioEvent::Investigate, EJMEnemyAudioEvent::Chase,
+        EJMEnemyAudioEvent::AttackWindup, EJMEnemyAudioEvent::Attack})
+    {
+        FJMEnemyAudioEventEntry& Entry = Audio->Events.AddDefaulted_GetRef();
+        Entry.Event = Event;
+    }
     UJMEnemyDefinition* Definition = CreateAsset<UJMEnemyDefinition>(TEXT("DA_Enemy_Listener"));
     Definition->EnemyId = TEXT("Listener.Reference");
     Definition->DisplayName = FText::FromString(TEXT("Listener Reference Enemy"));
@@ -959,16 +987,18 @@ int32 UJMMonsterFrameworkBuildReferenceAssetsCommandlet::Main(const FString& Par
     Definition->DefaultMovementProfile = TEXT("Patrol");
     Definition->Actions = {Melee};
     Definition->StateTree = StateTree;
+    Definition->AudioSet = Audio;
     UBlueprint* Blueprint = BuildBlueprint(Definition);
 
     const bool bMovementSaved = SaveAsset(Movement);
     const bool bMeleeSaved = SaveAsset(Melee);
     const bool bTreeSaved = SaveAsset(StateTree);
+    const bool bAudioSaved = SaveAsset(Audio);
     const bool bDefinitionSaved = SaveAsset(Definition);
     const bool bBlueprintSaved = SaveAsset(Blueprint);
     UE_LOG(LogTemp, Display, TEXT("JM_LISTENER_SAVE Movement=%d Melee=%d Tree=%d Definition=%d Blueprint=%d"),
         bMovementSaved, bMeleeSaved, bTreeSaved, bDefinitionSaved, bBlueprintSaved);
-    const bool bSaved = bMovementSaved && bMeleeSaved && bTreeSaved && bDefinitionSaved && bBlueprintSaved;
+    const bool bSaved = bMovementSaved && bMeleeSaved && bAudioSaved && bTreeSaved && bDefinitionSaved && bBlueprintSaved;
     UE_LOG(LogTemp, Display, TEXT("JM_LISTENER_REFERENCE_ASSETS=%s"), bSaved ? TEXT("SUCCESS") : TEXT("FAILED"));
     const bool bWatcherSaved = JMWatcherAssets::BuildAndSave();
     const bool bCrawlerSaved = JMCrawlerAssets::BuildAndSave();

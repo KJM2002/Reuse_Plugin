@@ -2,6 +2,7 @@
 
 #include "Action/JMEnemyActionComponent.h"
 #include "Action/JMEnemyActionDefinition.h"
+#include "Audio/JMEnemyAudioSet.h"
 #include "Components/CapsuleComponent.h"
 #include "Core/JMEnemyAIController.h"
 #include "Core/JMEnemyBase.h"
@@ -124,6 +125,10 @@ bool FJMEnemyCrawlerAssetCompositionTest::RunTest(const FString& Parameters)
         Definition->Actions[1]->ActionId == JMEnemyTags::Action_Scream);
     TestTrue(TEXT("Crawler StateTree is compile-ready"),
         Definition->StateTree && Definition->StateTree->IsReadyToRun());
+    TestTrue(TEXT("Crawler audio contract covers Enrage, Scream, and Frenzy"),
+        Definition->AudioSet && Definition->AudioSet->FindEvent(EJMEnemyAudioEvent::Enrage) &&
+        Definition->AudioSet->FindEvent(EJMEnemyAudioEvent::Scream) &&
+        Definition->AudioSet->FindEvent(EJMEnemyAudioEvent::Frenzy));
     TestTrue(TEXT("Crawler Blueprint uses only the locomotion shell"),
         Blueprint->GeneratedClass && Blueprint->GeneratedClass->GetSuperClass() ==
             AJMSurfaceCrawlerEnemyBase::StaticClass());
@@ -183,7 +188,8 @@ bool FJMEnemySurfaceCrawlerLocomotionTest::RunTest(const FString& Parameters)
         return false;
     }
     JMCrawlerReferenceTests::StopStateTree(*Crawler);
-    Crawler->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    TestTrue(TEXT("Production fixture keeps crawler capsule collision enabled"),
+        Crawler->GetCapsuleComponent()->GetCollisionEnabled() != ECollisionEnabled::NoCollision);
     UJMEnemyLocomotion_SurfaceCrawler* Surface = Cast<UJMEnemyLocomotion_SurfaceCrawler>(
         Crawler->GetEnemyLocomotionComponent());
     TestNotNull(TEXT("Surface backend is active"), Surface);
@@ -220,6 +226,36 @@ bool FJMEnemySurfaceCrawlerLocomotionTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Final orientation up follows ceiling normal"),
         FVector::DotProduct(Crawler->GetActorUpVector(), FVector::DownVector) > 0.75f);
     TestFalse(TEXT("Surface traversal never creates NaN position"), Crawler->GetActorLocation().ContainsNaN());
+
+    TestEqual(TEXT("Ceiling edge request starts with collision enabled"),
+        Surface->MoveToLocation(FVector(600.0, 0.0, 422.5), FJMEnemyMoveOptions()),
+        EJMEnemyMoveRequestResult::RequestStarted);
+    bool bSawReturnWall = false;
+    for (int32 Index = 0; Index < 400 && Surface->GetMoveStatus() == EJMEnemyMoveStatus::Moving && !bSawReturnWall; ++Index)
+    {
+        static_cast<UActorComponent*>(Surface)->TickComponent(0.02f, LEVELTICK_All, nullptr);
+        const FVector Normal = Surface->GetCurrentSurfaceNormal();
+        bSawReturnWall |= FMath::Abs(Normal.X) > 0.8f;
+    }
+    TestTrue(TEXT("Crawler transitions Ceiling to Wall"), bSawReturnWall);
+    Surface->StopMovement();
+    TestEqual(TEXT("Stopping during a surface transition aborts safely"),
+        Surface->GetMoveStatus(), EJMEnemyMoveStatus::Aborted);
+
+    TestEqual(TEXT("Wall-to-floor request starts with collision enabled"),
+        Surface->MoveToLocation(FVector(250.0, 0.0, 77.5), FJMEnemyMoveOptions()),
+        EJMEnemyMoveRequestResult::RequestStarted);
+    bool bSawReturnFloor = false;
+    for (int32 Index = 0; Index < 400 && Surface->GetMoveStatus() == EJMEnemyMoveStatus::Moving; ++Index)
+    {
+        static_cast<UActorComponent*>(Surface)->TickComponent(0.02f, LEVELTICK_All, nullptr);
+        bSawReturnFloor |= Surface->GetCurrentSurfaceNormal().Z > 0.8f;
+    }
+    TestTrue(TEXT("Crawler transitions Wall to Floor"), bSawReturnFloor);
+    TestEqual(TEXT("Wall-to-floor collision-on traversal succeeds"),
+        Surface->GetMoveStatus(), EJMEnemyMoveStatus::Succeeded);
+    TestTrue(TEXT("Final orientation up follows floor normal"),
+        FVector::DotProduct(Crawler->GetActorUpVector(), FVector::UpVector) > 0.75f);
 
     const FVector RestartGoal = Crawler->GetActorLocation() + Crawler->GetActorForwardVector() * 350.0f;
     TestEqual(TEXT("A new surface request starts after completion"),

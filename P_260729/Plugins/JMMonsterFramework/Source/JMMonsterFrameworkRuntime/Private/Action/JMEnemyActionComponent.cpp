@@ -123,6 +123,7 @@ void UJMEnemyActionComponent::NotifyActionStarted(UJMEnemyAction& Action)
     {
         SetComponentTickEnabled(Action.NeedsUpdate());
         OnActionStarted.Broadcast(Action.GetActionId(), &Action);
+        OnActionStartedNative.Broadcast(Action.GetActionId(), &Action);
     }
 }
 
@@ -132,6 +133,7 @@ void UJMEnemyActionComponent::NotifyActionPhaseChanged(
     if (CurrentAction == &Action)
     {
         OnActionPhaseChanged.Broadcast(Action.GetActionId(), &Action, PreviousPhase, NewPhase);
+        OnActionPhaseChangedNative.Broadcast(Action.GetActionId(), &Action, PreviousPhase, NewPhase);
     }
 }
 

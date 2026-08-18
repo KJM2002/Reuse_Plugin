@@ -1,9 +1,9 @@
 {
   "FileVersion": 3,
-  "Version": 1,
-  "VersionName": "0.1.0",
+  "Version": 11,
+  "VersionName": "1.1.0",
   "FriendlyName": "JM Monster Framework",
-  "Description": "Reusable, data-driven enemy AI building blocks for Unreal Engine 5.",
+  "Description": "Production-oriented, data-driven enemy AI building blocks with StateTree, validation, debug, audio events, and three reference enemies.",
   "Category": "JM Plugins",
   "CreatedBy": "JM",
   "CanContainContent": true,

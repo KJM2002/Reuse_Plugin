@@ -1,6 +1,7 @@
 #include "Core/JMEnemyDefinition.h"
 
 #include "Action/JMEnemyActionDefinition.h"
+#include "Audio/JMEnemyAudioSet.h"
 #include "Locomotion/JMEnemyMovementSet.h"
 #include "Types/JMEnemyTags.h"
 
@@ -25,6 +26,11 @@ EDataValidationResult UJMEnemyDefinition::IsDataValid(FDataValidationContext& Co
     if (DisplayName.IsEmpty())
     {
         Context.AddWarning(NSLOCTEXT("JMMonsterFramework", "MissingDisplayName", "Display Name is not set."));
+    }
+    if (!StateTree)
+    {
+        Context.AddWarning(NSLOCTEXT("JMMonsterFramework", "MissingStateTree",
+            "No StateTree is assigned. Core systems remain usable, but no framework behavior will run."));
     }
     if (MaxHealth <= 0.0f)
     {
@@ -103,6 +109,17 @@ EDataValidationResult UJMEnemyDefinition::IsDataValid(FDataValidationContext& Co
             Result = EDataValidationResult::Invalid;
         }
         ActionIds.Add(ActionDefinition->ActionId);
+    }
+
+    if (AudioSet)
+    {
+        FDataValidationContext AudioContext;
+        if (AudioSet->IsDataValid(AudioContext) == EDataValidationResult::Invalid)
+        {
+            Context.AddError(NSLOCTEXT("JMMonsterFramework", "InvalidAudioSet",
+                "The selected Audio Set contains invalid or duplicate event entries."));
+            Result = EDataValidationResult::Invalid;
+        }
     }
 
     return Result == EDataValidationResult::NotValidated ? EDataValidationResult::Valid : Result;

@@ -20,6 +20,11 @@ DECLARE_MULTICAST_DELEGATE_TwoParams(
     FJMEnemyActionFinishedNativeSignature, FGameplayTag, UJMEnemyAction*);
 DECLARE_MULTICAST_DELEGATE_TwoParams(
     FJMEnemyActionCancelledNativeSignature, FGameplayTag, UJMEnemyAction*);
+DECLARE_MULTICAST_DELEGATE_TwoParams(
+    FJMEnemyActionStartedNativeSignature, FGameplayTag, UJMEnemyAction*);
+DECLARE_MULTICAST_DELEGATE_FourParams(
+    FJMEnemyActionPhaseChangedNativeSignature, FGameplayTag, UJMEnemyAction*,
+    EJMEnemyActionPhase, EJMEnemyActionPhase);
 
 /** Owns runtime action instances and enforces the single-primary-action V1 policy. */
 UCLASS(ClassGroup=(JMEnemy), meta=(BlueprintSpawnableComponent))
@@ -70,6 +75,8 @@ public:
 
     FJMEnemyActionFinishedNativeSignature OnActionFinishedNative;
     FJMEnemyActionCancelledNativeSignature OnActionCancelledNative;
+    FJMEnemyActionStartedNativeSignature OnActionStartedNative;
+    FJMEnemyActionPhaseChangedNativeSignature OnActionPhaseChangedNative;
 
 protected:
     virtual void TickComponent(float DeltaTime, ELevelTick TickType,
