@@ -1,272 +1,282 @@
 # JMMonsterFramework
 
-Reusable, data-driven enemy AI building blocks for Unreal Engine 5.7. The plugin is standalone: it does not depend
-on the host `P_060715` module, legacy JM AI plugins, or `/Game` content.
+Unreal Engine 5.7용 데이터 기반 재사용형 Enemy AI 빌딩 블록 플러그인입니다. 호스트의 `P_060715` 모듈,
+기존 JM AI 플러그인 및 `/Game` 콘텐츠에 의존하지 않는 독립형 플러그인입니다.
 
-An enemy is a Definition plus Perception, Memory, StateTree, Locomotion, Actions, and optional Presentation. New
-behavior normally means composing existing nodes in a new StateTree; C++ is reserved for a genuinely new sense,
-movement backend, action capability, or reusable node.
+Enemy는 Definition, Perception, Memory, StateTree, Locomotion, Action과 선택적 Presentation의 조합입니다.
+새로운 행동은 일반적으로 기존 노드를 새로운 StateTree에서 조합해 만듭니다. C++ 확장은 실제로 새로운
+감지 능력, 이동 백엔드, 수행 능력 또는 재사용 노드가 필요할 때만 사용합니다.
 
-## Architecture
+## 아키텍처
 
 ```text
-UJMEnemyDefinition ───────────────> immutable system configuration
-        │
+UJMEnemyDefinition ----------------> 변경 불가능한 시스템 설정
+        |
 AJMEnemyBase
-├─ UJMEnemyStateComponent          one GameplayTag state
-├─ UJMEnemyPerceptionComponent     normalized sensory facts
-├─ UJMEnemyMemoryComponent         event-driven history and explicit target
-├─ UJMEnemyLocomotionComponent     movement intent and request lifecycle
-├─ UJMEnemyActionComponent         runtime action instances and cooldowns
-├─ UJMEnemyAudioComponent          optional event-to-sound presentation
-└─ UJMEnemyDebugComponent          opt-in runtime inspection
+|- UJMEnemyStateComponent          단일 GameplayTag 상태
+|- UJMEnemyPerceptionComponent     정규화된 감지 정보
+|- UJMEnemyMemoryComponent         이벤트 기반 기록과 명시적 Target
+|- UJMEnemyLocomotionComponent     이동 의도와 Request 생명주기
+|- UJMEnemyActionComponent         Runtime Action 인스턴스와 Cooldown
+|- UJMEnemyAudioComponent          선택적 Event-to-Sound Presentation
+`- UJMEnemyDebugComponent          선택형 Runtime 디버그
 
 Skeletal Mesh
-└─ UJMEnemyAnimInstance            cached, read-only animation data provider
+`- UJMEnemyAnimInstance            캐시 기반 읽기 전용 Animation 데이터 공급자
 
 AJMEnemyAIController
-├─ UAIPerceptionComponent          Unreal sensing adapter
-└─ UJMEnemyStateTreeComponent      possession-scoped behavior runner
+|- UAIPerceptionComponent          Unreal 감지 어댑터
+`- UJMEnemyStateTreeComponent      Possession 생명주기의 행동 실행기
 
 World -> Perception -> Memory -> StateTree -> State / Locomotion / Action -> Presentation
 ```
 
-Perception and Memory never choose behavior. Locomotion does not know why a destination was selected. Actions do
-not change State automatically. Enemy-specific rules remain in StateTree assets, and DataAssets never hold runtime
-state.
+Perception과 Memory는 행동을 선택하지 않습니다. Locomotion은 목적지가 선택된 이유를 알지 못합니다.
+Action은 State를 자동으로 변경하지 않습니다. Enemy별 규칙은 StateTree Asset에만 존재하며 DataAsset은
+Runtime 상태를 보관하지 않습니다.
 
-## Quick Start
+## 빠른 시작
 
-1. Enable the plugin and show Plugin Content in the Content Browser.
-2. Create a Blueprint derived from `AJMEnemyBase` (or `AJMSurfaceCrawlerEnemyBase` only for surface crawling).
-3. Create a `UJMEnemyDefinition` and assign it to the Blueprint's Enemy Definition property.
-4. Enable the required Vision, Hearing, and/or Player Gaze configuration.
-5. Create/select a `UJMEnemyMovementSet` and a valid default profile.
-6. Add the required `UJMEnemyActionDefinition` assets.
-7. Create a StateTree and compose the provided tasks and conditions.
-8. Optionally assign a `UJMEnemyAudioSet`, validate the assets, and Play.
+1. 플러그인을 활성화하고 Content Browser에서 Plugin Content를 표시합니다.
+2. `AJMEnemyBase` 기반 Blueprint를 만듭니다. Surface Crawler만 `AJMSurfaceCrawlerEnemyBase`를 사용합니다.
+3. `UJMEnemyDefinition`을 만들고 Blueprint의 Enemy Definition 속성에 지정합니다.
+4. 필요한 Vision, Hearing, Player Gaze 설정을 활성화합니다.
+5. `UJMEnemyMovementSet`과 유효한 기본 Movement Profile을 선택합니다.
+6. 필요한 `UJMEnemyActionDefinition` Asset을 추가합니다.
+7. StateTree를 만들고 제공된 Task와 Condition을 조합합니다.
+8. 필요하면 `UJMEnemyAudioSet`을 지정하고 Asset을 검증한 다음 Play합니다.
 
-The editor categories group authoring properties under `JM Monster|Identity`, `Perception`, `Movement`, `Actions`,
-`Behavior`, `Audio`, and `Debug`.
+Editor 속성은 `JM Monster|Identity`, `Perception`, `Movement`, `Actions`, `Behavior`, `Audio`, `Debug`
+Category로 정리되어 있습니다.
 
-## Creating a New Enemy
+## 새로운 Enemy 만들기
 
-Start with the closest reference, identify its senses, movement, actions, and state flow, then compose a new
-Definition and StateTree. If existing building blocks express the design, add no C++.
+가장 가까운 Reference Enemy에서 시작해 감지, 이동, Action, 상태 흐름을 분석한 뒤 새로운 Definition과
+StateTree를 구성합니다. 기존 빌딩 블록으로 설계를 표현할 수 있다면 C++를 추가하지 않습니다.
 
 ```text
-new behavior pattern or state flow -> StateTree
-new tuning value                 -> DataAsset/profile
-new sensing capability           -> Perception extension
-new movement capability          -> Locomotion subclass
-new performed capability         -> Action subclass + Definition
+새로운 행동 패턴 또는 상태 흐름 -> StateTree
+새로운 튜닝 수치              -> DataAsset / Profile
+새로운 감지 능력              -> Perception 확장
+새로운 이동 능력              -> Locomotion Subclass
+새로운 수행 능력              -> Action Subclass + Definition
 ```
 
-Examples: “player gaze causes fleeing” belongs in StateTree; “second encounter enrages” is StateTree plus Memory;
-“crawl on walls” requires a Locomotion backend.
+예를 들어 "플레이어가 보면 도망간다"는 StateTree, "두 번째 조우에서 광폭화한다"는 StateTree와 Memory,
+"벽을 기어 다닌다"는 새로운 Locomotion 백엔드의 책임입니다.
 
 ## Perception
 
-`UJMEnemyPerceptionComponent` normalizes Unreal Vision/Hearing, Player Gaze, Damage, and externally submitted
-observations into `FJMStimulus`. Vision and Hearing are engine-event driven. Gaze runs on the configured interval
-only when enabled. `SubmitPlayerGazeObservation` is the adapter boundary for VR, cameras, tests, or custom viewers.
+`UJMEnemyPerceptionComponent`는 Unreal Vision/Hearing, Player Gaze, Damage 및 외부 Observation을
+`FJMStimulus`로 정규화합니다. Vision과 Hearing은 Engine Event 기반입니다. Gaze는 활성화된 경우에만 설정된
+주기로 실행됩니다. `SubmitPlayerGazeObservation`은 VR, Camera, Test 또는 사용자 정의 Viewer용 어댑터 경계입니다.
 
-To add a sense, translate its result into `FJMStimulus` at the Perception boundary. Do not place target selection or
-state transitions in the sense adapter.
+새 Sense는 결과를 Perception 경계에서 `FJMStimulus`로 변환해 추가합니다. Sense 어댑터에 Target 선택이나
+State 전환을 구현하지 않습니다.
 
 ## Memory
 
-`UJMEnemyMemoryComponent` stores last seen/heard/known positions and times, current visibility, explicit current
-target, and encounter count. It updates from stimuli and emits target changes; StateTree decides how facts are used.
+`UJMEnemyMemoryComponent`는 마지막으로 본/들은/알려진 위치와 시간, 현재 시야 여부, 명시적 Current Target,
+Encounter Count를 저장합니다. Stimulus로 갱신되고 Target 변경을 알리지만, 정보의 사용 방법은 StateTree가 결정합니다.
 
 ## State
 
-`UJMEnemyStateComponent` owns one concrete `JM.Enemy.State.*` tag and emits `OnStateChanged`. State tags are
-observable runtime state, not a replacement behavior graph.
+`UJMEnemyStateComponent`는 하나의 구체적인 `JM.Enemy.State.*` Tag를 소유하고 `OnStateChanged`를 발생시킵니다.
+State Tag는 관찰 가능한 Runtime 상태이며 행동 그래프를 대체하지 않습니다.
 
 ## Locomotion
 
-`UJMEnemyLocomotionComponent` exposes MoveToActor, MoveToLocation, MoveAway, Stop, facing, random reachable point,
-and named profile operations with Started/Succeeded/Failed/Aborted results. Ground movement delegates to UE AI
-navigation and does not tick.
+`UJMEnemyLocomotionComponent`는 MoveToActor, MoveToLocation, MoveAway, Stop, Facing, Random Reachable Point 및
+Named Profile 기능을 제공합니다. 결과는 Started/Succeeded/Failed/Aborted로 정규화됩니다. Ground Movement는
+UE AI Navigation에 위임하며 Tick하지 않습니다.
 
-`UJMEnemyLocomotion_SurfaceCrawler` preserves the same intent API while tracing connected static geometry. It ticks
-only during an active request, normally performs a forward transition trace and one support trace, aligns Actor Up
-to the surface normal, and uses bounded surface-loss recovery before failing safely into Falling.
+`UJMEnemyLocomotion_SurfaceCrawler`는 동일한 이동 의도 API를 유지하면서 연결된 정적 Geometry를 Trace합니다.
+활성 Request가 있을 때만 Tick하고, 일반 이동 중 Forward Transition Trace와 Support Trace를 각각 한 번 수행합니다.
+Actor Up을 Surface Normal에 맞추고 제한된 Surface Loss 복구 후 안전하게 Falling/Failed 상태로 전환합니다.
 
-To add Flying or another backend, subclass the locomotion seam and preserve request identity and completion
-semantics so generic StateTree tasks remain reusable.
+Flying 등 새로운 백엔드는 Locomotion Seam을 Subclass하고 Request ID와 완료 의미를 유지해야 기존 StateTree Task를
+그대로 재사용할 수 있습니다.
 
-## Actions
+## Action
 
-`UJMEnemyActionComponent` creates one runtime `UJMEnemyAction` per immutable Definition and enforces one primary
-action. Windup, Active, Recovery, cancellation, and cooldown are timer-driven; component Tick is enabled only for
-actions that explicitly request updates. Melee and Scream are references. A new performed capability belongs in a
-new Action subclass and immutable Action Definition, not in an enemy class.
+`UJMEnemyActionComponent`는 변경 불가능한 Definition마다 Enemy별 Runtime `UJMEnemyAction`을 만들고 하나의
+Primary Action 정책을 적용합니다. Windup, Active, Recovery, Cancel, Cooldown은 Timer 기반입니다. 명시적으로
+Update를 요청한 Action이 실행 중일 때만 Component Tick이 활성화됩니다. Melee와 Scream은 Reference Action입니다.
+
+새로운 수행 능력은 Enemy Class가 아니라 새로운 Action Subclass와 변경 불가능한 Action Definition에 구현합니다.
 
 ## StateTree
 
-The controller owns and starts the tree for the possession lifetime. Generic tasks cover state, move, facing,
-movement profile, escape, action, encounter, wait, and target commands. Generic conditions query target, recent
-stimuli, sight, gaze, distance, encounter, state, and action readiness. `JM.Enemy.Event.Stimulus` wakes event-driven
-transitions. Add a new node only when a reusable query or command is missing; do not duplicate engine scheduling.
+Controller가 Possession 기간 동안 StateTree를 소유하고 실행합니다. 공통 Task는 State, Move, Facing, Movement
+Profile, Escape, Action, Encounter, Wait, Target 명령을 제공합니다. 공통 Condition은 Target, 최근 Stimulus, Sight,
+Gaze, Distance, Encounter, State, Action Ready 상태를 조회합니다. `JM.Enemy.Event.Stimulus`가 이벤트 기반 전환을
+깨웁니다. 재사용 가능한 Query나 Command가 실제로 없을 때만 새 노드를 추가하며 Engine Scheduling을 복제하지 않습니다.
 
 ## Audio
 
-`UJMEnemyAudioSet` maps presentation events to zero or more sound variants with volume and pitch ranges.
-`UJMEnemyAudioComponent` subscribes to State and Action delegates; AI code and Scream actions contain no Sound
-assets. An empty event entry is a valid placeholder contract.
+`UJMEnemyAudioSet`은 Presentation Event를 Volume/Pitch 범위를 가진 여러 Sound Variant에 연결합니다.
+`UJMEnemyAudioComponent`는 State와 Action Delegate를 구독합니다. AI 코드와 Scream Action은 Sound Asset을 직접
+소유하지 않습니다. Variant가 비어 있는 Event Entry도 유효한 Placeholder Contract입니다.
 
-Current mappings include Investigate, Chase, Flee, Frozen, Enrage, Frenzy, AttackWindup, Attack, Death, and Scream.
-Listener demonstrates Investigate/Chase/Attack, Watcher Frozen/Attack, and Crawler Enrage/Scream/Frenzy. Assign
-sounds to the variants in each reference Audio Set for playback. No Audio Set means no binding or runtime work.
+현재 Investigate, Chase, Flee, Frozen, Enrage, Frenzy, AttackWindup, Attack, Death, Scream Event를 지원합니다.
+Listener는 Investigate/Chase/Attack, Watcher는 Frozen/Attack, Crawler는 Enrage/Scream/Frenzy 연결을 검증합니다.
+재생하려면 각 Reference Audio Set의 Variant에 Sound를 지정합니다. Audio Set이 없으면 Delegate Binding과 Runtime
+작업도 수행하지 않습니다.
 
 ## Animation / Presentation
 
-`UJMEnemyAnimInstance` is the skeleton-independent bridge from framework runtime data to an Animation Blueprint.
-It caches the Enemy, State, Locomotion, and Action references during animation initialization. Each animation update
-only reads lightweight values: world velocity, Actor-local direction, speed, moving/falling flags, current State,
-movement profile, current Action, and Action phase. It performs no component search, sensing, trace, navigation,
-StateTree query, or asset lookup per frame.
+`UJMEnemyAnimInstance`는 Framework Runtime 데이터와 Animation Blueprint 사이의 Skeleton 독립적 경계입니다.
+Animation 초기화 시 Enemy, State, Locomotion, Action 참조를 캐시합니다. Animation Update에서는 World Velocity,
+Actor Local Direction, Speed, Moving/Falling 여부, Current State, Movement Profile, Current Action과 Action Phase만
+읽습니다. 매 Frame Component 검색, Sense, Trace, Navigation, StateTree Query 또는 Asset Lookup을 수행하지 않습니다.
 
 ```text
 StateTree -> State / Locomotion / Action -> UJMEnemyAnimInstance -> AnimBP -> Skeletal Mesh
 ```
 
-Animation is read-only presentation. An AnimBP must not choose targets or write AI State. GameplayTag state data lets
-Listener express Patrol/Investigate/Chase/Search, Watcher select a Frozen pose, and Crawler express Stalk/Flee/
-ReApproach/Enrage/Frenzy without enemy-type booleans or specialized runtime brains.
+Animation은 읽기 전용 Presentation입니다. AnimBP가 Target을 선택하거나 AI State를 변경해서는 안 됩니다.
+GameplayTag State Data만으로 Listener의 Patrol/Investigate/Chase/Search, Watcher의 Frozen Pose, Crawler의
+Stalk/Flee/ReApproach/Enrage/Frenzy를 Enemy Type Boolean이나 전용 Runtime Brain 없이 표현할 수 있습니다.
 
-Ground and SurfaceCrawler use the same local-space locomotion contract. SurfaceCrawler rotates Actor Up to the
-surface normal, so an in-place crawl animation can remain in Actor local space on floors, walls, and ceilings.
-Crawler locomotion should not use general root motion because surface attachment owns the Actor transform.
+Ground와 SurfaceCrawler는 동일한 Local-space Locomotion Contract를 사용합니다. SurfaceCrawler가 Actor Up을
+Surface Normal에 맞추므로 동일한 In-place Crawl Animation을 Floor, Wall, Ceiling에서 사용할 수 있습니다.
+Surface Attachment가 Actor Transform을 소유하므로 Crawler의 일반 이동에는 Root Motion을 사용하지 않는 것이 원칙입니다.
 
-One-shot animation can bind once to the existing Action Component delegates and select a Montage by Action tag.
-`OnActionStarted`, `OnActionPhaseChanged`, `OnActionFinished`, and `OnActionCancelled` remain the event contract;
-there is no duplicate animation lifecycle. The current policy remains:
+One-shot Animation은 기존 Action Component Delegate에 한 번 Bind하고 Action Tag로 Montage를 선택할 수 있습니다.
+`OnActionStarted`, `OnActionPhaseChanged`, `OnActionFinished`, `OnActionCancelled`가 그대로 Event Contract이며
+Animation 전용 생명주기를 중복 구현하지 않습니다.
+
+현재 Timing 소유 정책은 다음과 같습니다.
 
 ```text
-Action timer lifecycle -> gameplay timing and damage
-Montage/AnimBP          -> visual synchronization
+Action Timer Lifecycle -> Gameplay Timing과 Damage
+Montage / AnimBP        -> 시각적 동기화
 ```
 
-Future Notify-driven gameplay timing is possible as a separate extension, but this plugin does not move the stable
-Action timeline or damage ownership into AnimNotify. No `UJMEnemyAnimationSet` is included yet because there are no
-shared Montage assets to deduplicate; an optional Definition-owned set can be added when real content requires it.
+향후 Notify 기반 Gameplay Timing을 별도 확장으로 추가할 수 있지만, 현재의 안정적인 Action Timeline과 Damage
+Ownership을 AnimNotify로 옮기지 않습니다. 공유 Montage Asset이 없어 중복 제거의 실익이 없으므로
+`UJMEnemyAnimationSet`도 아직 추가하지 않았습니다. 실제 Content가 필요로 할 때 선택적 Definition Asset으로 확장합니다.
 
-New Enemy animation workflow:
+새 Enemy Animation 제작 절차:
 
-1. Prepare any Skeletal Mesh/Skeleton; no framework bone names are required.
-2. Create an AnimBP based on `UJMEnemyAnimInstance`.
-3. Build locomotion from Speed and Direction.
-4. Select special poses from CurrentState GameplayTags.
-5. Bind Action lifecycle events and select optional Montages by CurrentAction/phase.
-6. Keep normal locomotion in-place; treat special root-motion Actions as a future explicit integration.
+1. 원하는 Skeletal Mesh/Skeleton을 준비합니다. Framework 전용 Bone 이름은 없습니다.
+2. `UJMEnemyAnimInstance` 기반 AnimBP를 만듭니다.
+3. Speed와 Direction으로 Locomotion을 구성합니다.
+4. CurrentState GameplayTag로 특수 Pose를 선택합니다.
+5. Action Lifecycle Event에 Bind하고 CurrentAction/Phase로 선택적 Montage를 실행합니다.
+6. 일반 이동은 In-place로 유지하고 특수 Root-motion Action은 명시적인 후속 확장으로 취급합니다.
 
-Animation is completely optional. A cube/static placeholder with Definition, StateTree, Locomotion, Actions, and
-Debug can develop and validate the entire AI before a Skeletal Mesh, AnimBP, sequence, Montage, or AnimationSet exists.
+Animation은 완전히 선택 사항입니다. Cube/Static Placeholder와 Definition, StateTree, Locomotion, Action, Debug만으로
+Skeletal Mesh, AnimBP, Sequence, Montage 또는 AnimationSet이 준비되기 전에 AI 전체를 개발하고 검증할 수 있습니다.
 
 ## Debug
 
-Every enemy owns an opt-in `UJMEnemyDebugComponent`. It is disabled and non-ticking by default. In PIE, select one
-enemy and call `SetDebugEnabled(true)`, enable **Enable On Begin Play**, or use the console command:
+모든 Enemy는 선택형 `UJMEnemyDebugComponent`를 소유합니다. 기본값은 비활성 및 Tick OFF입니다. PIE에서 Enemy를
+선택해 `SetDebugEnabled(true)`를 호출하거나 **Enable On Begin Play**를 활성화할 수 있습니다. 전체 Enemy는 다음
+Console Command로 제어합니다.
 
 ```text
 JM.AI.Debug 1
 JM.AI.Debug 0
 ```
 
-The overlay shows enemy/state/target, seen-heard-known memory, visibility and gaze, encounter count, movement
-profile/status/destination/target/request, current action/phase/cooldown, and StateTree status. World primitives show
-vision, hearing, gaze, memory points, move destination, and Crawler attachment/normal/direction. Shipping builds
-force the component off and compile out its drawing path.
+Overlay는 Enemy/State/Target, Seen/Heard/Known Memory, Visibility/Gaze, Encounter Count, Movement Profile/Status/
+Destination/Target/Request, Current Action/Phase/Cooldown, StateTree 상태를 표시합니다. World Primitive는 Vision,
+Hearing, Gaze, Memory Point, Move Destination, Crawler Attachment/Normal/Direction을 표시합니다. Shipping Build에서는
+Component가 강제로 꺼지고 Draw 경로가 Compile-out됩니다.
 
-When a mesh uses `UJMEnemyAnimInstance`, the same overlay also shows AnimInstance class, animation Speed/Direction,
-CurrentAction, and Action phase. A placeholder without an AnimInstance reports `Anim: None` without warning or failure.
+Mesh가 `UJMEnemyAnimInstance`를 사용하면 동일한 Overlay에 AnimInstance Class, Animation Speed/Direction,
+CurrentAction, Action Phase도 표시됩니다. AnimInstance가 없는 Placeholder는 Warning이나 실패 없이 `Anim: None`으로 표시됩니다.
 
-## Reference Enemies
+## Reference Enemy
 
-- **Listener** validates Hearing, evidence investigation without premature targeting, Memory, Chase, Melee, Search,
-  and return to Patrol.
-- **Watcher** validates Vision, Player Gaze, Frozen, movement/action cancellation, gaze release, Chase, and Attack.
-- **Crawler** validates connected static floor/wall/ceiling locomotion, persistent encounter count, shared Gaze,
-  first-gaze Flee, second-gaze Enrage, Scream, Frenzy, and Attack.
+- **Listener**: Hearing, 성급한 Target 지정 없는 증거 조사, Memory, Chase, Melee, Search, Patrol 복귀를 검증합니다.
+- **Watcher**: Vision, Player Gaze, Frozen, Movement/Action Cancel, Gaze 해제, Chase, Attack을 검증합니다.
+- **Crawler**: 연결된 정적 Floor/Wall/Ceiling 이동, 지속되는 Encounter Count, 공통 Gaze, 첫 Gaze Flee,
+  두 번째 Gaze Enrage, Scream, Frenzy, Attack을 검증합니다.
 
-Reference content is consistently located in `Content/Reference/Listener`, `Watcher`, and `Crawler`. Each folder
-contains `BP_Enemy_*`, `DA_Enemy_*`, `ST_*`, Definition-local movement/action assets, and `DA_*_Audio`.
+Reference Content는 `Content/Reference/Listener`, `Watcher`, `Crawler`에 일관되게 배치되어 있습니다. 각 폴더에는
+`BP_Enemy_*`, `DA_Enemy_*`, `ST_*`, Definition별 Movement/Action Asset과 `DA_*_Audio`가 있습니다.
 
-## Testing
+## 테스트
 
-Run the `JM.MonsterFramework` automation group. Tests are grouped as:
+`JM.MonsterFramework` Automation Group을 실행합니다. 테스트는 다음 범주로 나뉩니다.
 
-- Unit: Core state/defaults/validation, stimulus and memory policy, profile lookup, action lifecycle, audio mapping.
-- Animation contract: initialization without assets, State/Frozen data, Action lifecycle data, and local-space
-  SurfaceCrawler displacement data.
-- Integration: Perception-to-Memory composition, StateTree ownership/event bridges, locomotion safe failure.
-- Asset Composition: each Reference Definition, Blueprint, StateTree, profiles/actions, and audio contract.
-- World Vertical Slice: Listener, Watcher, and Crawler building-block behavior flows in transient game worlds.
-- Surface Locomotion: Collision ON capsule traversal across Floor→Wall→Ceiling→Wall→Floor, orientation, request
-  replacement/abort, transition count, and NaN safety against actual static cube geometry.
+- Unit: Core State/Default/Validation, Stimulus와 Memory 정책, Profile 조회, Action Lifecycle, Audio Mapping
+- Animation Contract: Asset 없는 초기화, State/Frozen Data, Action Lifecycle Data, SurfaceCrawler Local-space 이동 Data
+- Integration: Perception-to-Memory 조합, StateTree Ownership/Event Bridge, Locomotion 안전 실패
+- Asset Composition: 각 Reference Definition, Blueprint, StateTree, Profile/Action, Audio Contract
+- World Vertical Slice: Transient Game World의 Listener, Watcher, Crawler 빌딩 블록 행동 흐름
+- Surface Locomotion: Collision ON 상태의 Floor -> Wall -> Ceiling -> Wall -> Floor Capsule 이동, Orientation,
+  Request 교체/Abort, Transition Count, 실제 Static Cube Geometry에서의 NaN 안전성
 
-Automation directly steps some StateTree and transient-world fixtures. It verifies component contracts and graph
-composition; it does not reproduce the full PIE scheduler, animation, player gameplay, sound-mix quality, packaged
-build, moving platforms, multiplayer authority, or a production level's collision complexity. Verify those items in
-the target project's PIE and packaged build.
+Automation은 일부 StateTree와 Transient World Fixture를 직접 Step합니다. Component Contract와 Graph Composition은
+검증하지만 전체 PIE Scheduler, Animation Rendering, Player Gameplay, Sound Mix 품질, Packaged Build, Moving Platform,
+Multiplayer Authority, Production Level의 복잡한 Collision까지 재현하지는 않습니다. 해당 항목은 대상 프로젝트의
+PIE와 Packaged Build에서 별도로 검증해야 합니다.
 
-Reference/test assets can be regenerated in the Editor commandlet environment with:
+Reference/Test Asset은 Editor Commandlet 환경에서 다음 명령으로 재생성할 수 있습니다.
 
 ```text
 UnrealEditor-Cmd.exe <Project>.uproject -run=JMMonsterFrameworkBuildReferenceAssets
 ```
 
-The builder lives in the Editor-only Tests module and is not a shipping Runtime dependency.
+Builder는 Editor 전용 Tests Module에 있으며 Shipping Runtime Dependency가 아닙니다.
 
-## Tick and Performance Policy
+## Tick 및 성능 정책
 
 ```text
 EnemyBase / State / Memory / Ground Locomotion / Audio   OFF
-Perception Vision/Hearing/Damage                          event driven
-Player Gaze                                               configured timer only
-Action                                                     normally OFF; opt-in active action only
-SurfaceCrawler                                             active move only
-StateTree                                                  engine managed
-AnimInstance                                               engine animation update; cached references/value reads
-Debug                                                      OFF unless explicitly enabled
+Perception Vision / Hearing / Damage                     Event 기반
+Player Gaze                                               설정된 Timer만 사용
+Action                                                    기본 OFF, Update 요청 Action 실행 중에만 ON
+SurfaceCrawler                                            Active Move 중에만 ON
+StateTree                                                 Engine 관리
+AnimInstance                                              Engine Animation Update, 캐시 참조와 값 읽기만 수행
+Debug                                                     명시적으로 활성화할 때만 ON
 ```
 
-There are no per-frame logs. Invalid required runtime configuration logs actionable warnings; detailed inspection
-belongs to the opt-in Debug layer.
+Frame 단위 로그는 없습니다. 잘못된 필수 Runtime 설정은 조치 가능한 Warning을 남기고 상세 확인은 선택형 Debug
+Layer가 담당합니다.
 
 ## Data Validation
 
-Validation rejects non-positive health, negative damage, invalid state/action tags, invalid enabled sense ranges,
-invalid gaze interval/distance, incomplete/missing default movement profile, invalid or duplicate movement
-profiles, null/invalid/duplicate Action Definitions, and invalid/duplicate Audio events or variants. Missing
-authoring identity or StateTree is a warning because headless building blocks are supported. Validation does not
-parse StateTree graphs to infer cross-system intent.
+다음 설정을 Error로 검증합니다.
 
-## Known Limitations
+- 0 이하 Health 또는 음수 Damage
+- 잘못된 State/Action Tag
+- 활성화된 Sense의 잘못된 Range
+- 잘못된 Gaze Interval/Distance
+- 불완전하거나 존재하지 않는 기본 Movement Profile
+- 잘못되거나 중복된 Movement Profile
+- Null/Invalid/Duplicate Action Definition
+- 잘못되거나 중복된 Audio Event/Variant
 
-- Single-player reference scope; production replication, authority, and network smoothing are not validated.
-- SurfaceCrawler supports connected static geometry, not arbitrary-surface path planning or moving platforms.
-- `ACharacter` retains its capsule/CharacterMovement assumptions. Collision ON reference geometry is validated,
-  but complex concave corners, narrow passages, dynamic obstacles, and arbitrary capsule orientation require
-  project-specific PIE testing. A custom Pawn/movement solution is the recommended future path if truly arbitrary
-  surface collision is required.
-- Crawler uses placeholder presentation; production Animation Blueprint, root-motion policy, leg IK, and visual
-  corner polish are not included. The common data provider is implemented, but no Montage/sequence is bundled.
-- Audio event contracts are wired, but high-quality sounds/mixing are project content.
-- Legacy `AJMDungeonMonster`, Listener/Hoarder/Blackout implementations are not migrated.
+Authoring Identity 또는 StateTree 누락은 Headless 빌딩 블록 사용을 지원하기 위해 Warning으로 처리합니다.
+StateTree Graph를 Parsing해 Cross-system 의도를 추론하지는 않습니다.
 
-## Future Extensions
+## 알려진 제한 사항
 
-Consider Flying Locomotion, advanced target selection/EQS, multiplayer replication, Gameplay Debugger integration,
-and richer editor tooling only when a concrete project needs them. A Rule layer was an early candidate, but
-Listener, Watcher, and Crawler are fully expressible with StateTree. Add `UJMEnemyRule`/Rule Component only when a
-real global constraint cannot be cleanly represented there.
+- Single-player Reference 범위이며 Production Replication, Authority, Network Smoothing은 검증하지 않았습니다.
+- SurfaceCrawler는 연결된 정적 Geometry를 지원하며 Arbitrary-surface Path Planning과 Moving Platform은 지원하지 않습니다.
+- `ACharacter`의 Capsule/CharacterMovement 전제를 유지합니다. Collision ON Reference Geometry는 검증했지만 복잡한
+  Concave Corner, 좁은 통로, Dynamic Obstacle, 임의 Capsule Orientation은 프로젝트별 PIE 검증이 필요합니다.
+  완전한 Arbitrary-surface Collision이 필요하다면 Custom Pawn/Movement 구현을 권장합니다.
+- Crawler는 Placeholder Presentation을 사용합니다. Production AnimBP, Root-motion 정책, Leg IK, Corner 시각 보정은
+  포함하지 않습니다. 공통 Animation Data Provider는 있지만 Montage/Sequence는 제공하지 않습니다.
+- 위치 변화 기반 Velocity Fallback을 사용하므로 외부 Teleport 직후 Animation Speed가 일시적으로 크게 보일 수 있습니다.
+- Audio Event Contract는 연결되어 있지만 고품질 Sound와 Mixing은 프로젝트 Content의 책임입니다.
+- 기존 `AJMDungeonMonster`, Listener/Hoarder/Blackout 구현은 Migration하지 않았습니다.
 
-## Migration Strategy
+## 향후 확장
 
-Migrate legacy AI one enemy at a time: analyze behavior; split senses, movement, and actions; create the Definition;
-compose the StateTree; run the new and old enemy in parallel; then decide whether to retire the old implementation.
-Do not replace all legacy AI in one step.
+실제 프로젝트 요구가 생길 때 Flying Locomotion, 고급 Target Selection/EQS, Multiplayer Replication,
+Gameplay Debugger 연동, 확장된 Editor Tooling을 고려합니다. Rule Layer는 초기 설계 후보였지만 Listener, Watcher,
+Crawler를 StateTree만으로 표현할 수 있었습니다. 실제 전역 제약이 StateTree로 깔끔하게 표현되지 않을 때만
+`UJMEnemyRule`/Rule Component를 추가합니다.
+
+## Migration 전략
+
+기존 AI는 한 번에 하나씩 Migration합니다. 행동을 분석하고 Sense/Movement/Action으로 분리한 뒤 Definition과
+StateTree를 구성합니다. 기존 Enemy와 새 Framework Enemy를 병렬 검증한 다음 기존 구현 제거 여부를 결정합니다.
+전체 Legacy AI를 한 번에 교체하지 않습니다.
