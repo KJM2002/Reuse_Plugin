@@ -1,3 +1,14 @@
+---
+title: "JM Plugins 구조"
+status: Superseded
+authority: Historical
+scope: "Plugin Ecosystem"
+classified_on: 2026-08-19
+owners:
+  - "Plugin Architecture"
+superseded_by: "../Docs/Architecture/PLUGIN_DEPENDENCY_GRAPH.md"
+---
+
 # JM Plugins 구조
 
 ## 목적과 적용 원칙

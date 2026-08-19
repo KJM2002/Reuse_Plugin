@@ -1,4 +1,27 @@
+---
+title: "JMInteraction 사용 가이드"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: JMInteraction"
+classified_on: 2026-08-19
+owners:
+  - "JMInteraction Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # JMInteraction 사용 가이드
+
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+| Archive | [기존 프로젝트 분석 및 Migration 기록](Archive/PROJECT_ANALYSIS.md) | `Archived` |
+| Docs Root | [Architecture](ARCHITECTURE.md) | `ReviewRequired` |
+| Docs Root | [Changelog](CHANGELOG.md) | `ReviewRequired` |
+| Guides | [Custom Interaction Prompt Widget 만들기](Guides/CUSTOM_PROMPT_WIDGET_KO.md) | `ReviewRequired` |
+
 
 ## 1. 개요
 
@@ -58,7 +81,7 @@ BP_NPC:  E키를 눌러 대화
 
 기본 `JMInteractionPromptWidgetBase`는 최소 텍스트 UI를 제공한다. 게임 전용 Widget Blueprint를 이 클래스로부터 만들고 `Set Interaction Prompt`/`Clear Interaction Prompt`를 재정의한 뒤 Project Settings의 `Default Prompt Widget Class` 또는 컴포넌트의 `Interaction Prompt Widget Class`에 지정한다. Dedicated Server에서는 Widget을 만들지 않는다.
 
-배경 없는 Text 전용 Widget을 만드는 전체 Designer 절차는 [CUSTOM_PROMPT_WIDGET_KO.md](CUSTOM_PROMPT_WIDGET_KO.md)를 참고한다. `PromptText` TextBlock과 선택적 `PromptContainer` Border를 `BindWidgetOptional`로 지원하므로 기본적인 경우 Event Graph 구현이 필요 없다.
+배경 없는 Text 전용 Widget을 만드는 전체 Designer 절차는 [CUSTOM_PROMPT_WIDGET_KO.md](Guides/CUSTOM_PROMPT_WIDGET_KO.md)를 참고한다. `PromptText` TextBlock과 선택적 `PromptContainer` Border를 `BindWidgetOptional`로 지원하므로 기본적인 경우 Event Graph 구현이 필요 없다.
 
 인스펙터나 인벤토리 같은 Modal UI는 `SetPromptSuppressed(true)`로 Prompt만 일시 중지하고, 닫힐 때 기존 상태로 복원할 수 있다. 탐지와 상호작용 자체는 비활성화되지 않는다. `ItemInspector` 플러그인은 검사 화면이 열리고 닫힐 때 이 처리를 자동으로 수행한다.
 

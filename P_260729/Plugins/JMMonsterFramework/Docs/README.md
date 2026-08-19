@@ -1,4 +1,23 @@
+---
+title: "JMMonsterFramework"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: JMMonsterFramework"
+classified_on: 2026-08-19
+owners:
+  - "JMMonsterFramework Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # JMMonsterFramework
+
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+
 
 Unreal Engine 5.7용 데이터 기반 재사용형 Enemy AI 빌딩 블록 플러그인입니다. 호스트의 `P_060715` 모듈,
 기존 JM AI 플러그인 및 `/Game` 콘텐츠에 의존하지 않는 독립형 플러그인입니다.

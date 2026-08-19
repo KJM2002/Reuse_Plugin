@@ -1,3 +1,14 @@
+---
+title: "Portable Gameplay Plugin Bundle"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin Ecosystem"
+classified_on: 2026-08-19
+owners:
+  - "Plugin Architecture"
+review_reason: "현재 Plugin 전체 구성과 배포 절차를 다시 실행해 검증하지 않음"
+---
+
 # Portable Gameplay Plugin Bundle
 
 다른 Unreal Engine 5.7 C++ 프로젝트로 다음 세 폴더를 함께 복사한다.

@@ -1,4 +1,25 @@
+---
+title: "JMFootstep"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: JMFootstep"
+classified_on: 2026-08-19
+owners:
+  - "JMFootstep Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # JMFootstep
+
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+| Docs Root | [JMFootstep Architecture](ARCHITECTURE.md) | `ReviewRequired` |
+| Docs Root | [Changelog](CHANGELOG.md) | `ReviewRequired` |
+
 
 JMFootstep v1.1은 애니메이션, Anim Blueprint, Anim Notify, 발 Bone/Socket 없이
 작동하는 Unreal Engine 5.7 Runtime 발걸음 플러그인입니다.

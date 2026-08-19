@@ -1,4 +1,28 @@
+---
+title: "JMJumpScare"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: JMJumpScare"
+classified_on: 2026-08-19
+owners:
+  - "JMJumpScare Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # JMJumpScare
+
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+| Colocated | [Gameplay Tags](../Config/Tags/README.md) | `ReviewRequired` |
+| Docs Root | [JMJumpScare 아키텍처](ARCHITECTURE_KO.md) | `ReviewRequired` |
+| Docs Root | [Changelog](CHANGELOG.md) | `ReviewRequired` |
+| Guides | [통합 가이드](Guides/INTEGRATION_KO.md) | `ReviewRequired` |
+| Guides | [2D JumpScare 빠른 시작](Guides/QUICK_START_KO.md) | `ReviewRequired` |
+
 
 `JMJumpScare`는 플레이어의 카메라 화면 위에 2D 이미지를 잠시 표시하는 Runtime 플러그인이다.
 3D Actor Spawn, Anchor, 카메라 이동, FOV, 입력 잠금, Post Process 설정은 필요하지 않다.
@@ -35,4 +59,4 @@ Start Delay
 - `Jump Scare Sound`, `Sound Delay`, `Volume`, `Pitch`
 - `Trigger Policy` (`Once` 또는 `Repeatable`)
 
-자세한 설정 순서는 [QUICK_START_KO.md](QUICK_START_KO.md)를 참고한다.
+자세한 설정 순서는 [QUICK_START_KO.md](Guides/QUICK_START_KO.md)를 참고한다.

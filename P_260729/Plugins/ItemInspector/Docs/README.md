@@ -1,4 +1,34 @@
+---
+title: "ItemInspector 초보자 사용 안내"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: ItemInspector"
+classified_on: 2026-08-19
+owners:
+  - "ItemInspector Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # ItemInspector 초보자 사용 안내
+
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+| Docs Root | [아키텍처](ARCHITECTURE.md) | `ReviewRequired` |
+| Docs Root | [변경 기록](CHANGELOG.md) | `ReviewRequired` |
+| Guides | [Blueprint 사용법](Guides/BLUEPRINT_USAGE.md) | `ReviewRequired` |
+| Guides | [데이터 작성법](Guides/DATA_AUTHORING.md) | `ReviewRequired` |
+| Guides | [다른 프로젝트에 이식하기](Guides/PORTABLE_INSTALL.md) | `ReviewRequired` |
+| Guides | [문제 해결](Guides/TROUBLESHOOTING.md) | `ReviewRequired` |
+| Guides | [Inspector Widget 제작 및 이식 가이드](Guides/WIDGET_SETUP.md) | `ReviewRequired` |
+| Plans | [구현 계획](Plans/IMPLEMENTATION_PLAN.md) | `Draft` |
+| Plans | [TODO](Plans/TODO.md) | `Draft` |
+| Reference | [상호작용 시스템](Reference/INTERACTION_SYSTEM.md) | `ReviewRequired` |
+| Reference | [아이템 조사 시스템](Reference/ITEM_INSPECTION_SYSTEM.md) | `ReviewRequired` |
+
 
 `ItemInspector`는 Unreal Engine 프로젝트에서 반복해서 만들게 되는 상호작용과 아이템 조사 기능을 재사용하기 위한 Runtime Plugin입니다.
 
@@ -64,7 +94,7 @@ Preview 화면에 하늘이 보이거나 아이템이 너무 작게 보이면 `U
 - `MinZoom`, `MaxZoom`: 마우스 휠 확대/축소 범위입니다.
 - `LightingSettings`: 프리뷰 전용 조명 스타일입니다. `SoftStudio`, `BrightProduct`, `WarmDramatic`, `CoolRim`, `Flat` 중에서 고르거나 `Override Preset`을 켜서 Key/Fill/Rim 조명을 직접 조정합니다.
 
-기본 Preview Render Target은 알파용 UI 머티리얼을 거쳐 표시되므로 하늘이나 검은 배경 없이 아이템만 보이도록 구성되어 있습니다. 커스텀 Widget Blueprint를 쓰는 경우에는 `PreviewPanel` 또는 `PreviewImage` 뒤에 불투명한 배경색을 칠하면 투명 배경처럼 보이지 않을 수 있습니다. 이 부분은 [WIDGET_SETUP.md](WIDGET_SETUP.md)의 PreviewPanel 권장값을 같이 확인하세요.
+기본 Preview Render Target은 알파용 UI 머티리얼을 거쳐 표시되므로 하늘이나 검은 배경 없이 아이템만 보이도록 구성되어 있습니다. 커스텀 Widget Blueprint를 쓰는 경우에는 `PreviewPanel` 또는 `PreviewImage` 뒤에 불투명한 배경색을 칠하면 투명 배경처럼 보이지 않을 수 있습니다. 이 부분은 [WIDGET_SETUP.md](Guides/WIDGET_SETUP.md)의 PreviewPanel 권장값을 같이 확인하세요.
 
 Preview 조명은 레벨의 Directional Light와 경쟁하지 않도록 Directional Light를 사용하지 않습니다. 대신 Preview Actor 내부의 Spot Key Light, Point Fill Light, Point Rim Light를 사용하고, 기본값으로 Lighting Channel 2에 격리합니다.
 
@@ -340,7 +370,7 @@ Edit
 
 기본 C++ 위젯은 임시 테스트용으로 충분하지만, 실제 게임에서는 이 방식으로 프로젝트별 UI를 만드는 것을 권장합니다.
 
-커스텀 위젯에 어떤 TextBlock, Image, Button을 추가해야 하는지는 [WIDGET_SETUP.md](WIDGET_SETUP.md)에 자세히 정리되어 있습니다.
+커스텀 위젯에 어떤 TextBlock, Image, Button을 추가해야 하는지는 [WIDGET_SETUP.md](Guides/WIDGET_SETUP.md)에 자세히 정리되어 있습니다.
 
 기본 C++ 위젯에서 자동으로 처리하는 항목:
 

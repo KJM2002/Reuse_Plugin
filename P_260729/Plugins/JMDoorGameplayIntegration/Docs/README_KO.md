@@ -1,4 +1,26 @@
+---
+title: "JM Door Gameplay Integration"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: JMDoorGameplayIntegration"
+classified_on: 2026-08-19
+owners:
+  - "JMDoorGameplayIntegration Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # JM Door Gameplay Integration
+
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+| Docs Root | [Architecture](ARCHITECTURE.md) | `ReviewRequired` |
+| Docs Root | [Changelog](CHANGELOG.md) | `ReviewRequired` |
+| Guides | [Portable Install](Guides/PORTABLE_INSTALL.md) | `ReviewRequired` |
+
 
 ## 문 상호작용 문구 설정
 

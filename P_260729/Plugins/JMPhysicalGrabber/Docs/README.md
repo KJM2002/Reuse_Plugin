@@ -1,6 +1,29 @@
+---
+title: "JM Physical Grabber and Harpoon Gun"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: JMPhysicalGrabber"
+classified_on: 2026-08-19
+owners:
+  - "JMPhysicalGrabber Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # JM Physical Grabber and Harpoon Gun
 
-작살총의 전체 한글 사용 및 튜닝 문서는 [HARPOON_GUN_KO.md](HARPOON_GUN_KO.md)를 참고하세요. 화물, 파손, 추출, 소음, 포탈 코어 설정은 [WORK_TOOL_INTERACTIONS_KO.md](WORK_TOOL_INTERACTIONS_KO.md)에 단계별로 정리되어 있습니다.
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+| Docs Root | [JM Physical Grabber Architecture](ARCHITECTURE.md) | `ReviewRequired` |
+| Docs Root | [Changelog](CHANGELOG.md) | `ReviewRequired` |
+| Guides | [JM 작살총 사용 및 수정 문서](Guides/HARPOON_GUN_KO.md) | `ReviewRequired` |
+| Guides | [JM 작살 작업 도구 상호작용 사용법](Guides/WORK_TOOL_INTERACTIONS_KO.md) | `ReviewRequired` |
+
+
+작살총의 전체 한글 사용 및 튜닝 문서는 [HARPOON_GUN_KO.md](Guides/HARPOON_GUN_KO.md)를 참고하세요. 화물, 파손, 추출, 소음, 포탈 코어 설정은 [WORK_TOOL_INTERACTIONS_KO.md](Guides/WORK_TOOL_INTERACTIONS_KO.md)에 단계별로 정리되어 있습니다.
 
 ## Harpoon Gun
 

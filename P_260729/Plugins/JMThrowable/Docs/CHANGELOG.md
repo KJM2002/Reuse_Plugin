@@ -1,3 +1,14 @@
+---
+title: "Changelog"
+status: ReviewRequired
+authority: Historical
+scope: "Plugin: JMThrowable"
+classified_on: 2026-08-19
+owners:
+  - "JMThrowable Maintainers"
+review_reason: "릴리스 및 Git 이력과 변경 항목의 누락 여부를 재대조하지 않음"
+---
+
 # Changelog
 
 ## 1.3.0

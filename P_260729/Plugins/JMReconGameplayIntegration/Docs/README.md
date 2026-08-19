@@ -1,4 +1,26 @@
+---
+title: "JMReconGameplayIntegration"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: JMReconGameplayIntegration"
+classified_on: 2026-08-19
+owners:
+  - "JMReconGameplayIntegration Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # JMReconGameplayIntegration
+
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+| Docs Root | [JMReconGameplayIntegration 아키텍처](ARCHITECTURE.md) | `ReviewRequired` |
+| Docs Root | [변경 이력](CHANGELOG.md) | `ReviewRequired` |
+| Guides | [설치 및 설정](Guides/INSTALLATION.md) | `ReviewRequired` |
+
 
 기존 `JMInteraction` 포커스 흐름을 `JMRecon`에 연결하는 선택적 Runtime Bridge입니다. 별도의 정찰 Trace나 플레이어 Blueprint 이벤트 그래프를 만들지 않습니다.
 

@@ -1,4 +1,25 @@
+---
+title: "JM Room Grid 1.5.0"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: JMRoomGrid"
+classified_on: 2026-08-19
+owners:
+  - "JMRoomGrid Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # JM Room Grid 1.5.0
+
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+| Docs Root | [JM Room Grid architecture](ARCHITECTURE.md) | `ReviewRequired` |
+| Docs Root | [Changelog](CHANGELOG.md) | `ReviewRequired` |
+
 
 Unreal Engine 5.7용 모듈형 방 Blueprint 및 5×5 맵 생성 플러그인입니다. 현재 기본 라이브러리는 편집 가능한 13×13 타일 방 12종으로 구성됩니다.
 

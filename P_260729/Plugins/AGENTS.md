@@ -333,6 +333,35 @@ JM.Save.*
 - 에셋 이동/이름 변경 시 Redirector 정리와 Core Redirect 또는 명시적 마이그레이션을 검토한다.
 - 각 플러그인의 `Docs/CHANGELOG.md`에 Added/Changed/Fixed/Breaking을 기록한다.
 
+### Plugin 문서 구조와 현재성
+
+Plugin 문서는 다음 구조를 사용한다. 빈 분류 폴더는 만들지 않는다.
+
+```text
+<Plugin>/
+├─ README.md                    # 선택: 저장소·Marketplace 진입점
+└─ Docs/
+   ├─ README.md 또는 README_KO.md
+   ├─ ARCHITECTURE.md 또는 ARCHITECTURE_KO.md
+   ├─ CHANGELOG.md
+   ├─ Guides/                   # 설치·사용·저작·Migration 절차
+   ├─ Reference/                # API·Tag·Config·Save·정책 계약
+   ├─ Testing/                  # 자동화·Editor·회귀 테스트
+   ├─ Plans/                    # 미구현 계획과 TODO
+   ├─ Decisions/                # 장기 설계 결정(ADR)
+   └─ Archive/                  # 대체·종료된 역사 문서
+```
+
+- 모든 Plugin Markdown은 `title`, `status`, `authority`, `scope`, `owners` YAML 메타데이터를 가진다. 이 실행 지침인 `Plugins/AGENTS.md`만 예외다.
+- 상태는 `Current`, `Draft`, `ReviewRequired`, `Superseded`, `Archived`만 사용한다.
+- 코드·설정 문서를 `Current`로 올릴 때는 `last_verified`와 검증한 commit 또는 working-tree 기준을 기록한다.
+- Editor 가이드는 실제 절차를 다시 수행한 경우에만 `Current`로 올린다.
+- 분류만 했거나 코드·에셋과 재검증하지 않은 기존 문서는 `ReviewRequired`로 둔다.
+- 계획과 TODO는 `Draft/Plan`, 과거 기록은 `Archived/Historical`로 현재 구현과 구분한다.
+- 문서를 추가·이동·대체하면 대상 Plugin README의 `문서 지도`와 `Plugins/DOCUMENTATION_INDEX.md`를 같은 변경에서 갱신한다.
+- 완료 전에 프로젝트 루트에서 `Docs/Tools/Validate-Docs.ps1`을 실행해 메타데이터와 상대 링크를 검사한다.
+- 세부 상태 전환과 Archive 규칙은 `Docs/DOCUMENTATION_POLICY.md`를 따른다.
+
 ---
 
 ## 10. 새 플러그인 구현 절차

@@ -1,4 +1,27 @@
+---
+title: "재사용형 대화 시스템"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: ReusableDialogueSystem"
+classified_on: 2026-08-19
+owners:
+  - "ReusableDialogueSystem Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # 재사용형 대화 시스템
+
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+| Docs Root | [아키텍처](Docs/ARCHITECTURE.md) | `ReviewRequired` |
+| Docs Root | [Changelog](Docs/CHANGELOG.md) | `ReviewRequired` |
+| Plans | [구현 계획](Docs/Plans/IMPLEMENTATION_PLAN.md) | `Draft` |
+| Plans | [후속 구현 목록](Docs/Plans/TODO.md) | `Draft` |
+
 
 > 0.2.0부터 `UReuseDialogueInteractableComponent`가 이 플러그인에 포함됩니다. 액터에 컴포넌트를 추가하고 Dialogue Sequence를 지정하면 ItemInspector의 상호작용으로 대화를 시작할 수 있습니다. 따라서 이 플러그인을 사용할 때는 `ItemInspector` 플러그인 폴더도 함께 복사합니다.
 

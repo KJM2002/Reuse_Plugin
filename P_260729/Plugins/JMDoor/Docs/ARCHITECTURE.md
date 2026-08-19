@@ -1,3 +1,14 @@
+---
+title: "JMDoor 아키텍처"
+status: ReviewRequired
+authority: Canonical
+scope: "Plugin: JMDoor"
+classified_on: 2026-08-19
+owners:
+  - "JMDoor Maintainers"
+review_reason: "2026-08-19 전체 감사 이후 문서 구조만 정비했으며 모든 세부를 현재 코드와 재대조하지 않음"
+---
+
 # JMDoor 아키텍처
 
 ## Dual sliding-panel model (1.6+)

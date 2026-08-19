@@ -1,4 +1,39 @@
+---
+title: "재사용형 인벤토리 시스템"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: InventorySystem"
+classified_on: 2026-08-19
+owners:
+  - "InventorySystem Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # 재사용형 인벤토리 시스템
+
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+| Docs Root | [인벤토리 시스템 아키텍처](ARCHITECTURE.md) | `ReviewRequired` |
+| Docs Root | [변경 기록](CHANGELOG.md) | `ReviewRequired` |
+| Guides | [아이템 데이터 제작](Guides/DATA_AUTHORING.md) | `ReviewRequired` |
+| Guides | [아이템 드랍과 획득 알림](Guides/DROP_AND_NOTIFICATION.md) | `ReviewRequired` |
+| Guides | [Duckov 스타일 Inventory UI 1차 구현: Unreal Editor 제작 가이드](Guides/DUCKOV_STYLE_UI_IMPLEMENTATION_KO.md) | `ReviewRequired` |
+| Guides | [Item Inspector 연동](Guides/INSPECTOR_INTEGRATION.md) | `ReviewRequired` |
+| Guides | [설치 방법](Guides/INSTALLATION.md) | `ReviewRequired` |
+| Guides | [Loot Box 사용 설명서](Guides/LOOT_CONTAINERS_KO.md) | `ReviewRequired` |
+| Guides | [JMInspectable 아이템 획득 연동](Guides/PICKUP_INTEGRATION.md) | `ReviewRequired` |
+| Guides | [문제 해결](Guides/TROUBLESHOOTING.md) | `ReviewRequired` |
+| Guides | [인벤토리 UI 및 Enhanced Input 제작 가이드](Guides/UI_SETUP.md) | `ReviewRequired` |
+| Guides | [Inventory UI/UX 0.5 적용 가이드](Guides/UI_UX_UPGRADE_KO.md) | `ReviewRequired` |
+| Guides | [Inventory Widget 배치 가이드](Guides/WIDGET_LAYOUT_GUIDE_KO.md) | `ReviewRequired` |
+| Plans | [인벤토리 시스템 구현 계획](Plans/IMPLEMENTATION_PLAN.md) | `Draft` |
+| Plans | [인벤토리 시스템 작업 목록](Plans/TODO.md) | `Draft` |
+| Testing | [인벤토리 플러그인 에디터 최종 세팅 및 회귀 테스트 가이드](Testing/EDITOR_SETUP_AND_REGRESSION_TEST_KO.md) | `ReviewRequired` |
+
 
 `InventorySystem`은 데이터 기반 아이템, 스택형 인벤토리 저장소, 월드 아이템 획득·버리기, 교체 가능한 UMG UI, Enhanced Input 연결, 저장용 데이터, 아이템 조사 연동 지점을 제공하는 UE 5.7 Runtime Plugin이다.
 
@@ -27,6 +62,6 @@ Runtime 코드에서는 프로젝트 전용 Player, GameMode, HUD 또는 특정 
 에디터 설정 방법은 `INSTALLATION.md`, `DATA_AUTHORING.md`, `UI_SETUP.md`, `INSPECTOR_INTEGRATION.md`, `PICKUP_INTEGRATION.md`를 참고한다.
 이번 UI/UX 개편의 구조와 WBP 선택 작업은 `UI_UX_UPGRADE_KO.md`를 참고한다.
 Designer의 정확한 계층, 이름, 크기와 정렬값은 `WIDGET_LAYOUT_GUIDE_KO.md`에 있다.
-Loot Box 생성, 고정 아이템, 가중치 Loot Table, 조작과 테스트 방법은 [`LOOT_CONTAINERS_KO.md`](LOOT_CONTAINERS_KO.md)를 참고한다.
+Loot Box 생성, 고정 아이템, 가중치 Loot Table, 조작과 테스트 방법은 [`LOOT_CONTAINERS_KO.md`](Guides/LOOT_CONTAINERS_KO.md)를 참고한다.
 
-지금까지 확인된 시행착오, 최종 Widget 구조, PlayerController/Character 설정과 전체 회귀 테스트 순서는 [`EDITOR_SETUP_AND_REGRESSION_TEST_KO.md`](EDITOR_SETUP_AND_REGRESSION_TEST_KO.md)를 기준으로 한다. 새 프로젝트 이식이나 UI 재제작 시에는 이 문서의 최종 완료 체크리스트까지 수행한다.
+지금까지 확인된 시행착오, 최종 Widget 구조, PlayerController/Character 설정과 전체 회귀 테스트 순서는 [`EDITOR_SETUP_AND_REGRESSION_TEST_KO.md`](Testing/EDITOR_SETUP_AND_REGRESSION_TEST_KO.md)를 기준으로 한다. 새 프로젝트 이식이나 UI 재제작 시에는 이 문서의 최종 완료 체크리스트까지 수행한다.

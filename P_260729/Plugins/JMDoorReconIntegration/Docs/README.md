@@ -1,4 +1,26 @@
+---
+title: "JMDoorReconIntegration"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: JMDoorReconIntegration"
+classified_on: 2026-08-19
+owners:
+  - "JMDoorReconIntegration Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # JMDoorReconIntegration
+
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+| Docs Root | [JMDoorReconIntegration 아키텍처](ARCHITECTURE.md) | `ReviewRequired` |
+| Docs Root | [변경 이력](CHANGELOG.md) | `ReviewRequired` |
+| Guides | [설치 및 설정](Guides/INSTALLATION.md) | `ReviewRequired` |
+
 
 `JMDoor`와 `JMRecon`을 서로 결합하지 않고 연결하는 Runtime Adapter 플러그인입니다. 일반 `E` 문 상호작용, 잠금 해제, 저장 상태와 자동 닫힘 Timer는 그대로 두고 Recon 세션에만 문짝을 약간 엽니다.
 

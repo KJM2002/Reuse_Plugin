@@ -1,3 +1,14 @@
+---
+title: "JM 재사용 시스템 개발 컨텍스트"
+status: ReviewRequired
+authority: Plan
+scope: "Plugin Ecosystem"
+classified_on: 2026-08-19
+owners:
+  - "Plugin Architecture"
+review_reason: "2026-08-19 아키텍처 감사에서 Plugin 레지스트리와 버전 드리프트가 확인됨"
+---
+
 # JM 재사용 시스템 개발 컨텍스트
 
 > 문서 목적: 이 파일 하나를 AI에게 제공해, 앞으로 추가할 Unreal Engine 시스템의 시스템 프롬프트·설계안·구현 계획을 만들 수 있게 한다.  
@@ -820,7 +831,7 @@ UGameplayStatics::GetActorOfClass(World, ASpecificSingletonActor::StaticClass())
 
 ### 15.3 JMDoor Save 문서 버전이 오래됐다
 
-- `JMDoor/Docs/SAVE_INTEGRATION.md`는 `FJMDoorSaveData.Version = 1`이라고 적혀 있다.
+- `JMDoor/Docs/Guides/SAVE_INTEGRATION.md`는 `FJMDoorSaveData.Version = 1`이라고 적혀 있다.
 - 실제 `JMDoorTypes.h` 기본값은 2이며, Dual Panel A/B 상태를 저장하고 Version 1을 Legacy Panel A로 복원한다.
 - Save 연동을 구현할 때 코드의 Version 2 계약과 Migration 경로를 기준으로 한다.
 
@@ -944,10 +955,10 @@ Plugins/JM_FUTURE_SYSTEM_DESIGN_CONTEXT_KO.md를 기준으로
 - 각 플러그인의 `Source/*/Public`
 - 각 플러그인의 `Config`
 - 각 플러그인의 `Docs/ARCHITECTURE*.md`
-- `JMGameplayEvent/Docs/MIGRATION_KO.md`
-- `JMInteraction/Docs/PROJECT_ANALYSIS.md`
-- `JMDoor/Docs/SAVE_INTEGRATION.md`
-- `JMObjective/Docs/SAVE_INTEGRATION_KO.md`
+- `JMGameplayEvent/Docs/Guides/MIGRATION_KO.md`
+- `JMInteraction/Docs/Archive/PROJECT_ANALYSIS.md`
+- `JMDoor/Docs/Guides/SAVE_INTEGRATION.md`
+- `JMObjective/Docs/Guides/SAVE_INTEGRATION_KO.md`
 - Inventory, ItemInspector, Dialogue의 `TODO`, `IMPLEMENTATION_PLAN`, `TROUBLESHOOTING`
 
 가장 중요한 결론:

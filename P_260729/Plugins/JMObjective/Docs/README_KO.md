@@ -1,4 +1,29 @@
+---
+title: "JMObjective"
+status: ReviewRequired
+authority: Guide
+scope: "Plugin: JMObjective"
+classified_on: 2026-08-19
+owners:
+  - "JMObjective Maintainers"
+review_reason: "설치 closure와 사용 절차를 현재 .uplugin·Build.cs·코드와 완전히 재검증하지 않음"
+---
+
 # JMObjective
+
+## 문서 지도
+
+> 아래 상태는 문서 내용의 검증 수준이다. `ReviewRequired` 문서는 현재 코드·에셋·Editor 절차와 다시 확인하기 전까지 최종 구현 기준으로 사용하지 않는다.
+
+| 분류 | 문서 | 상태 |
+|---|---|---|
+| Docs Root | [JMObjective 아키텍처](ARCHITECTURE_KO.md) | `ReviewRequired` |
+| Docs Root | [Changelog](CHANGELOG.md) | `ReviewRequired` |
+| Guides | [Objective Definition 만들기](Guides/EDITOR_OBJECTIVE_SETUP_KO.md) | `ReviewRequired` |
+| Guides | [Objective Flow 처음 설정하기](Guides/FLOW_SETUP_KO.md) | `ReviewRequired` |
+| Guides | [Save 연동](Guides/SAVE_INTEGRATION_KO.md) | `ReviewRequired` |
+| Testing | [열쇠 → 문 → Dialogue 통합](Testing/INTEGRATION_TEST_KO.md) | `ReviewRequired` |
+
 
 `JMObjective`는 `JMGameplayEvent`를 받아 목표 진행도를 계산하는 재사용 가능한 Runtime Plugin이다. Door, Inventory, Dialogue, Interaction 플러그인을 직접 참조하지 않는다.
 
@@ -17,10 +42,10 @@ Objective Definition 생성
 
 Flow는 목표 등록, 첫 목표 활성화, 완료된 목표 판별, 다음 목표 활성화를 C++에서 자동 처리한다. UI도 Project Settings 설정에 따라 자동 생성된다.
 
-- 처음 설정하기: [FLOW_SETUP_KO.md](FLOW_SETUP_KO.md)
-- 개별 Objective와 고급 수동 연결: [EDITOR_OBJECTIVE_SETUP_KO.md](EDITOR_OBJECTIVE_SETUP_KO.md)
+- 처음 설정하기: [FLOW_SETUP_KO.md](Guides/FLOW_SETUP_KO.md)
+- 개별 Objective와 고급 수동 연결: [EDITOR_OBJECTIVE_SETUP_KO.md](Guides/EDITOR_OBJECTIVE_SETUP_KO.md)
 - 구조 설명: [ARCHITECTURE_KO.md](ARCHITECTURE_KO.md)
-- 저장 연동: [SAVE_INTEGRATION_KO.md](SAVE_INTEGRATION_KO.md)
+- 저장 연동: [SAVE_INTEGRATION_KO.md](Guides/SAVE_INTEGRATION_KO.md)
 
 ## 주요 타입
 

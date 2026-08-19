@@ -1,3 +1,14 @@
+---
+title: "JMReconGameplayIntegration 아키텍처"
+status: ReviewRequired
+authority: Canonical
+scope: "Plugin: JMReconGameplayIntegration"
+classified_on: 2026-08-19
+owners:
+  - "JMReconGameplayIntegration Maintainers"
+review_reason: "2026-08-19 전체 감사 이후 문서 구조만 정비했으며 모든 세부를 현재 코드와 재대조하지 않음"
+---
+
 # JMReconGameplayIntegration 아키텍처
 
 ## 책임과 비책임
