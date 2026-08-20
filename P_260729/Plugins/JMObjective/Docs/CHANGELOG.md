@@ -13,6 +13,11 @@ review_reason: "릴리스 및 Git 이력과 변경 항목의 누락 여부를 �
 
 ## Unreleased
 
+### Fixed
+
+- Objective/Flow delegate reentrancy no longer retains `TMap` element pointers or references across Blueprint and Gameplay Event callbacks.
+- Added unregister/register/complete progress reentrancy and nested Flow-start regression coverage.
+
 ### Changed
 
 - Nested modal UI keeps the Objective Widget hidden until the final modal closes.

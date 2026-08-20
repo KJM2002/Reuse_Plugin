@@ -103,6 +103,7 @@ void UInventoryUIComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		PickupNotificationWidget->RemoveFromParent();
 		PickupNotificationWidget = nullptr;
 	}
+	UnbindEnhancedInput();
 	FinalizeCloseInventory();
 	Super::EndPlay(EndPlayReason);
 }
@@ -128,9 +129,21 @@ bool UInventoryUIComponent::BindEnhancedInput(UEnhancedInputComponent* EnhancedI
 
 	// Open on release so the key-down that initiated opening cannot also reach the
 	// newly focused inventory widget and immediately request a close.
-	EnhancedInputComponent->BindAction(Action, ETriggerEvent::Completed, this, &UInventoryUIComponent::HandleToggleInput);
+	UnbindEnhancedInput();
+	FEnhancedInputActionEventBinding& Binding = EnhancedInputComponent->BindAction(Action, ETriggerEvent::Completed, this, &UInventoryUIComponent::HandleToggleInput);
+	ToggleInputBindingHandle = Binding.GetHandle();
 	BoundEnhancedInputComponent = EnhancedInputComponent;
 	return true;
+}
+
+void UInventoryUIComponent::UnbindEnhancedInput()
+{
+	if (UEnhancedInputComponent* EnhancedInputComponent = BoundEnhancedInputComponent.Get(); EnhancedInputComponent && ToggleInputBindingHandle != 0)
+	{
+		EnhancedInputComponent->RemoveBindingByHandle(ToggleInputBindingHandle);
+	}
+	ToggleInputBindingHandle = 0;
+	BoundEnhancedInputComponent.Reset();
 }
 
 bool UInventoryUIComponent::OpenInventory()

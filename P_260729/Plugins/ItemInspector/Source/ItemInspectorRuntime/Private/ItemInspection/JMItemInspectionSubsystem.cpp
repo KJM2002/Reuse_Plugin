@@ -22,8 +22,16 @@
 #include "Kismet/GameplayStatics.h"
 #include "Subsystems/JMGameplayEventSubsystem.h"
 
+void UJMItemInspectionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+	FWorldDelegates::OnWorldCleanup.AddUObject(this, &UJMItemInspectionSubsystem::HandleWorldCleanup);
+}
+
 void UJMItemInspectionSubsystem::Deinitialize()
 {
+	bDeinitializing = true;
+	FWorldDelegates::OnWorldCleanup.RemoveAll(this);
 	CloseInspection(EJMItemInspectionCloseReason::WorldTearDown);
 	Super::Deinitialize();
 }
@@ -43,6 +51,15 @@ bool UJMItemInspectionSubsystem::OpenInspection(UJMItemInspectionData* Inspectio
 
 bool UJMItemInspectionSubsystem::OpenInspectionFromRequest(const FJMItemInspectionRequest& Request)
 {
+	if (bDeinitializing)
+	{
+		return false;
+	}
+	if (bCloseInProgress)
+	{
+		FailOpen(Request, NSLOCTEXT("JMGameplay", "InspectionClosing", "The previous inspection is still closing."));
+		return false;
+	}
 	if (!IsValid(Request.InspectionData))
 	{
 		FailOpen(Request, NSLOCTEXT("JMGameplay", "InspectionDataMissing", "Inspection data is missing."));
@@ -62,9 +79,22 @@ bool UJMItemInspectionSubsystem::OpenInspectionFromRequest(const FJMItemInspecti
 		CloseInspection(EJMItemInspectionCloseReason::Replaced);
 	}
 
+	UWorld* World = GetWorld();
+	if (!World || World->bIsTearingDown)
+	{
+		FailOpen(Request, NSLOCTEXT("JMGameplay", "InspectionWorldMissing", "A valid world is required to inspect an item."));
+		return false;
+	}
+
 	State = EJMItemInspectionState::Opening;
 	CurrentInspectionData = Request.InspectionData;
+	SessionWorld = World;
+	const uint64 SessionId = ++SessionSerial;
 	PublishModalPresentation(true);
+	if (SessionSerial != SessionId || State != EJMItemInspectionState::Opening || !IsSessionWorldValid())
+	{
+		return true;
+	}
 	SuppressInteractionPrompt();
 
 	CurrentTransitionSettings = ResolveTransitionSettings(Request);
@@ -81,7 +111,7 @@ bool UJMItemInspectionSubsystem::OpenInspectionFromRequest(const FJMItemInspecti
 			|| (CurrentTransitionSettings.bEnableEnterTransition && CurrentTransitionSettings.bHideSourceActorDuringInspection);
 	}
 
-	if (UWorld* World = GetWorld())
+	if (World)
 	{
 		bWasGamePausedBeforeOpen = UGameplayStatics::IsGamePaused(World);
 		if (Request.bPauseGame && !bWasGamePausedBeforeOpen)
@@ -109,7 +139,14 @@ bool UJMItemInspectionSubsystem::OpenInspectionFromRequest(const FJMItemInspecti
 	HideSourceActorIfNeeded();
 	State = EJMItemInspectionState::Inspecting;
 	OnInspectionOpened.Broadcast(CurrentInspectionData);
-	CurrentWidget->OnInspectionOpened(CurrentInspectionData);
+	if (SessionSerial == SessionId
+		&& State == EJMItemInspectionState::Inspecting
+		&& CurrentInspectionData == Request.InspectionData
+		&& IsValid(CurrentWidget)
+		&& IsSessionWorldValid())
+	{
+		CurrentWidget->OnInspectionOpened(CurrentInspectionData);
+	}
 
 	return true;
 }
@@ -148,10 +185,16 @@ void UJMItemInspectionSubsystem::CloseInspection(EJMItemInspectionCloseReason Re
 
 void UJMItemInspectionSubsystem::FinalizeCloseInspection(EJMItemInspectionCloseReason Reason)
 {
+	if (State == EJMItemInspectionState::Closed || bCloseInProgress)
+	{
+		return;
+	}
+	bCloseInProgress = true;
+	++SessionSerial;
 	CancelEnterTransition();
 	CancelExitTransition();
 
-	if (CurrentWidget)
+	if (IsValid(CurrentWidget))
 	{
 		CurrentWidget->OnCloseRequested.RemoveDynamic(this, &UJMItemInspectionSubsystem::HandleWidgetCloseRequested);
 		CurrentWidget->OnPreviewDragged.RemoveDynamic(this, &UJMItemInspectionSubsystem::HandlePreviewDragged);
@@ -165,7 +208,7 @@ void UJMItemInspectionSubsystem::FinalizeCloseInspection(EJMItemInspectionCloseR
 
 	if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
 	{
-		if (APlayerController* PlayerController = LocalPlayer->GetPlayerController(GetWorld()))
+		if (APlayerController* PlayerController = LocalPlayer->GetPlayerController(SessionWorld.Get()))
 		{
 			if (bPreviousMouseCursor)
 			{
@@ -191,7 +234,9 @@ void UJMItemInspectionSubsystem::FinalizeCloseInspection(EJMItemInspectionCloseR
 
 	CurrentInspectionData = nullptr;
 	bUseSimpleUITransition = false;
+	SessionWorld.Reset();
 	State = EJMItemInspectionState::Closed;
+	bCloseInProgress = false;
 	OnInspectionClosed.Broadcast(Reason);
 }
 
@@ -584,7 +629,13 @@ FJMItemInspectionTransitionSettings UJMItemInspectionSubsystem::ResolveTransitio
 
 bool UJMItemInspectionSubsystem::TickEnterTransition(float DeltaTime)
 {
-	if (State != EJMItemInspectionState::TransitioningIn || !CurrentWidget)
+	if (!IsSessionWorldValid())
+	{
+		State = EJMItemInspectionState::Closing;
+		FinalizeCloseInspection(EJMItemInspectionCloseReason::WorldTearDown);
+		return false;
+	}
+	if (State != EJMItemInspectionState::TransitioningIn || !IsValid(CurrentWidget))
 	{
 		CancelEnterTransition();
 		return false;
@@ -604,7 +655,9 @@ bool UJMItemInspectionSubsystem::TickEnterTransition(float DeltaTime)
 		return true;
 	}
 
-	if (!CurrentPreviewActor || !CurrentTransitionWidget)
+	if (!IsValid(CurrentPreviewActor)
+		|| CurrentPreviewActor->GetWorld() != SessionWorld.Get()
+		|| !IsValid(CurrentTransitionWidget))
 	{
 		CancelEnterTransition();
 		return false;
@@ -673,7 +726,7 @@ void UJMItemInspectionSubsystem::CompleteEnterTransition()
 
 	TransitionTickerHandle.Reset();
 	HideSourceActorIfNeeded();
-	if (CurrentPreviewActor)
+	if (IsValid(CurrentPreviewActor) && CurrentPreviewActor->GetWorld() == SessionWorld.Get())
 	{
 		CurrentPreviewActor->CompleteEnterTransition();
 	}
@@ -695,8 +748,14 @@ void UJMItemInspectionSubsystem::CompleteEnterTransition()
 	}
 
 	State = EJMItemInspectionState::Inspecting;
+	const uint64 SessionId = SessionSerial;
+	UJMItemInspectionData* InspectionData = CurrentInspectionData;
 	OnInspectionOpened.Broadcast(CurrentInspectionData);
-	if (CurrentWidget)
+	if (SessionSerial == SessionId
+		&& State == EJMItemInspectionState::Inspecting
+		&& CurrentInspectionData == InspectionData
+		&& IsValid(CurrentWidget)
+		&& IsSessionWorldValid())
 	{
 		CurrentWidget->OnInspectionOpened(CurrentInspectionData);
 	}
@@ -800,7 +859,14 @@ bool UJMItemInspectionSubsystem::TryStartExitTransition(EJMItemInspectionCloseRe
 
 bool UJMItemInspectionSubsystem::TickExitTransition(float DeltaTime)
 {
-	if (State != EJMItemInspectionState::TransitioningOut || !CurrentWidget)
+	if (!IsSessionWorldValid())
+	{
+		TransitionTickerHandle.Reset();
+		State = EJMItemInspectionState::Closing;
+		FinalizeCloseInspection(EJMItemInspectionCloseReason::WorldTearDown);
+		return false;
+	}
+	if (State != EJMItemInspectionState::TransitioningOut || !IsValid(CurrentWidget))
 	{
 		TransitionTickerHandle.Reset();
 		State = EJMItemInspectionState::Closing;
@@ -822,7 +888,11 @@ bool UJMItemInspectionSubsystem::TickExitTransition(float DeltaTime)
 		return true;
 	}
 
-	if (!CurrentPreviewActor || !CurrentTransitionWidget || !IsValid(HiddenSourceActor))
+	if (!IsValid(CurrentPreviewActor)
+		|| CurrentPreviewActor->GetWorld() != SessionWorld.Get()
+		|| !IsValid(CurrentTransitionWidget)
+		|| !IsValid(HiddenSourceActor)
+		|| HiddenSourceActor->GetWorld() != SessionWorld.Get())
 	{
 		TransitionTickerHandle.Reset();
 		State = EJMItemInspectionState::Closing;
@@ -920,6 +990,20 @@ void UJMItemInspectionSubsystem::RevealSourceActorForExitHandoff()
 	}
 }
 
+void UJMItemInspectionSubsystem::HandleWorldCleanup(UWorld* World, bool bSessionEnded, bool bCleanupResources)
+{
+	if (World && SessionWorld.Get() == World && State != EJMItemInspectionState::Closed)
+	{
+		CloseInspection(EJMItemInspectionCloseReason::WorldTearDown);
+	}
+}
+
+bool UJMItemInspectionSubsystem::IsSessionWorldValid() const
+{
+	UWorld* World = SessionWorld.Get();
+	return World && !World->bIsTearingDown && World == GetWorld();
+}
+
 void UJMItemInspectionSubsystem::HideSourceActorIfNeeded()
 {
 	if (bShouldHideSourceActor && !bDidHideSourceActor && IsValid(HiddenSourceActor))
@@ -950,17 +1034,17 @@ float UJMItemInspectionSubsystem::ApplyTransitionEasing(float Alpha, EJMItemInsp
 
 void UJMItemInspectionSubsystem::DestroyPreviewResources()
 {
-	if (CurrentPreviewActor)
+	if (IsValid(CurrentPreviewActor))
 	{
 		CurrentPreviewActor->Destroy();
-		CurrentPreviewActor = nullptr;
 	}
+	CurrentPreviewActor = nullptr;
 
-	if (CurrentPreviewRenderTarget)
+	if (IsValid(CurrentPreviewRenderTarget))
 	{
 		CurrentPreviewRenderTarget->ReleaseResource();
-		CurrentPreviewRenderTarget = nullptr;
 	}
+	CurrentPreviewRenderTarget = nullptr;
 }
 
 void UJMItemInspectionSubsystem::FailOpen(const FJMItemInspectionRequest& Request, const FText& Reason)

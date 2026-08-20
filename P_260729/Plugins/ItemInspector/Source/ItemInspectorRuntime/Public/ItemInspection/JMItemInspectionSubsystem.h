@@ -24,6 +24,7 @@ class ITEMINSPECTORRUNTIME_API UJMItemInspectionSubsystem : public ULocalPlayerS
 	GENERATED_BODY()
 
 public:
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
 	UPROPERTY(BlueprintAssignable, Category = "JM Gameplay|Item Inspection")
@@ -83,6 +84,8 @@ protected:
 	void SuppressInteractionPrompt();
 	void RestoreInteractionPrompt();
 	void PublishModalPresentation(bool bIsOpen);
+	void HandleWorldCleanup(UWorld* World, bool bSessionEnded, bool bCleanupResources);
+	bool IsSessionWorldValid() const;
 
 	UFUNCTION()
 	void HandleWidgetCloseRequested(EJMItemInspectionCloseReason Reason);
@@ -136,4 +139,8 @@ protected:
 	bool bInteractionPromptWasSuppressed = false;
 	bool bModalPresentationPublished = false;
 	bool bUseSimpleUITransition = false;
+	TWeakObjectPtr<UWorld> SessionWorld;
+	uint64 SessionSerial = 0;
+	bool bCloseInProgress = false;
+	bool bDeinitializing = false;
 };

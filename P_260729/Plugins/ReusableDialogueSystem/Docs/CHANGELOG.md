@@ -13,6 +13,7 @@ review_reason: "릴리스 및 Git 이력과 변경 항목의 누락 여부를 �
 
 ## Unreleased
 
+- Dialogue sessions now revalidate a session serial after synchronous callbacks and clean up timers, widgets, audio, and input when their owning World is torn down.
 - Dialogue interaction prompt text is fully instance-authored; an empty value now hides the prompt instead of using a hardcoded fallback.
 
 ## 0.2.1

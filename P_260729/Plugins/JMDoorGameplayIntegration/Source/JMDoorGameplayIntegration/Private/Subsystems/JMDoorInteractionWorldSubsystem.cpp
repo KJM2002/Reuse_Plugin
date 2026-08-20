@@ -5,6 +5,11 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 
+bool UJMDoorInteractionWorldSubsystem::DoesSupportWorldType(EWorldType::Type WorldType) const
+{
+	return WorldType == EWorldType::Game || WorldType == EWorldType::PIE || WorldType == EWorldType::GamePreview;
+}
+
 void UJMDoorInteractionWorldSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
     Super::Initialize(Collection);

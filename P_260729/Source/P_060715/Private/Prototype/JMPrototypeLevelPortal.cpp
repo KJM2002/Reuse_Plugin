@@ -14,6 +14,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "NiagaraComponent.h"
 #include "Prototype/JMPrototypeTravelTransitionSubsystem.h"
+#include "Prototype/JMPrototypeProgressionSubsystem.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogJMPrototypePortal, Log, All);
@@ -248,6 +249,10 @@ void AJMPrototypeLevelPortal::TryExecuteTravel()
 	SetActorTickEnabled(false);
 	if (UGameInstance* GI = GetGameInstance())
 	{
+		if (UJMPrototypeProgressionSubsystem* Progression = GI->GetSubsystem<UJMPrototypeProgressionSubsystem>())
+		{
+			Progression->MarkLevelTravelPending(FName(*TravelDestinationPackageName));
+		}
 		if (UJMPrototypeTravelTransitionSubsystem* Transition = GI->GetSubsystem<UJMPrototypeTravelTransitionSubsystem>())
 		{
 			Transition->PrepareLoadingScreen(ArrivalMessages);

@@ -35,6 +35,7 @@ void UJMJumpScareSubsystem::Deinitialize()
 
 EJMJumpScarePlayResult UJMJumpScareSubsystem::PlayJumpScare(UJMJumpScareDefinition* Definition, const FJMJumpScarePlayContext& Context)
 {
+    PruneTriggeredOnceKeys();
     const EJMJumpScarePlayResult Validation = ValidateRequest(Definition, Context);
     if (Validation != EJMJumpScarePlayResult::Started)
     {
@@ -60,12 +61,16 @@ EJMJumpScarePlayResult UJMJumpScareSubsystem::PlayJumpScare(UJMJumpScareDefiniti
     ActiveDefinition = Definition;
     ActiveContext = Context;
     ActiveOnceKey = OnceKey;
+    const uint64 SessionId = ++SessionSerial;
     if (Policy == EJMJumpScareTriggerPolicy::Once && OnceKey)
     {
         TriggeredOnceKeys.Add(OnceKey);
     }
 
-    SetPhase(EJMJumpScarePhase::Preparing);
+    if (!SetPhase(EJMJumpScarePhase::Preparing, SessionId))
+    {
+        return EJMJumpScarePlayResult::Started;
+    }
     if (Definition->StartDelay > 0.0f)
     {
         GetWorld()->GetTimerManager().SetTimer(StartTimer, this, &UJMJumpScareSubsystem::ShowOverlay, Definition->StartDelay, false);
@@ -127,41 +132,55 @@ FTransform UJMJumpScareSubsystem::CalculateWorldAnchorTransform(const FTransform
     return ActorOffset * AnchorTransform;
 }
 
-void UJMJumpScareSubsystem::SetState(EJMJumpScareState NewState)
+bool UJMJumpScareSubsystem::SetState(EJMJumpScareState NewState, uint64 ExpectedSession)
 {
+    if (ExpectedSession != 0 && SessionSerial != ExpectedSession)
+    {
+        return false;
+    }
     if (State == NewState)
     {
-        return;
+        return true;
     }
     const EJMJumpScareState OldState = State;
     State = NewState;
     OnStateChanged.Broadcast(OldState, NewState);
+    return ExpectedSession == 0 || SessionSerial == ExpectedSession;
 }
 
-void UJMJumpScareSubsystem::SetPhase(EJMJumpScarePhase NewPhase)
+bool UJMJumpScareSubsystem::SetPhase(EJMJumpScarePhase NewPhase, uint64 ExpectedSession)
 {
+    if (ExpectedSession != 0 && SessionSerial != ExpectedSession)
+    {
+        return false;
+    }
     if (Phase == NewPhase)
     {
-        return;
+        return true;
     }
 
     const EJMJumpScarePhase OldPhase = Phase;
     Phase = NewPhase;
     OnPhaseChanged.Broadcast(OldPhase, NewPhase);
+    if (ExpectedSession != 0 && (SessionSerial != ExpectedSession || Phase != NewPhase))
+    {
+        return false;
+    }
 
+    bool bStateCurrent = true;
     switch (NewPhase)
     {
     case EJMJumpScarePhase::Idle:
-        SetState(EJMJumpScareState::Idle);
+        bStateCurrent = SetState(EJMJumpScareState::Idle, ExpectedSession);
         break;
     case EJMJumpScarePhase::Preparing:
-        SetState(EJMJumpScareState::Waiting);
+        bStateCurrent = SetState(EJMJumpScareState::Waiting, ExpectedSession);
         break;
     case EJMJumpScarePhase::Finishing:
-        SetState(EJMJumpScareState::Finishing);
+        bStateCurrent = SetState(EJMJumpScareState::Finishing, ExpectedSession);
         break;
     default:
-        SetState(EJMJumpScareState::Playing);
+        bStateCurrent = SetState(EJMJumpScareState::Playing, ExpectedSession);
         break;
     }
 
@@ -170,6 +189,7 @@ void UJMJumpScareSubsystem::SetPhase(EJMJumpScarePhase NewPhase)
     {
         UE_LOG(LogJMJumpScare, Log, TEXT("2D JumpScare phase %d -> %d"), static_cast<int32>(OldPhase), static_cast<int32>(NewPhase));
     }
+    return bStateCurrent && (ExpectedSession == 0 || SessionSerial == ExpectedSession);
 }
 
 EJMJumpScarePlayResult UJMJumpScareSubsystem::ValidateRequest(
@@ -286,6 +306,7 @@ void UJMJumpScareSubsystem::RestorePlayerInput()
 
 void UJMJumpScareSubsystem::ShowOverlay()
 {
+    const uint64 SessionId = SessionSerial;
     if (!ActiveDefinition || !GetWorld())
     {
         Cleanup(false, true, EJMJumpScarePlayResult::InvalidDefinition);
@@ -315,9 +336,14 @@ void UJMJumpScareSubsystem::ShowOverlay()
         ActiveDefinition->ImageResolution,
         ActiveDefinition->RiseDuration);
 
-    SetPhase(EJMJumpScarePhase::Impact);
+    if (!SetPhase(EJMJumpScarePhase::Impact, SessionId))
+    {
+        return;
+    }
     PublishEvent(JMJumpScareEventTags::Started, EJMJumpScarePlayResult::Started);
+    if (SessionSerial != SessionId) return;
     PublishEvent(JMJumpScareEventTags::Impact, EJMJumpScarePlayResult::Started);
+    if (SessionSerial != SessionId) return;
 
     if (ActiveDefinition->JumpScareSound)
     {
@@ -331,7 +357,10 @@ void UJMJumpScareSubsystem::ShowOverlay()
         }
     }
 
-    SetPhase(EJMJumpScarePhase::Holding);
+    if (!SetPhase(EJMJumpScarePhase::Holding, SessionId))
+    {
+        return;
+    }
     if (ActiveDefinition->Duration > 0.0f)
     {
         GetWorld()->GetTimerManager().SetTimer(DurationTimer, this, &UJMJumpScareSubsystem::FinishJumpScare, ActiveDefinition->Duration, false);
@@ -363,8 +392,13 @@ void UJMJumpScareSubsystem::FinishJumpScare()
         return;
     }
 
-    SetPhase(EJMJumpScarePhase::Exiting);
+    const uint64 SessionId = SessionSerial;
+    if (!SetPhase(EJMJumpScarePhase::Exiting, SessionId))
+    {
+        return;
+    }
     PublishEvent(JMJumpScareEventTags::Exiting, EJMJumpScarePlayResult::Started);
+    if (SessionSerial != SessionId) return;
 
     if (OverlayWidget)
     {
@@ -441,10 +475,16 @@ void UJMJumpScareSubsystem::RemoveGlitch()
 
 void UJMJumpScareSubsystem::Cleanup(bool bCancelled, bool bFailed, EJMJumpScarePlayResult Result)
 {
+    if (bCleanupInProgress)
+    {
+        return;
+    }
+    bCleanupInProgress = true;
+    const uint64 CleanupSession = ++SessionSerial;
     ClearTimers();
     RemoveGlitch();
     RestorePlayerInput();
-    SetPhase(EJMJumpScarePhase::Finishing);
+    SetPhase(EJMJumpScarePhase::Finishing, CleanupSession);
 
     if (OverlayWidget)
     {
@@ -478,7 +518,8 @@ void UJMJumpScareSubsystem::Cleanup(bool bCancelled, bool bFailed, EJMJumpScareP
     ActiveDefinition = nullptr;
     ActiveContext = FJMJumpScarePlayContext();
     ActiveOnceKey.Reset();
-    SetPhase(EJMJumpScarePhase::Idle);
+    SetPhase(EJMJumpScarePhase::Idle, CleanupSession);
+    bCleanupInProgress = false;
 }
 
 void UJMJumpScareSubsystem::ClearTimers()
@@ -533,4 +574,15 @@ void UJMJumpScareSubsystem::PublishEvent(FGameplayTag EventTag, EJMJumpScarePlay
     Message.ContextTags = ActiveContext.ContextTags;
     Message.Payload = Payload;
     Events->PublishEvent(Message);
+}
+
+void UJMJumpScareSubsystem::PruneTriggeredOnceKeys()
+{
+    for (auto It = TriggeredOnceKeys.CreateIterator(); It; ++It)
+    {
+        if (!It->IsValid())
+        {
+            It.RemoveCurrent();
+        }
+    }
 }

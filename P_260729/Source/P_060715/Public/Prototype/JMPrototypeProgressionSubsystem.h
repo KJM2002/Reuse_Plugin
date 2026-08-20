@@ -84,6 +84,8 @@ public:
 
 	/** Marks an intentional OpenLevel so the next map keeps the current run. */
 	void MarkLevelTravelPending();
+	/** Captures travel state for this GameInstance immediately before opening the explicit destination. */
+	void MarkLevelTravelPending(FName DestinationMap);
 
 	/** Consumes the one-shot travel marker on arrival. */
 	bool ConsumeLevelTravelPending();

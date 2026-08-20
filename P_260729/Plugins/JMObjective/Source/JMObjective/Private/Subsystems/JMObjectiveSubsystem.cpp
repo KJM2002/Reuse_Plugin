@@ -64,9 +64,17 @@ bool UJMObjectiveSubsystem::RegisterObjectiveInternal(UJMObjectiveDefinition* De
     {
         UE_LOG(LogJMObjective, Log, TEXT("[JMObjective] Registered: %s State: Inactive Required: %d"), *Definition->ObjectiveId.ToString(), RuntimeState.RequiredCount);
     }
-    OnObjectiveRegistered.Broadcast(RuntimeState.ObjectiveId, RuntimeState);
-    PublishObjectiveEvent(JMObjectiveEventTags::Registered, RuntimeState, 0, nullptr);
-    return !bHonorAutoActivate || !Definition->bAutoActivate || ActivateObjective(Definition->ObjectiveId);
+    const FJMObjectiveRuntimeState RegisteredState = RuntimeState;
+    OnObjectiveRegistered.Broadcast(RegisteredState.ObjectiveId, RegisteredState);
+    PublishObjectiveEvent(JMObjectiveEventTags::Registered, RegisteredState, 0, nullptr);
+    if (!bHonorAutoActivate || !Definition->bAutoActivate)
+    {
+        return true;
+    }
+    const FJMObjectiveRuntimeState* CurrentState = ObjectiveStates.Find(Definition->ObjectiveId);
+    return !CurrentState || CurrentState->Definition != Definition
+        ? true
+        : ActivateObjective(Definition->ObjectiveId);
 }
 
 bool UJMObjectiveSubsystem::UnregisterObjective(FGameplayTag ObjectiveId)
@@ -104,8 +112,9 @@ bool UJMObjectiveSubsystem::ActivateObjective(FGameplayTag ObjectiveId)
     {
         UE_LOG(LogJMObjective, Log, TEXT("[JMObjective] Activated: %s Listening: %s"), *ObjectiveId.ToString(), *RuntimeState->Definition->ListeningEventTag.ToString());
     }
-    OnObjectiveActivated.Broadcast(ObjectiveId, *RuntimeState);
-    PublishObjectiveEvent(JMObjectiveEventTags::Activated, *RuntimeState, 0, nullptr);
+    const FJMObjectiveRuntimeState ActivatedState = *RuntimeState;
+    OnObjectiveActivated.Broadcast(ObjectiveId, ActivatedState);
+    PublishObjectiveEvent(JMObjectiveEventTags::Activated, ActivatedState, 0, nullptr);
     return true;
 }
 
@@ -118,8 +127,9 @@ bool UJMObjectiveSubsystem::DeactivateObjective(FGameplayTag ObjectiveId)
     }
     UnsubscribeObjective(ObjectiveId);
     RuntimeState->State = EJMObjectiveState::Inactive;
-    OnObjectiveDeactivated.Broadcast(ObjectiveId, *RuntimeState);
-    PublishObjectiveEvent(JMObjectiveEventTags::Deactivated, *RuntimeState, 0, nullptr);
+    const FJMObjectiveRuntimeState DeactivatedState = *RuntimeState;
+    OnObjectiveDeactivated.Broadcast(ObjectiveId, DeactivatedState);
+    PublishObjectiveEvent(JMObjectiveEventTags::Deactivated, DeactivatedState, 0, nullptr);
     return true;
 }
 
@@ -138,8 +148,9 @@ bool UJMObjectiveSubsystem::CompleteObjective(FGameplayTag ObjectiveId)
     {
         UE_LOG(LogJMObjective, Log, TEXT("[JMObjective] Completed: %s"), *ObjectiveId.ToString());
     }
-    OnObjectiveCompleted.Broadcast(ObjectiveId, *RuntimeState);
-    PublishObjectiveEvent(JMObjectiveEventTags::Completed, *RuntimeState, 0, nullptr);
+    const FJMObjectiveRuntimeState CompletedState = *RuntimeState;
+    OnObjectiveCompleted.Broadcast(ObjectiveId, CompletedState);
+    PublishObjectiveEvent(JMObjectiveEventTags::Completed, CompletedState, 0, nullptr);
     return true;
 }
 
@@ -153,8 +164,9 @@ bool UJMObjectiveSubsystem::FailObjective(FGameplayTag ObjectiveId)
     UnsubscribeObjective(ObjectiveId);
     RuntimeState->State = EJMObjectiveState::Failed;
     RuntimeState->FailureTime = FDateTime::UtcNow();
-    OnObjectiveFailed.Broadcast(ObjectiveId, *RuntimeState);
-    PublishObjectiveEvent(JMObjectiveEventTags::Failed, *RuntimeState, 0, nullptr);
+    const FJMObjectiveRuntimeState FailedState = *RuntimeState;
+    OnObjectiveFailed.Broadcast(ObjectiveId, FailedState);
+    PublishObjectiveEvent(JMObjectiveEventTags::Failed, FailedState, 0, nullptr);
     return true;
 }
 
@@ -173,8 +185,9 @@ bool UJMObjectiveSubsystem::ResetObjective(FGameplayTag ObjectiveId)
     RuntimeState->FailureTime = FDateTime();
     RuntimeState->LastEventTag = FGameplayTag();
     RuntimeState->LastTargetIdentifier = NAME_None;
-    OnObjectiveReset.Broadcast(ObjectiveId, *RuntimeState);
-    PublishObjectiveEvent(JMObjectiveEventTags::Reset, *RuntimeState, 0, nullptr);
+    const FJMObjectiveRuntimeState ResetState = *RuntimeState;
+    OnObjectiveReset.Broadcast(ObjectiveId, ResetState);
+    PublishObjectiveEvent(JMObjectiveEventTags::Reset, ResetState, 0, nullptr);
     return true;
 }
 
@@ -415,15 +428,24 @@ bool UJMObjectiveSubsystem::ApplyProgress(FGameplayTag ObjectiveId, int32 Amount
     {
         UE_LOG(LogJMObjective, Log, TEXT("[JMObjective] Progressed: %s %d -> %d / %d"), *ObjectiveId.ToString(), OldCount, RuntimeState->CurrentCount, RuntimeState->RequiredCount);
     }
-    OnObjectiveProgressed.Broadcast(ObjectiveId, *RuntimeState, AppliedDelta);
-    PublishObjectiveEvent(JMObjectiveEventTags::Progressed, *RuntimeState, AppliedDelta, SourceMessage);
-    if (RuntimeState->CurrentCount >= RuntimeState->RequiredCount)
+    const FJMObjectiveRuntimeState ProgressedState = *RuntimeState;
+    OnObjectiveProgressed.Broadcast(ObjectiveId, ProgressedState, AppliedDelta);
+    PublishObjectiveEvent(JMObjectiveEventTags::Progressed, ProgressedState, AppliedDelta, SourceMessage);
+
+    RuntimeState = ObjectiveStates.Find(ObjectiveId);
+    if (RuntimeState
+        && RuntimeState->State == EJMObjectiveState::Active
+        && RuntimeState->Definition == ProgressedState.Definition
+        && RuntimeState->ActivationTime == ProgressedState.ActivationTime
+        && RuntimeState->CurrentCount == ProgressedState.CurrentCount
+        && RuntimeState->CurrentCount >= RuntimeState->RequiredCount)
     {
         UnsubscribeObjective(ObjectiveId);
         RuntimeState->State = EJMObjectiveState::Completed;
         RuntimeState->CompletionTime = FDateTime::UtcNow();
-        OnObjectiveCompleted.Broadcast(ObjectiveId, *RuntimeState);
-        PublishObjectiveEvent(JMObjectiveEventTags::Completed, *RuntimeState, 0, SourceMessage);
+        const FJMObjectiveRuntimeState CompletedState = *RuntimeState;
+        OnObjectiveCompleted.Broadcast(ObjectiveId, CompletedState);
+        PublishObjectiveEvent(JMObjectiveEventTags::Completed, CompletedState, 0, SourceMessage);
     }
     return true;
 }

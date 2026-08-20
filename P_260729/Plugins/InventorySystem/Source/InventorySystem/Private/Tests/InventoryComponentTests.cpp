@@ -3,7 +3,11 @@
 #include "Misc/AutomationTest.h"
 
 #include "Components/InventoryComponent.h"
+#include "Components/InventoryUIComponent.h"
+#include "EnhancedInputComponent.h"
+#include "InputAction.h"
 #include "Items/InventoryItemDefinition.h"
+#include "Tests/InventorySafetyTestTypes.h"
 #include "UI/InventoryWidgetBase.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -190,6 +194,113 @@ bool FInventoryLayoutOperationsTest::RunTest(const FString& Parameters)
 		TEXT("Rejected move preserves source identity"),
 		Inventory->GetSlotsNative()[3].InstanceId,
 		MovedInstanceId);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventoryUseReentrancyIdentityTest,
+	"InventorySystem.Component.UseReentrancyPreservesInstanceIdentity",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryUseReentrancyIdentityTest::RunTest(const FString& Parameters)
+{
+	for (int32 Action = 1; Action <= 4; ++Action)
+	{
+		UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+		Inventory->MaxInventorySlots = 4;
+		UInventoryItemDefinition* Consumable = NewObject<UInventoryItemDefinition>();
+		Consumable->ItemId = TEXT("Automation.Consumable");
+		Consumable->bCanUse = true;
+		Consumable->bConsumeOnUse = true;
+		Consumable->ConsumeQuantity = 1;
+		Consumable->bStackable = true;
+		Consumable->MaxStackSize = 10;
+		Consumable->UseEffect = NewObject<UInventoryAlwaysSucceedsUseEffect>(Consumable);
+		UInventoryItemDefinition* Other = NewObject<UInventoryItemDefinition>();
+		Other->ItemId = TEXT("Automation.Other");
+		Other->bStackable = true;
+		Other->MaxStackSize = 10;
+
+		TestTrue(TEXT("Consumable stack is added"), Inventory->AddItem(Consumable, 2));
+		TestTrue(TEXT("Other stack is added"), Inventory->AddItem(Other, 5));
+		const FGuid OriginalInstanceId = Inventory->GetSlotsNative()[0].InstanceId;
+		const FGuid OtherInstanceId = Inventory->GetSlotsNative()[1].InstanceId;
+
+		UInventoryUseReentrancyReceiver* Receiver = NewObject<UInventoryUseReentrancyReceiver>();
+		Receiver->Inventory = Inventory;
+		Receiver->Action = Action;
+		Inventory->OnItemUsed.AddDynamic(Receiver, &UInventoryUseReentrancyReceiver::HandleItemUsed);
+		TestEqual(TEXT("Use succeeds across listener mutation"), Inventory->UseItemAtSlot(0), EInventoryOperationResult::Success);
+
+		int32 OriginalQuantity = 0;
+		int32 OtherQuantity = 0;
+		for (const FInventorySlot& Slot : Inventory->GetSlotsNative())
+		{
+			if (Slot.InstanceId == OriginalInstanceId)
+			{
+				OriginalQuantity = Slot.Quantity;
+			}
+			if (Slot.InstanceId == OtherInstanceId)
+			{
+				OtherQuantity = Slot.Quantity;
+			}
+		}
+		if (Action <= 2)
+		{
+			TestEqual(TEXT("Only the original moved/sorted instance is consumed"), OriginalQuantity, 1);
+		}
+		else
+		{
+			TestEqual(TEXT("A listener-removed original instance is not consumed again"), OriginalQuantity, 0);
+		}
+		TestEqual(TEXT("The other item is never consumed"), OtherQuantity, 5);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventoryAddTransactionBoundaryTest,
+	"InventorySystem.Component.AddTransactionCommitsBeforeNotifications",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryAddTransactionBoundaryTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->MaxInventorySlots = 3;
+	UInventoryItemDefinition* Definition = NewObject<UInventoryItemDefinition>();
+	Definition->ItemId = TEXT("Automation.Transaction");
+	Definition->bStackable = true;
+	Definition->MaxStackSize = 2;
+	UInventoryUseReentrancyReceiver* Receiver = NewObject<UInventoryUseReentrancyReceiver>();
+	Receiver->Inventory = Inventory;
+	Inventory->OnItemAdded.AddDynamic(Receiver, &UInventoryUseReentrancyReceiver::HandleItemAdded);
+
+	const FInventoryAddOutcome Outcome = Inventory->AddItemDetailed(Definition, 5);
+	TestEqual(TEXT("All requested items are committed"), Outcome.AddedQuantity, 5);
+	TestEqual(TEXT("Per-stack notifications are retained"), Receiver->AddedCallbackCount, 3);
+	TestEqual(TEXT("Every listener observes the fully committed transaction"), Receiver->MinimumObservedTotal, 5);
+	TestEqual(TEXT("Listener layout mutation does not corrupt the outcome"), Inventory->GetItemQuantity(Definition), 5);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventoryEnhancedInputRebindTest,
+	"InventorySystem.UI.EnhancedInputRebindOwnsOnlyCurrentBinding",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryEnhancedInputRebindTest::RunTest(const FString& Parameters)
+{
+	UInventoryUIComponent* UI = NewObject<UInventoryUIComponent>();
+	UInputAction* Action = NewObject<UInputAction>();
+	UEnhancedInputComponent* First = NewObject<UEnhancedInputComponent>();
+	UEnhancedInputComponent* Second = NewObject<UEnhancedInputComponent>();
+	UI->ToggleInventoryAction = Action;
+
+	TestTrue(TEXT("First Enhanced Input component binds"), UI->BindEnhancedInput(First));
+	TestEqual(TEXT("First component owns one binding"), First->GetActionEventBindings().Num(), 1);
+	TestTrue(TEXT("Second Enhanced Input component rebinds"), UI->BindEnhancedInput(Second));
+	TestEqual(TEXT("Old component binding is removed"), First->GetActionEventBindings().Num(), 0);
+	TestEqual(TEXT("New component owns one binding"), Second->GetActionEventBindings().Num(), 1);
 	return true;
 }
 

@@ -30,7 +30,7 @@ public:
     bool CancelJumpScare();
 
     UFUNCTION(BlueprintPure, Category="JM JumpScare")
-    bool IsJumpScarePlaying() const { return State != EJMJumpScareState::Idle; }
+    bool IsJumpScarePlaying() const { return State != EJMJumpScareState::Idle || Phase != EJMJumpScarePhase::Idle || ActiveDefinition != nullptr; }
 
     UFUNCTION(BlueprintPure, Category="JM JumpScare")
     EJMJumpScareState GetState() const { return State; }
@@ -90,8 +90,8 @@ private:
     bool bAppliedMoveInputLock = false;
     bool bAppliedLookInputLock = false;
 
-    void SetState(EJMJumpScareState NewState);
-    void SetPhase(EJMJumpScarePhase NewPhase);
+    bool SetState(EJMJumpScareState NewState, uint64 ExpectedSession = 0);
+    bool SetPhase(EJMJumpScarePhase NewPhase, uint64 ExpectedSession = 0);
     EJMJumpScarePlayResult ValidateRequest(UJMJumpScareDefinition* Definition, const FJMJumpScarePlayContext& Context) const;
     UObject* ResolveOnceKey(UJMJumpScareDefinition* Definition, const FJMJumpScarePlayContext& Context) const;
     APlayerController* ResolveTargetPlayer(const FJMJumpScarePlayContext& Context) const;
@@ -107,4 +107,8 @@ private:
     void Cleanup(bool bCancelled, bool bFailed, EJMJumpScarePlayResult Result);
     void ClearTimers();
     void PublishEvent(FGameplayTag EventTag, EJMJumpScarePlayResult Result);
+    void PruneTriggeredOnceKeys();
+
+    uint64 SessionSerial = 0;
+    bool bCleanupInProgress = false;
 };

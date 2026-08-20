@@ -126,6 +126,7 @@ protected:
 	void FinalizeCloseInventory();
 	void PublishPresentationEvent(bool bInventoryVisible);
 	void PlayConfiguredSound(const TSoftObjectPtr<class USoundBase>& Sound) const;
+	void UnbindEnhancedInput();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInventoryWidgetBase> InventoryWidget = nullptr;
@@ -149,4 +150,5 @@ protected:
 	bool bAppliedLookInputBlock = false;
 	bool bAppliedPawnInputBlock = false;
 	bool bClosePending = false;
+	uint32 ToggleInputBindingHandle = 0;
 };

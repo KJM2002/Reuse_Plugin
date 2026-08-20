@@ -11,6 +11,13 @@ review_reason: "릴리스 및 Git 이력과 변경 항목의 누락 여부를 �
 
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Phase/state callback cancellation is guarded by a session serial so the cancelled call cannot create ghost timers or overlays.
+- Invalid weak once-policy keys are pruned when a new play request is evaluated.
+
 ## 1.1.0
 
 ### Added

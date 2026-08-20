@@ -4,7 +4,7 @@ status: Current
 authority: Supporting
 scope: Project Runtime Safety
 last_verified: 2026-08-20
-verified_against: working-tree-runtime-safety-audit-2026-08-20
+verified_against: working-tree-runtime-safety-remediation-2026-08-20
 owners:
   - Runtime Engineering
 related:
@@ -436,3 +436,206 @@ Integration Subsystem이 만드는 ActorComponent는 Actor를 Outer로 사용하
 - line number는 `working-tree-runtime-safety-audit-2026-08-20` 기준이며 이후 편집으로 이동할 수 있다. 클래스명과 함수명을 우선 식별자로 사용한다.
 
 이 문서는 현재 위험의 기준 보고서다. 실제 수정이 시작되면 각 ID를 regression test 이름과 연결하고, 수정 완료 뒤 PIE 실행 결과와 검증 commit을 추가해야 한다.
+
+## 13. 2026-08-20 Current-code 재분류 및 Remediation
+
+이 절은 최초 감사 이후 현재 working tree를 다시 대조하고 수행한 remediation 기록이다. 최초 판정과 심각도는 3~7장의 원문을 보존하며, 아래 `Current-code 판정`과 검증 수준을 별도로 사용한다.
+
+### 13.1 수정 전 Baseline
+
+| 항목 | 결과 |
+|---|---|
+| `P_060715Editor Win64 Development` | `PASS` — 40 actions, `Result: Succeeded` |
+| `JM.Objective` | `9/9 PASS` |
+| `InventorySystem` | `11/11 PASS` |
+| `ReusableDialogue` | `1/1 PASS` |
+| `JM.ItemInspector` | `1/1 PASS` |
+| `JM.JumpScare` | `3/3 PASS` |
+| `JM.Door.Integration` | `2/2 PASS` |
+| `JM.Prototype` | `6/6 PASS` |
+
+Known pre-existing test/build failure는 없었다. Wintab/optional profiler DLL 및 headless WebBrowser 경고는 Automation 결과와 무관한 환경 경고로 관찰됐다.
+
+### 13.2 Issue 결과
+
+| ID | 기존 판정 | Current-code 판정 | 변경 | Regression | Runtime Verification | 상태 |
+|---|---|---|---|---|---|---|
+| OBJ-001 | Critical / 정적 확정 | `CONFIRMED` | delegate용 상태를 값 snapshot으로 만들고 progress callback 뒤 ID/definition/activation/count를 재검증 | `JM.Objective.Reentrancy.ActivationUnregister`, `JM.Objective.Reentrancy.ProgressMutations` | `AUTOMATION PASS` | Implementation/Automation `COMPLETE` |
+| OBJ-002 | High / 정적 확정 | `CONFIRMED` | Flow helper를 `FlowId` 기반 재조회로 변경하고 Objective API/delegate 뒤 기존 map reference를 사용하지 않음 | `JM.Objective.Flow.Reentrancy.StartOtherFlow` | `AUTOMATION PASS` | Implementation/Automation `COMPLETE` |
+| DLG-001 | High / 정적 확정 | `CONFIRMED` | session serial, finish guard, Opening/line callback 뒤 state·sequence·widget 재검증 | `NOT AUTOMATED` | Static `PASS`, Build `PASS`, PIE `NOT RUN` | Implementation `COMPLETE`, runtime repro pending |
+| DLG-002 | High / 고신뢰 위험 | `CONFIRMED` | session World weak ownership, `OnWorldCleanup` 대칭 등록/해제, owning World timer cleanup | `NOT AUTOMATED` | Static `PASS`, PIE Travel `NOT RUN` | Implementation `COMPLETE`, runtime travel pending |
+| INS-001 | High / 고신뢰 위험 | `CONFIRMED` | session World 기록, matching World cleanup, ticker 제거, Actor `IsValid`+World 검증 | `NOT AUTOMATED` | Static `PASS`, PIE Travel `NOT RUN` | Implementation `COMPLETE`, runtime travel pending |
+| INS-002 | High / 정적 확정 | `CONFIRMED` | open delegate 뒤 serial/state/data/widget/world 재검증 | `NOT AUTOMATED` | Static `PASS`, Build `PASS` | Implementation `COMPLETE`, direct callback automation pending |
+| INV-001 | High / 정적 확정 | `CONFIRMED` | callback 뒤 원래 `InstanceId`를 다시 찾아 definition/quantity가 일치할 때만 소비 | `InventorySystem.Component.UseReentrancyPreservesInstanceIdentity` | `AUTOMATION PASS` | Implementation/Automation `COMPLETE` |
+| INV-002 | Medium / 정적 확정 | `CONFIRMED` | `AddItemDetailed`의 모든 slot mutation을 먼저 commit한 뒤 immutable per-stack notification 발행 | `InventorySystem.Component.AddTransactionCommitsBeforeNotifications` | `AUTOMATION PASS` | Add transaction `COMPLETE`; cross-container 이동은 Remaining Risk |
+| WLD-001 | High / 고신뢰 위험 | `CONFIRMED` | PostLoad는 owning GameInstance 필터, PreLoad 전역 추론은 제거하고 두 실제 `OpenLevel` 호출점에서 명시적 destination capture | 기존 `JM.Prototype.*` | `6/6 PASS`; multi-PIE `NOT RUN` | Implementation `COMPLETE`, multi-PIE pending |
+| INP-001 | Medium / 정적 확정 | `CONFIRMED / ARCHITECTURAL` | 코드 변경 없음 | `NOT AUTOMATED` | Nested input PIE `NOT RUN` | `DEFERRED` |
+| MOD-001 | Medium / 정적 확정 | `CONFIRMED / ARCHITECTURAL` | 코드 변경 없음 | `NOT AUTOMATED` | Split-screen `NOT RUN` | `DEFERRED` |
+| EDT-001 | Medium / 고신뢰 위험 | `CONFIRMED` | Door Integration WorldSubsystem을 Game/PIE/GamePreview로 제한 | `JM.Door.Integration.RuntimeWorldTypesOnly` | `AUTOMATION PASS` | Implementation/Automation `COMPLETE` |
+| DEL-001 | Medium / 정적 확정 | `CONFIRMED` | 생성한 Enhanced Input binding handle만 rebind/EndPlay에서 제거 | `InventorySystem.UI.EnhancedInputRebindOwnsOnlyCurrentBinding` | `AUTOMATION PASS` | Implementation/Automation `COMPLETE` |
+| JMP-001 | Medium / 정적 확정 | `CONFIRMED` | phase/state callback을 session serial로 검증하고 cleanup을 idempotent하게 차단 | `JM.JumpScare.Reentrancy.CancelDuringPreparing` | `AUTOMATION PASS` | Implementation/Automation `COMPLETE` |
+| GC-001 | Low / 정적 확정 | `CONFIRMED` | 새 play request 검증 시 invalid weak once-key prune | `NOT AUTOMATED` | Static `PASS`, Build `PASS` | Implementation `COMPLETE` |
+| NUL-001 | Low / 조건부 | `CONFIRMED AS DEFENSIVE BOUNDARY` | `TryGrab` 시작에서 owner/world/teardown 검증 후 cached World 사용 | `NOT AUTOMATED` | Static `PASS`, Build `PASS` | Defensive implementation `COMPLETE` |
+| NET-001 | High before multiplayer / 조건부 | `OUT_OF_SCOPE` | RPC/Replication 변경 없음 | N/A | 문서 정적 대조 `PASS` | 현재 single-player/process-local 계약 유지 |
+
+### 13.3 Issue별 Remediation 상세
+
+#### OBJ-001 / OBJ-002
+
+Remediation:
+- Objective mutation 뒤 delegate와 Gameplay Event에는 `FJMObjectiveRuntimeState` 값 snapshot을 전달한다.
+- progress callback 뒤 자동 완료는 `ObjectiveId`, Definition, ActivationTime, CurrentCount가 모두 기대값일 때만 계속한다.
+- Flow는 Objective API와 외부 callback 전후에 `FlowStates` element reference를 유지하지 않고 `FlowId`로 재조회한다.
+
+Remaining Risk:
+- Branching/parallel Quest는 현재 Public 계약 밖이다. 현재 선형 Flow 범위에서 검증했다.
+
+#### DLG-001 / DLG-002
+
+Remediation:
+- Dialogue session마다 serial과 weak owning World를 기록한다.
+- Opening, line start/reveal/advance callback 뒤 현재 session을 다시 확인한다.
+- `OnWorldCleanup`은 session World가 일치할 때만 중앙 `FinishDialogue`/`CleanupPlayback`을 실행하며 `Deinitialize`에서 delegate를 제거한다.
+
+Regression:
+- `NOT AUTOMATED` — 현재 Dialogue test module에는 PlayerController+viewport Widget session fixture가 없다.
+
+Verification:
+- Implementation: `COMPLETE`
+- Static Verification: `PASS`
+- Editor Build: `PASS`
+- PIE Opening→Stop: `NOT RUN`
+- PIE Travel: `NOT RUN`
+
+Manual PIE repro:
+1. `Opening` state listener에서 `StopDialogue`를 호출한다.
+2. reveal/start-delay 중 `OpenLevel`을 호출한다.
+3. destination에서 새 Dialogue를 시작한다.
+
+Expected:
+- null Widget 접근, old World timer/audio/widget 잔류, 새 Dialogue reject가 없어야 한다.
+
+#### INS-001 / INS-002
+
+Remediation:
+- Inspection session World와 serial을 기록하고 open delegate 뒤 Widget/state/data/world를 재검증한다.
+- CoreTicker enter/exit에서 Widget/Preview Actor/Source Actor의 `IsValid`와 owning World 일치를 검사한다.
+- matching `OnWorldCleanup`에서 ticker와 preview/UI/input/modal 상태를 기존 중앙 cleanup으로 회수한다.
+
+Regression:
+- `NOT AUTOMATED` — 현재 ItemInspector test module의 surface-widget test는 실제 LocalPlayer travel session을 구성하지 않는다.
+
+Verification:
+- Implementation: `COMPLETE`
+- Static Verification: `PASS`
+- Editor Build: `PASS`
+- PIE Opened→Close: `NOT RUN`
+- PIE Transition Travel: `NOT RUN`
+
+#### INV-001 / INV-002
+
+Remediation:
+- Use Effect와 `OnItemUsed` 이후 소비 대상은 원래 stack의 `InstanceId`로 찾는다. 사라졌거나 definition/quantity가 달라졌으면 effect 성공은 유지하되 추가 소비하지 않는다.
+- `AddItemDetailed`은 전체 stack mutation과 Outcome 계산을 commit한 뒤 기존 per-stack `OnItemAdded` 호출을 발행한다.
+
+Remaining Risk:
+- `MoveItem(Destination, Source, INDEX_NONE)`는 두 Inventory를 아우르는 공통 transaction/rollback object가 없으므로 destination notification과 source removal을 완전히 하나의 observer transaction으로 만들지 않았다. 이를 고치려면 transfer 전용 internal commit/change-set을 추가해야 하며 후속 Medium 작업으로 남긴다.
+
+#### WLD-001 / EDT-001
+
+Remediation:
+- arrival overlay는 `LoadedWorld->GetGameInstance() == GetGameInstance()`인 경우만 표시한다.
+- World가 없는 process-global `PreLoadMap` 구독은 제거했다. Portal과 RunReset의 실제 `OpenLevel` 직전에 destination을 넘겨 해당 GameInstance progression이 직접 capture한다.
+- Door gameplay integration은 Runtime world type만 지원한다.
+
+Verification:
+- Prototype Automation: `6/6 PASS`
+- Door Integration Automation: `3/3 PASS`
+- single-process multi-PIE: `NOT RUN`
+
+#### DEL-001 / JMP-001 / GC-001 / NUL-001
+
+Remediation:
+- Inventory UI는 `BindAction`이 반환한 handle 하나만 소유하고 이전 component/EndPlay에서 그 handle만 제거한다.
+- JumpScare는 callback 뒤 session serial을 확인하고 cleanup 중 중복 cancel을 무시한다.
+- once weak set은 새 요청 시 invalid entry를 prune하며 Tick은 추가하지 않았다.
+- PhysicalGrabber는 공개 grab 경계에서 cached World를 검증한다.
+
+Verification:
+- Inventory Automation: `14/14 PASS`
+- JumpScare Automation: `4/4 PASS`
+- PhysicalGrabber targeted Automation: 최종 검증 절 참조
+
+#### INP-001 / MOD-001 — Deferred architecture
+
+Current owner 조사:
+- Dialogue, Inventory, Inspector, Prototype Travel/Portal, JumpScare, Recon Integration이 각자 PlayerController input lock/mode/cursor를 획득·복구한다.
+- Inventory와 Inspector가 `Event.UI.Modal.Opened/Closed`를 발행하지만 Interaction과 Objective UI는 persistent state 없이 process-local notification depth만 보유한다.
+- 현재 공통 LocalPlayer presentation owner/token registry는 없다.
+
+따라서 LocalPlayer 구분만 consumer에 부분 추가하거나 일부 close 경로만 보정하면 late subscriber, focus arbitration, 다른 owner의 lock 해제를 해결하지 못한다. 이번 버그 수정에서는 여러 독립 Plugin의 dependency/Public API를 동시에 바꾸지 않았다.
+
+후속 설계:
+1. 하위 공통 `JMPresentation` Runtime Plugin에 `ULocalPlayerSubsystem` registry를 둔다. 이 Plugin은 feature Plugin을 참조하지 않는다.
+2. acquire는 `{Token GUID, Weak Owner, LocalPlayer, Requested Mode, Cursor, Move/Look/Pawn lock, Focus Widget, Priority}` lease를 반환한다.
+3. release는 token owner만 가능하고 owner 파괴/World cleanup에서 자동 회수한다.
+4. modal registry는 notification과 분리된 persistent state이며 `AcquireModal`, `ReleaseModal`, `IsModalActive`, active lease query를 제공한다.
+5. 실제 input mode/focus/cursor는 registry가 모든 lease를 arbitration한 결과로 한 번만 적용한다.
+6. 기존 `Event.UI.Modal.*`은 compatibility notification으로 유지하되 payload에 LocalPlayer/token을 싣고, 새 subscriber는 먼저 registry state를 query한다.
+7. migration 순서는 Inventory/Inspector → Dialogue/JumpScare → Prototype UI → Interaction/Objective UI subscriber 순서로 한다.
+8. 모든 producer migration 전에는 기존 event path를 제거하지 않고 compatibility adapter를 유지한다.
+
+필수 후속 검증:
+- nested owner lock, out-of-order release, owner destruction, late subscriber, split-screen Player 1 only modal, single-process multi-PIE.
+
+#### NET-001
+
+Remediation:
+- 코드 변경 없음. 현재 문서는 Gameplay Event의 process-local/non-replicated 계약과 주요 Runtime Plugin의 local single-player 범위를 이미 명시하며 multiplayer-ready라고 주장하지 않는다.
+
+Remaining Risk:
+- Multiplayer 도입은 별도 authority/RPC/replicated state 설계 범위다.
+
+### 13.4 Public Surface / Dependency 확인
+
+| Surface | 변화 |
+|---|---|
+| BlueprintCallable / BlueprintAssignable API | 변경 없음 |
+| Gameplay Tags | 변경 없음 |
+| Config | 변경 없음 |
+| Save structure | 변경 없음 |
+| `.uplugin` / `Build.cs` dependency | 변경 없음 |
+| Native Public API | 호환 overload `MarkLevelTravelPending(FName)` 추가; 기존 no-arg 유지 |
+| Public implementation declarations | Subsystem lifecycle/world-type override와 private helper 선언만 추가 |
+
+### 13.5 실행하지 않은 Runtime 검증
+
+- Dialogue Opening→Stop 실제 viewport/Blueprint callback PIE
+- Dialogue reveal/start-delay map travel PIE
+- Inspector Opened→Close 실제 LocalPlayer/Widget PIE
+- Inspector enter/exit transition map travel PIE
+- single-process multi-PIE cross-GameInstance travel
+- split-screen modal isolation
+- nested input ownership/focus arbitration
+- Shipping build/package
+
+위 항목은 코드 패치 또는 Editor Automation 통과로 `PIE PASS`라고 간주하지 않는다.
+
+### 13.6 최종 검증 결과 (2026-08-20)
+
+| 검증 | 결과 |
+|---|---:|
+| `P_060715Editor Win64 Development` | `PASS` |
+| `JM.Objective` | `12/12 PASS` |
+| `InventorySystem` | `14/14 PASS` |
+| `ReusableDialogue` | `1/1 PASS` |
+| `JM.ItemInspector` | `1/1 PASS` |
+| `JM.JumpScare` | `4/4 PASS` |
+| `JM.Door.Integration` | `3/3 PASS` |
+| `JM.Prototype` | `6/6 PASS` |
+| `JM.PhysicalGrabber` | `12/12 PASS` |
+| Automation 합계 | `53/53 PASS` |
+| `Docs/Tools/Validate-Docs.ps1` | `158 Markdown files PASS` |
+| `git diff --check` | `PASS` (CRLF 변환 안내만 존재) |
+
+Automation은 각 filter를 별도 `UnrealEditor-Cmd` process에서 `-NullRHI -Unattended`로 실행했다. 이는 정적 검사와 Editor Automation 결과이며, 13.5의 실제 viewport PIE, travel, single-process multi-PIE, split-screen, Shipping 검증을 대체하지 않는다.

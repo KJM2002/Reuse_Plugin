@@ -11,6 +11,12 @@ review_reason: "릴리스 및 Git 이력과 변경 항목의 누락 여부를 �
 
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `TryGrab` now rejects missing/tearing-down Worlds before tracing or drawing debug geometry.
+
 ## 1.8.0
 
 ### Added

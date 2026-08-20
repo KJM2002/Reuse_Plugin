@@ -21,6 +21,7 @@ class REUSABLEDIALOGUESYSTEM_API UDialogueSubsystem : public UGameInstanceSubsys
 {
     GENERATED_BODY()
 public:
+    virtual void Initialize(FSubsystemCollectionBase& Collection) override;
     virtual void Deinitialize() override;
 
     UFUNCTION(BlueprintCallable, Category="Dialogue") bool StartDialogue(UDialogueSequence* Sequence, EDialogueInteractionMode InteractionMode, APlayerController* PlayerController, EExistingDialoguePolicy ExistingPolicy = EExistingDialoguePolicy::Reject);
@@ -61,6 +62,8 @@ private:
     void RecordCurrentLine();
     void PlayTextSound(const FDialogueRevealToken& Token);
     UDialogueTextSoundSet* ResolveTextSoundSet(const FDialogueLine& Line) const;
+    void HandleWorldCleanup(UWorld* World, bool bSessionEnded, bool bCleanupResources);
+    bool IsSessionCurrent(uint64 SessionId, UDialogueSequence* Sequence, EDialogueState ExpectedState) const;
 
     UPROPERTY(Transient) TObjectPtr<UDialogueSequence> CurrentSequence = nullptr;
     UPROPERTY(Transient) TObjectPtr<UDialogueWidgetBase> DialogueWidget = nullptr;
@@ -84,4 +87,8 @@ private:
     double LastAdvanceTime = -1.0;
     double LastTextSoundTime = -1.0;
     FTimerHandle RevealTimerHandle;
+    TWeakObjectPtr<UWorld> SessionWorld;
+    uint64 SessionSerial = 0;
+    bool bFinishInProgress = false;
+    bool bDeinitializing = false;
 };

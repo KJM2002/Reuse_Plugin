@@ -42,11 +42,26 @@ namespace
     }
 }
 
+void UDialogueSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+    Super::Initialize(Collection);
+    FWorldDelegates::OnWorldCleanup.AddUObject(this, &UDialogueSubsystem::HandleWorldCleanup);
+}
+
 void UDialogueSubsystem::Deinitialize()
 {
-    CleanupPlayback();
-    CurrentSequence = nullptr;
-    SetState(EDialogueState::Inactive);
+    bDeinitializing = true;
+    FWorldDelegates::OnWorldCleanup.RemoveAll(this);
+    if (IsDialogueActive())
+    {
+        FinishDialogue(EDialogueEndReason::Cancelled, true);
+    }
+    else
+    {
+        CleanupPlayback();
+        CurrentSequence = nullptr;
+        State = EDialogueState::Inactive;
+    }
     Super::Deinitialize();
 }
 
@@ -57,6 +72,11 @@ FDialogueLine UDialogueSubsystem::GetCurrentLine() const
 
 bool UDialogueSubsystem::StartDialogue(UDialogueSequence* Sequence, EDialogueInteractionMode InteractionMode, APlayerController* PlayerController, EExistingDialoguePolicy ExistingPolicy)
 {
+    if (bFinishInProgress || bDeinitializing)
+    {
+        UE_LOG(LogReusableDialogue, Warning, TEXT("Dialogue start rejected while the previous session is finishing."));
+        return false;
+    }
     if (!Sequence || Sequence->Lines.IsEmpty()) { UE_LOG(LogReusableDialogue, Warning, TEXT("Dialogue start failed: null or empty sequence.")); return false; }
     if (IsDialogueActive())
     {
@@ -64,7 +84,7 @@ bool UDialogueSubsystem::StartDialogue(UDialogueSequence* Sequence, EDialogueInt
         FinishDialogue(EDialogueEndReason::Replaced, true);
     }
     UWorld* World = GetWorld();
-    if (!World) { UE_LOG(LogReusableDialogue, Warning, TEXT("Dialogue start failed: no world.")); return false; }
+    if (!World || World->bIsTearingDown) { UE_LOG(LogReusableDialogue, Warning, TEXT("Dialogue start failed: no valid world.")); return false; }
     const UDialogueSettings* Settings = GetDefault<UDialogueSettings>();
     TSubclassOf<UDialogueWidgetBase> WidgetClass = Settings->DefaultDialogueWidgetClass.LoadSynchronous();
     if (!WidgetClass) { UE_LOG(LogReusableDialogue, Error, TEXT("Dialogue start failed: Default Dialogue Widget Class is not configured.")); return false; }
@@ -74,15 +94,29 @@ bool UDialogueSubsystem::StartDialogue(UDialogueSequence* Sequence, EDialogueInt
     if (!DialogueWidget) { UE_LOG(LogReusableDialogue, Error, TEXT("Dialogue start failed: widget creation failed.")); return false; }
 
     CurrentSequence = Sequence;
+    SessionWorld = World;
+    const uint64 SessionId = ++SessionSerial;
     CurrentLineIndex = 0;
     ActiveInteractionMode = InteractionMode;
     SetState(EDialogueState::Opening);
+    if (!IsSessionCurrent(SessionId, Sequence, EDialogueState::Opening) || !IsValid(DialogueWidget))
+    {
+        return true;
+    }
     DialogueWidget->AddToViewport();
     DialogueWidget->ResetDialogueWidget();
     DialogueWidget->OnDialogueOpened();
     ApplyInteractionMode();
     OnDialogueStarted.Broadcast(CurrentSequence);
+    if (!IsSessionCurrent(SessionId, Sequence, EDialogueState::Opening))
+    {
+        return true;
+    }
     PublishDialogueEvent(this, JMDialogueEventTags::Started, CurrentSequence);
+    if (!IsSessionCurrent(SessionId, Sequence, EDialogueState::Opening))
+    {
+        return true;
+    }
     UE_LOG(LogReusableDialogue, Log, TEXT("Started dialogue %s."), *Sequence->GetName());
     BeginCurrentLine();
     return true;
@@ -99,7 +133,11 @@ void UDialogueSubsystem::SetState(EDialogueState NewState)
 void UDialogueSubsystem::BeginCurrentLine()
 {
     if (!CurrentSequence || !CurrentSequence->Lines.IsValidIndex(CurrentLineIndex)) { FinishDialogue(EDialogueEndReason::InvalidData, true); return; }
-    const FDialogueLine& Line = CurrentSequence->Lines[CurrentLineIndex];
+    const uint64 SessionId = SessionSerial;
+    UDialogueSequence* Sequence = CurrentSequence;
+    const EDialogueState ExpectedState = State;
+    const FDialogueLine Line = CurrentSequence->Lines[CurrentLineIndex];
+    if (!IsValid(DialogueWidget)) { FinishDialogue(EDialogueEndReason::WidgetCreationFailed, true); return; }
     bCurrentLineRecorded = false;
     VisibleText.Reset(); RevealTokens.Reset(); RevealTokenIndex = 0; RevealCharacterCount = 0; LastSoundIndex = INDEX_NONE;
     const FText SpeakerName = !Line.SpeakerNameOverride.IsEmpty() ? Line.SpeakerNameOverride : (Line.Speaker ? Line.Speaker->DisplayName : FText::GetEmpty());
@@ -111,12 +149,20 @@ void UDialogueSubsystem::BeginCurrentLine()
     DialogueWidget->OnSpeakerChanged();
     DialogueWidget->OnLineStarted(Line.LineId, CurrentLineIndex);
     OnLineStarted.Broadcast(CurrentSequence, Line.LineId, CurrentLineIndex);
+    if (!IsSessionCurrent(SessionId, Sequence, ExpectedState) || !IsValid(DialogueWidget))
+    {
+        return;
+    }
     USoundBase* VoiceSound = Line.VoiceSound ? Line.VoiceSound.Get() : (Line.Speaker ? Line.Speaker->DefaultVoiceSound.Get() : nullptr);
     if (VoiceSound) VoiceAudioComponent = UGameplayStatics::SpawnSound2D(this, VoiceSound);
     SetState(EDialogueState::Revealing);
+    if (!IsSessionCurrent(SessionId, Sequence, EDialogueState::Revealing))
+    {
+        return;
+    }
     if (Line.StartDelay > 0.f)
     {
-        if (UWorld* World = GetWorld()) World->GetTimerManager().SetTimer(RevealTimerHandle, this, &UDialogueSubsystem::BeginReveal, Line.StartDelay, false);
+        if (UWorld* World = SessionWorld.Get()) World->GetTimerManager().SetTimer(RevealTimerHandle, this, &UDialogueSubsystem::BeginReveal, Line.StartDelay, false);
     }
     else BeginReveal();
 }
@@ -165,28 +211,32 @@ void UDialogueSubsystem::RevealNextToken()
 
 void UDialogueSubsystem::ScheduleNextReveal(float Delay)
 {
-    if (UWorld* World = GetWorld()) World->GetTimerManager().SetTimer(RevealTimerHandle, this, &UDialogueSubsystem::RevealNextToken, FMath::Max(Delay, .001f), false);
+    if (UWorld* World = SessionWorld.Get()) World->GetTimerManager().SetTimer(RevealTimerHandle, this, &UDialogueSubsystem::RevealNextToken, FMath::Max(Delay, .001f), false);
 }
 
 void UDialogueSubsystem::CompleteCurrentLine()
 {
     if (State != EDialogueState::Revealing || !CurrentSequence || !CurrentSequence->Lines.IsValidIndex(CurrentLineIndex)) return;
-    if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(RevealTimerHandle);
-    const FDialogueLine& Line = CurrentSequence->Lines[CurrentLineIndex];
+    const uint64 SessionId = SessionSerial;
+    UDialogueSequence* Sequence = CurrentSequence;
+    if (UWorld* World = SessionWorld.Get()) World->GetTimerManager().ClearTimer(RevealTimerHandle);
+    const FDialogueLine Line = CurrentSequence->Lines[CurrentLineIndex];
     if (DialogueWidget) { DialogueWidget->SetDialogueText(Line.DialogueText); DialogueWidget->SetAdvanceIndicatorVisible(Line.bWaitForPlayerInput && !Line.bAutoAdvance); DialogueWidget->OnLineCompleted(Line.LineId, CurrentLineIndex); }
     RecordCurrentLine();
     SetState(EDialogueState::WaitingForAdvance);
+    if (!IsSessionCurrent(SessionId, Sequence, EDialogueState::WaitingForAdvance)) return;
     OnLineRevealCompleted.Broadcast(CurrentSequence, Line.LineId, CurrentLineIndex);
+    if (!IsSessionCurrent(SessionId, Sequence, EDialogueState::WaitingForAdvance)) return;
     if (Line.bAutoAdvance || !Line.bWaitForPlayerInput)
     {
         const float Delay = Line.bAutoAdvance ? Line.AutoAdvanceDelay : Line.EndDelay;
-        if (UWorld* World = GetWorld()) World->GetTimerManager().SetTimer(RevealTimerHandle, this, &UDialogueSubsystem::MoveToNextLine, FMath::Max(Delay, .001f), false);
+        if (UWorld* World = SessionWorld.Get()) World->GetTimerManager().SetTimer(RevealTimerHandle, this, &UDialogueSubsystem::MoveToNextLine, FMath::Max(Delay, .001f), false);
     }
 }
 
 void UDialogueSubsystem::AdvanceDialogue()
 {
-    UWorld* World = GetWorld();
+    UWorld* World = SessionWorld.Get();
     if (!World || State == EDialogueState::Paused) return;
     const double Now = World->GetRealTimeSeconds();
     if (LastAdvanceTime >= 0.0 && Now - LastAdvanceTime < GetDefault<UDialogueSettings>()->InputDebounceTime) return;
@@ -202,10 +252,14 @@ void UDialogueSubsystem::AdvanceDialogue()
 void UDialogueSubsystem::MoveToNextLine()
 {
     if (State != EDialogueState::WaitingForAdvance || !CurrentSequence) return;
-    if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(RevealTimerHandle);
+    const uint64 SessionId = SessionSerial;
+    UDialogueSequence* Sequence = CurrentSequence;
+    if (UWorld* World = SessionWorld.Get()) World->GetTimerManager().ClearTimer(RevealTimerHandle);
     const FDialogueLine PreviousLine = GetCurrentLine();
     OnLineAdvanced.Broadcast(CurrentSequence, PreviousLine.LineId, CurrentLineIndex);
+    if (!IsSessionCurrent(SessionId, Sequence, EDialogueState::WaitingForAdvance)) return;
     SetState(EDialogueState::Transitioning);
+    if (!IsSessionCurrent(SessionId, Sequence, EDialogueState::Transitioning)) return;
     ++CurrentLineIndex;
     if (!CurrentSequence->Lines.IsValidIndex(CurrentLineIndex)) { FinishDialogue(EDialogueEndReason::Completed, false); return; }
     if (VoiceAudioComponent) { VoiceAudioComponent->Stop(); VoiceAudioComponent = nullptr; }
@@ -243,7 +297,7 @@ void UDialogueSubsystem::PlayTextSound(const FDialogueRevealToken& Token)
     RevealCharacterCount += Token.Text.Len();
     const int32 EveryN = Line.SoundEveryNCharactersOverride > 0 ? Line.SoundEveryNCharactersOverride : Set->SoundEveryNCharacters;
     if (Line.TextSoundTriggerMode == EDialogueTextSoundTriggerMode::EveryNCharacters && RevealCharacterCount % FMath::Max(EveryN, 1) != 0) return;
-    UWorld* World = GetWorld(); if (!World) return;
+    UWorld* World = SessionWorld.Get(); if (!World) return;
     const double Now = World->GetRealTimeSeconds();
     const float MinInterval = Line.MinimumTextSoundIntervalOverride >= 0.f ? Line.MinimumTextSoundIntervalOverride : Set->MinimumPlaybackInterval;
     if (LastTextSoundTime >= 0.0 && Now - LastTextSoundTime < MinInterval) return;
@@ -259,23 +313,27 @@ void UDialogueSubsystem::PlayTextSound(const FDialogueRevealToken& Token)
 void UDialogueSubsystem::PauseDialogue()
 {
     if (!IsDialogueActive() || State == EDialogueState::Paused) return;
-    StateBeforePause = State; if (UWorld* World = GetWorld()) World->GetTimerManager().PauseTimer(RevealTimerHandle); SetState(EDialogueState::Paused);
+    StateBeforePause = State; if (UWorld* World = SessionWorld.Get()) World->GetTimerManager().PauseTimer(RevealTimerHandle); SetState(EDialogueState::Paused);
 }
 void UDialogueSubsystem::ResumeDialogue()
 {
     if (State != EDialogueState::Paused) return;
-    if (UWorld* World = GetWorld()) World->GetTimerManager().UnPauseTimer(RevealTimerHandle); SetState(StateBeforePause);
+    if (UWorld* World = SessionWorld.Get()) World->GetTimerManager().UnPauseTimer(RevealTimerHandle); SetState(StateBeforePause);
 }
 void UDialogueSubsystem::StopDialogue() { if (IsDialogueActive()) FinishDialogue(EDialogueEndReason::Cancelled, true); }
 
 void UDialogueSubsystem::FinishDialogue(EDialogueEndReason Reason, bool bCancelled)
 {
-    if (!IsDialogueActive()) return;
+    if (!IsDialogueActive() || bFinishInProgress) return;
+    bFinishInProgress = true;
+    ++SessionSerial;
     UDialogueSequence* FinishedSequence = CurrentSequence;
     SetState(EDialogueState::Closing);
     CleanupPlayback();
     CurrentSequence = nullptr; CurrentLineIndex = INDEX_NONE;
+    SessionWorld.Reset();
     SetState(EDialogueState::Inactive);
+    bFinishInProgress = false;
     if (bCancelled) OnDialogueCancelled.Broadcast(FinishedSequence, Reason); else OnDialogueFinished.Broadcast(FinishedSequence, Reason);
     if (!bCancelled) PublishDialogueEvent(this, JMDialogueEventTags::Finished, FinishedSequence, Reason);
     UE_LOG(LogReusableDialogue, Log, TEXT("Dialogue ended with reason %d."), static_cast<int32>(Reason));
@@ -283,12 +341,29 @@ void UDialogueSubsystem::FinishDialogue(EDialogueEndReason Reason, bool bCancell
 
 void UDialogueSubsystem::CleanupPlayback()
 {
-    if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(RevealTimerHandle);
+    if (UWorld* World = SessionWorld.Get()) World->GetTimerManager().ClearTimer(RevealTimerHandle);
     if (TextAudioComponent) TextAudioComponent->Stop(); if (VoiceAudioComponent) VoiceAudioComponent->Stop();
     TextAudioComponent = nullptr; VoiceAudioComponent = nullptr;
     RestoreInteractionMode();
     if (DialogueWidget) { DialogueWidget->OnDialogueClosed(); DialogueWidget->RemoveFromParent(); }
     DialogueWidget = nullptr; OwningPlayerController = nullptr; RevealTokens.Reset(); VisibleText.Reset();
+}
+
+void UDialogueSubsystem::HandleWorldCleanup(UWorld* World, bool bSessionEnded, bool bCleanupResources)
+{
+    if (World && SessionWorld.Get() == World && IsDialogueActive())
+    {
+        FinishDialogue(EDialogueEndReason::Cancelled, true);
+    }
+}
+
+bool UDialogueSubsystem::IsSessionCurrent(uint64 SessionId, UDialogueSequence* Sequence, EDialogueState ExpectedState) const
+{
+    return SessionSerial == SessionId
+        && CurrentSequence == Sequence
+        && State == ExpectedState
+        && SessionWorld.IsValid()
+        && SessionWorld.Get() == GetWorld();
 }
 
 void UDialogueSubsystem::ApplyInteractionMode()

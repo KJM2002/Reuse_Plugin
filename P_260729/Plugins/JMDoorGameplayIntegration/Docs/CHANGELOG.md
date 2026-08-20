@@ -13,6 +13,7 @@ review_reason: "릴리스 및 Git 이력과 변경 항목의 누락 여부를 �
 
 ## Unreleased
 
+- Automatic runtime Door adapters are now limited to Game, PIE, and GamePreview worlds; Editor worlds are excluded.
 - Door open, close, and locked interaction prompts are configurable in Project Settings.
 - An explicitly-added `JMDoorInteractableAdapterComponent` can override all three prompt texts per door.
 - Empty prompt text is respected and hides the prompt instead of restoring a hardcoded fallback.

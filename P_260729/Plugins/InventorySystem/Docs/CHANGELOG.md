@@ -13,6 +13,8 @@ review_reason: "릴리스 및 Git 이력과 변경 항목의 누락 여부를 �
 
 ## Unreleased
 
+- Consumable use now re-finds the original stack by `InstanceId` after use callbacks, and add operations commit all stack mutations before emitting per-stack notifications.
+- Enhanced Input rebinding and EndPlay remove only the binding handle created by `InventoryUIComponent`.
 - Added safe runtime capacity APIs that preserve contents, reject destructive
   shrink requests, refresh listeners, and support inventory-size upgrades.
 

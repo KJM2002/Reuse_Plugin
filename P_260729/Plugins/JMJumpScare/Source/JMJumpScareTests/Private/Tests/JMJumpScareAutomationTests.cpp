@@ -2,6 +2,9 @@
 
 #include "Data/JMJumpScareDefinition.h"
 #include "Engine/Texture2D.h"
+#include "GameFramework/PlayerController.h"
+#include "Tests/JMJumpScareSafetyTestReceiver.h"
+#include "Engine/World.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInterface.h"
 #include "Subsystems/JMJumpScareSubsystem.h"
@@ -65,6 +68,60 @@ bool FJMJumpScareEventTagsTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Finished event tag registered"), JMJumpScareEventTags::Finished.GetTag().IsValid());
     TestTrue(TEXT("Cancelled event tag registered"), JMJumpScareEventTags::Cancelled.GetTag().IsValid());
     TestTrue(TEXT("Failed event tag registered"), JMJumpScareEventTags::Failed.GetTag().IsValid());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FJMJumpScarePreparingCancelReentrancyTest,
+    "JM.JumpScare.Reentrancy.CancelDuringPreparing",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FJMJumpScarePreparingCancelReentrancyTest::RunTest(const FString& Parameters)
+{
+    const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues()
+        .AllowAudioPlayback(false)
+        .RequiresHitProxies(false)
+        .CreateNavigation(false)
+        .CreateAISystem(false)
+        .ShouldSimulatePhysics(false)
+        .SetTransactional(false);
+    UWorld* World = UWorld::CreateWorld(
+        EWorldType::Game,
+        false,
+        FName(TEXT("JMJumpScareSafetyWorld")),
+        nullptr,
+        true,
+        ERHIFeatureLevel::Num,
+        &WorldInitialization);
+    TestNotNull(TEXT("Automation world is available"), World);
+    if (!World)
+    {
+        return false;
+    }
+    APlayerController* Player = World->SpawnActor<APlayerController>();
+    UJMJumpScareSubsystem* Subsystem = World->GetSubsystem<UJMJumpScareSubsystem>();
+    TestNotNull(TEXT("Runtime JumpScare Subsystem is available"), Subsystem);
+    if (!Subsystem)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+    UJMJumpScareDefinition* Definition = NewObject<UJMJumpScareDefinition>();
+    Definition->Image = NewObject<UTexture2D>(Definition);
+    Definition->StartDelay = 1.0f;
+    FJMJumpScarePlayContext Context;
+    Context.TargetPlayer = Player;
+
+    UJMJumpScareSafetyTestReceiver* Receiver = NewObject<UJMJumpScareSafetyTestReceiver>();
+    Receiver->Subsystem = Subsystem;
+    Subsystem->OnStateChanged.AddDynamic(Receiver, &UJMJumpScareSafetyTestReceiver::CancelOnWaiting);
+
+    TestEqual(TEXT("Play request is accepted before the callback cancels it"), Subsystem->PlayJumpScare(Definition, Context), EJMJumpScarePlayResult::Started);
+    TestEqual(TEXT("Preparing callback cancels exactly once"), Receiver->CancelCount, 1);
+    TestFalse(TEXT("No ghost session remains"), Subsystem->IsJumpScarePlaying());
+    TestEqual(TEXT("State returns to Idle"), Subsystem->GetState(), EJMJumpScareState::Idle);
+    TestEqual(TEXT("Phase returns to Idle"), Subsystem->GetPhase(), EJMJumpScarePhase::Idle);
+    World->DestroyWorld(false);
     return true;
 }
 

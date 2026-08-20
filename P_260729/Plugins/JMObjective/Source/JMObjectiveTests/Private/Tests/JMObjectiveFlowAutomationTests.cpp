@@ -227,3 +227,27 @@ bool FJMObjectiveUIContractTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Widget receives Objective state without Blueprint logic"), Widget->GetObjectiveState().ObjectiveId, ObjectiveA);
     return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FJMObjectiveFlowReentrancyTest, "JM.Objective.Flow.Reentrancy.StartOtherFlow", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FJMObjectiveFlowReentrancyTest::RunTest(const FString& Parameters)
+{
+    FFlowFixture Fixture;
+    UJMObjectiveDefinition* A = Fixture.MakeObjective(ObjectiveA, EventA, TEXT("Flow.Primary"));
+    UJMObjectiveFlowDefinition* PrimaryFlow = Fixture.MakeFlow({A});
+
+    UJMObjectiveDefinition* B = Fixture.MakeObjective(ExtraObjective, EventB, TEXT("Flow.Other"));
+    UJMObjectiveFlowDefinition* OtherFlow = NewObject<UJMObjectiveFlowDefinition>(Fixture.GameInstance.Get());
+    OtherFlow->FlowId = JMObjectiveFlowEventTags::Started;
+    OtherFlow->ObjectiveDefinitions.Add(B);
+
+    TStrongObjectPtr<UJMObjectiveReentrancyReceiver> Receiver{NewObject<UJMObjectiveReentrancyReceiver>()};
+    Receiver->Flows = Fixture.Flows.Get();
+    Receiver->OtherFlow = OtherFlow;
+    Fixture.Flows->OnObjectiveFlowStarted.AddDynamic(Receiver.Get(), &UJMObjectiveReentrancyReceiver::StartOtherFlow);
+
+    TestTrue(TEXT("Primary Flow starts"), Fixture.Flows->StartObjectiveFlow(PrimaryFlow));
+    TestTrue(TEXT("Primary Flow remains active after map growth"), Fixture.Flows->IsObjectiveFlowActive(PrimaryFlow->FlowId));
+    TestTrue(TEXT("Reentrant Flow starts"), Fixture.Flows->IsObjectiveFlowActive(OtherFlow->FlowId));
+    TestEqual(TEXT("Only the primary callback recursively starts another Flow"), Receiver->CallbackCount, 2);
+    return true;
+}

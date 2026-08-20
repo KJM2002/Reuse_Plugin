@@ -13,6 +13,7 @@ review_reason: "릴리스 및 Git 이력과 변경 항목의 누락 여부를 �
 
 ## Unreleased
 
+- Inspection sessions now track their owning World, cancel CoreTicker transitions during matching World cleanup, and revalidate Widget/session state after open delegates.
 - Empty inspect interaction text is now respected, allowing designers to hide a prompt intentionally.
 - Simple UI transitions now keep the Inspector backdrop opaque and animate only `MainRow`/`ContentRow`, avoiding background flicker between modal screens.
 - Added an optional full-widget fade transition for Inspector sessions opened from another UI such as Inventory.

@@ -49,7 +49,7 @@ FJMPrototypeOperationResult UJMPrototypeRunResetComponent::FailCurrentRun()
 	{
 		if (Progression)
 		{
-			Progression->MarkLevelTravelPending();
+			Progression->MarkLevelTravelPending(FailureLevelName);
 		}
 		UGameplayStatics::OpenLevel(this, FailureLevelName);
 		const FJMPrototypeOperationResult Result = FJMPrototypeOperationResult::Success(LOCTEXT("RunResetTravel", "The run was reset and the player returned to base."));

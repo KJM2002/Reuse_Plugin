@@ -79,14 +79,19 @@ bool UJMObjectiveFlowSubsystem::StartObjectiveFlow(UJMObjectiveFlowDefinition* D
     RuntimeState.CurrentObjectiveId = Definition->ObjectiveDefinitions[0]->ObjectiveId;
     RuntimeState.StartTime = FDateTime::UtcNow();
 
-    if (!ActivateCurrentStep(RuntimeState, false))
+    if (!ActivateCurrentStep(Definition->FlowId, false))
     {
         FlowStates.Remove(Definition->FlowId);
         return false;
     }
 
-    OnObjectiveFlowStarted.Broadcast(RuntimeState.FlowId, RuntimeState);
-    PublishFlowEvent(JMObjectiveFlowEventTags::Started, RuntimeState);
+    const FJMObjectiveFlowRuntimeState* StartedState = FlowStates.Find(Definition->FlowId);
+    if (StartedState && StartedState->State == EJMObjectiveFlowState::Active)
+    {
+        const FJMObjectiveFlowRuntimeState Snapshot = *StartedState;
+        OnObjectiveFlowStarted.Broadcast(Snapshot.FlowId, Snapshot);
+        PublishFlowEvent(JMObjectiveFlowEventTags::Started, Snapshot);
+    }
     return true;
 }
 
@@ -97,10 +102,17 @@ bool UJMObjectiveFlowSubsystem::StopObjectiveFlow(FGameplayTag FlowId)
     {
         return false;
     }
-    ObjectiveSubsystem->DeactivateObjective(RuntimeState->CurrentObjectiveId);
+    const FGameplayTag ExpectedObjectiveId = RuntimeState->CurrentObjectiveId;
+    ObjectiveSubsystem->DeactivateObjective(ExpectedObjectiveId);
+    RuntimeState = FlowStates.Find(FlowId);
+    if (!RuntimeState || RuntimeState->State != EJMObjectiveFlowState::Active || RuntimeState->CurrentObjectiveId != ExpectedObjectiveId)
+    {
+        return true;
+    }
     RuntimeState->State = EJMObjectiveFlowState::Inactive;
-    OnObjectiveFlowStopped.Broadcast(FlowId, *RuntimeState);
-    PublishFlowEvent(JMObjectiveFlowEventTags::Stopped, *RuntimeState);
+    const FJMObjectiveFlowRuntimeState Snapshot = *RuntimeState;
+    OnObjectiveFlowStopped.Broadcast(FlowId, Snapshot);
+    PublishFlowEvent(JMObjectiveFlowEventTags::Stopped, Snapshot);
     return true;
 }
 
@@ -111,14 +123,28 @@ bool UJMObjectiveFlowSubsystem::ResetObjectiveFlow(FGameplayTag FlowId)
     {
         return false;
     }
+    UJMObjectiveFlowDefinition* Definition = RuntimeState->Definition;
+    TArray<FGameplayTag> ObjectiveIds;
+    for (const UJMObjectiveDefinition* ObjectiveDefinition : Definition->ObjectiveDefinitions)
+    {
+        if (IsValid(ObjectiveDefinition))
+        {
+            ObjectiveIds.Add(ObjectiveDefinition->ObjectiveId);
+        }
+    }
     bool bSuccess = true;
-    for (UJMObjectiveDefinition* Definition : RuntimeState->Definition->ObjectiveDefinitions)
+    for (const FGameplayTag ObjectiveId : ObjectiveIds)
     {
         FJMObjectiveRuntimeState ObjectiveState;
-        if (IsValid(Definition) && ObjectiveSubsystem->GetObjectiveState(Definition->ObjectiveId, ObjectiveState))
+        if (ObjectiveSubsystem->GetObjectiveState(ObjectiveId, ObjectiveState))
         {
-            bSuccess &= ObjectiveSubsystem->ResetObjective(Definition->ObjectiveId);
+            bSuccess &= ObjectiveSubsystem->ResetObjective(ObjectiveId);
         }
+    }
+    RuntimeState = FlowStates.Find(FlowId);
+    if (!RuntimeState || RuntimeState->Definition != Definition)
+    {
+        return bSuccess;
     }
     RuntimeState->State = EJMObjectiveFlowState::Inactive;
     RuntimeState->CurrentStepIndex = INDEX_NONE;
@@ -142,19 +168,32 @@ bool UJMObjectiveFlowSubsystem::RestartObjectiveFlow(FGameplayTag FlowId)
     {
         return false;
     }
+    RuntimeState = FlowStates.Find(FlowId);
+    if (!RuntimeState || RuntimeState->Definition != Definition || RuntimeState->State == EJMObjectiveFlowState::Active)
+    {
+        return false;
+    }
     RuntimeState->State = EJMObjectiveFlowState::Active;
     RuntimeState->CurrentStepIndex = 0;
     RuntimeState->CurrentObjectiveId = Definition->ObjectiveDefinitions[0]->ObjectiveId;
     RuntimeState->StartTime = FDateTime::UtcNow();
     RuntimeState->CompletionTime = FDateTime();
     RuntimeState->FailureTime = FDateTime();
-    if (!ActivateCurrentStep(*RuntimeState, false))
+    if (!ActivateCurrentStep(FlowId, false))
     {
-        RuntimeState->State = EJMObjectiveFlowState::Inactive;
+        if (FJMObjectiveFlowRuntimeState* CurrentState = FlowStates.Find(FlowId))
+        {
+            CurrentState->State = EJMObjectiveFlowState::Inactive;
+        }
         return false;
     }
-    OnObjectiveFlowStarted.Broadcast(FlowId, *RuntimeState);
-    PublishFlowEvent(JMObjectiveFlowEventTags::Started, *RuntimeState);
+    RuntimeState = FlowStates.Find(FlowId);
+    if (RuntimeState && RuntimeState->State == EJMObjectiveFlowState::Active)
+    {
+        const FJMObjectiveFlowRuntimeState Snapshot = *RuntimeState;
+        OnObjectiveFlowStarted.Broadcast(FlowId, Snapshot);
+        PublishFlowEvent(JMObjectiveFlowEventTags::Started, Snapshot);
+    }
     return true;
 }
 
@@ -235,49 +274,69 @@ bool UJMObjectiveFlowSubsystem::PrepareObjectives(UJMObjectiveFlowDefinition* De
     return true;
 }
 
-bool UJMObjectiveFlowSubsystem::ActivateCurrentStep(FJMObjectiveFlowRuntimeState& RuntimeState, bool bBroadcastStepChanged)
+bool UJMObjectiveFlowSubsystem::ActivateCurrentStep(FGameplayTag FlowId, bool bBroadcastStepChanged)
 {
-    if (!ObjectiveSubsystem || !IsValid(RuntimeState.Definition) || !RuntimeState.Definition->ObjectiveDefinitions.IsValidIndex(RuntimeState.CurrentStepIndex))
+    FJMObjectiveFlowRuntimeState* RuntimeState = FlowStates.Find(FlowId);
+    if (!ObjectiveSubsystem || !RuntimeState || !IsValid(RuntimeState->Definition) || !RuntimeState->Definition->ObjectiveDefinitions.IsValidIndex(RuntimeState->CurrentStepIndex))
     {
         return false;
     }
-    RuntimeState.CurrentObjectiveId = RuntimeState.Definition->ObjectiveDefinitions[RuntimeState.CurrentStepIndex]->ObjectiveId;
-    if (!ObjectiveSubsystem->ActivateObjective(RuntimeState.CurrentObjectiveId))
+    RuntimeState->CurrentObjectiveId = RuntimeState->Definition->ObjectiveDefinitions[RuntimeState->CurrentStepIndex]->ObjectiveId;
+    const int32 ExpectedStepIndex = RuntimeState->CurrentStepIndex;
+    const FGameplayTag ExpectedObjectiveId = RuntimeState->CurrentObjectiveId;
+    if (!ObjectiveSubsystem->ActivateObjective(ExpectedObjectiveId))
     {
         return false;
+    }
+    RuntimeState = FlowStates.Find(FlowId);
+    if (!RuntimeState
+        || RuntimeState->State != EJMObjectiveFlowState::Active
+        || RuntimeState->CurrentStepIndex != ExpectedStepIndex
+        || RuntimeState->CurrentObjectiveId != ExpectedObjectiveId)
+    {
+        return true;
     }
     if (bBroadcastStepChanged)
     {
-        OnObjectiveFlowStepChanged.Broadcast(RuntimeState.FlowId, RuntimeState);
-        PublishFlowEvent(JMObjectiveFlowEventTags::StepChanged, RuntimeState);
+        const FJMObjectiveFlowRuntimeState Snapshot = *RuntimeState;
+        OnObjectiveFlowStepChanged.Broadcast(FlowId, Snapshot);
+        PublishFlowEvent(JMObjectiveFlowEventTags::StepChanged, Snapshot);
     }
     return true;
 }
 
-bool UJMObjectiveFlowSubsystem::AdvanceFlow(FJMObjectiveFlowRuntimeState& RuntimeState)
+bool UJMObjectiveFlowSubsystem::AdvanceFlow(FGameplayTag FlowId)
 {
-    if (RuntimeState.State != EJMObjectiveFlowState::Active || !IsValid(RuntimeState.Definition))
+    FJMObjectiveFlowRuntimeState* RuntimeState = FlowStates.Find(FlowId);
+    if (!RuntimeState || RuntimeState->State != EJMObjectiveFlowState::Active || !IsValid(RuntimeState->Definition))
     {
         return false;
     }
-    const int32 NextStep = RuntimeState.CurrentStepIndex + 1;
-    if (!RuntimeState.Definition->ObjectiveDefinitions.IsValidIndex(NextStep))
+    const int32 NextStep = RuntimeState->CurrentStepIndex + 1;
+    if (!RuntimeState->Definition->ObjectiveDefinitions.IsValidIndex(NextStep))
     {
-        RuntimeState.State = EJMObjectiveFlowState::Completed;
-        RuntimeState.CompletionTime = FDateTime::UtcNow();
-        OnObjectiveFlowCompleted.Broadcast(RuntimeState.FlowId, RuntimeState);
-        PublishFlowEvent(JMObjectiveFlowEventTags::Completed, RuntimeState);
+        RuntimeState->State = EJMObjectiveFlowState::Completed;
+        RuntimeState->CompletionTime = FDateTime::UtcNow();
+        const FJMObjectiveFlowRuntimeState Snapshot = *RuntimeState;
+        OnObjectiveFlowCompleted.Broadcast(FlowId, Snapshot);
+        PublishFlowEvent(JMObjectiveFlowEventTags::Completed, Snapshot);
         return true;
     }
-    RuntimeState.CurrentStepIndex = NextStep;
-    if (ActivateCurrentStep(RuntimeState, true))
+    RuntimeState->CurrentStepIndex = NextStep;
+    if (ActivateCurrentStep(FlowId, true))
     {
         return true;
     }
-    RuntimeState.State = EJMObjectiveFlowState::Failed;
-    RuntimeState.FailureTime = FDateTime::UtcNow();
-    OnObjectiveFlowFailed.Broadcast(RuntimeState.FlowId, RuntimeState);
-    PublishFlowEvent(JMObjectiveFlowEventTags::Failed, RuntimeState);
+    RuntimeState = FlowStates.Find(FlowId);
+    if (!RuntimeState)
+    {
+        return false;
+    }
+    RuntimeState->State = EJMObjectiveFlowState::Failed;
+    RuntimeState->FailureTime = FDateTime::UtcNow();
+    const FJMObjectiveFlowRuntimeState Snapshot = *RuntimeState;
+    OnObjectiveFlowFailed.Broadcast(FlowId, Snapshot);
+    PublishFlowEvent(JMObjectiveFlowEventTags::Failed, Snapshot);
     return false;
 }
 
@@ -295,7 +354,7 @@ void UJMObjectiveFlowSubsystem::HandleObjectiveCompleted(FGameplayTag ObjectiveI
     {
         if (FJMObjectiveFlowRuntimeState* FlowState = FlowStates.Find(FlowId); FlowState && FlowState->CurrentObjectiveId == ObjectiveId)
         {
-            AdvanceFlow(*FlowState);
+            AdvanceFlow(FlowId);
         }
     }
 }
@@ -321,12 +380,13 @@ void UJMObjectiveFlowSubsystem::HandleObjectiveFailed(FGameplayTag ObjectiveId, 
         {
             FlowState->State = EJMObjectiveFlowState::Failed;
             FlowState->FailureTime = FDateTime::UtcNow();
-            OnObjectiveFlowFailed.Broadcast(FlowId, *FlowState);
-            PublishFlowEvent(JMObjectiveFlowEventTags::Failed, *FlowState);
+            const FJMObjectiveFlowRuntimeState Snapshot = *FlowState;
+            OnObjectiveFlowFailed.Broadcast(FlowId, Snapshot);
+            PublishFlowEvent(JMObjectiveFlowEventTags::Failed, Snapshot);
         }
         else
         {
-            AdvanceFlow(*FlowState);
+            AdvanceFlow(FlowId);
         }
     }
 }

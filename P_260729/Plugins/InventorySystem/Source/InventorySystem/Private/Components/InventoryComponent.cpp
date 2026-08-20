@@ -15,6 +15,28 @@
 
 namespace
 {
+	struct FPendingItemAddedNotification
+	{
+		int32 Quantity = 0;
+		int32 SlotIndex = INDEX_NONE;
+	};
+
+	int32 FindSlotByInstanceId(const TArray<FInventorySlot>& Slots, const FGuid& InstanceId)
+	{
+		if (!InstanceId.IsValid())
+		{
+			return INDEX_NONE;
+		}
+		for (int32 Index = 0; Index < Slots.Num(); ++Index)
+		{
+			if (Slots[Index].IsValid() && Slots[Index].InstanceId == InstanceId)
+			{
+				return Index;
+			}
+		}
+		return INDEX_NONE;
+	}
+
 	void PublishInventoryEvent(UInventoryComponent* Inventory, FGameplayTag EventTag, UInventoryItemDefinition* ItemDefinition, int32 Quantity, int32 SlotIndex, AActor* Instigator = nullptr)
 	{
 		UGameInstance* GameInstance = Inventory && Inventory->GetWorld() ? Inventory->GetWorld()->GetGameInstance() : nullptr;
@@ -140,6 +162,7 @@ FInventoryAddOutcome UInventoryComponent::AddItemDetailed(UInventoryItemDefiniti
 	EnsureSlotCapacity();
 	int32 Remaining = WeightAcceptedQuantity;
 	const int32 StackLimit = ItemDefinition->GetEffectiveMaxStackSize();
+	TArray<FPendingItemAddedNotification> PendingNotifications;
 
 	if (ItemDefinition->bStackable)
 	{
@@ -154,7 +177,7 @@ FInventoryAddOutcome UInventoryComponent::AddItemDetailed(UInventoryItemDefiniti
 			const int32 Added = FMath::Min(Remaining, StackLimit - Slot.Quantity);
 			Slot.Quantity += Added;
 			Remaining -= Added;
-			OnItemAdded.Broadcast(ItemDefinition, Added, SlotIndex);
+			PendingNotifications.Add({Added, SlotIndex});
 		}
 	}
 
@@ -171,7 +194,7 @@ FInventoryAddOutcome UInventoryComponent::AddItemDetailed(UInventoryItemDefiniti
 		Slot.Quantity = Added;
 		Slot.InstanceId = FGuid::NewGuid();
 		Remaining -= Added;
-		OnItemAdded.Broadcast(ItemDefinition, Added, SlotIndex);
+		PendingNotifications.Add({Added, SlotIndex});
 	}
 
 	Outcome.AddedQuantity = WeightAcceptedQuantity - Remaining;
@@ -191,6 +214,10 @@ FInventoryAddOutcome UInventoryComponent::AddItemDetailed(UInventoryItemDefiniti
 
 	if (Outcome.AddedQuantity > 0)
 	{
+		for (const FPendingItemAddedNotification& Notification : PendingNotifications)
+		{
+			OnItemAdded.Broadcast(ItemDefinition, Notification.Quantity, Notification.SlotIndex);
+		}
 		UE_LOG(
 			LogInventorySystem,
 			Log,
@@ -302,12 +329,15 @@ EInventoryOperationResult UInventoryComponent::UseItemAtSlot(int32 SlotIndex, AA
 	if (ItemDefinition->bConsumeOnUse)
 	{
 		const int32 ConsumeQuantity = FMath::Max(1, ItemDefinition->ConsumeQuantity);
-		if (!IsValidSlotIndex(SlotIndex) || Slots[SlotIndex].Quantity < ConsumeQuantity)
+		const int32 ConsumeSlotIndex = FindSlotByInstanceId(Slots, SlotSnapshot.InstanceId);
+		if (!IsValidSlotIndex(ConsumeSlotIndex)
+			|| Slots[ConsumeSlotIndex].ItemDefinition != ItemDefinition
+			|| Slots[ConsumeSlotIndex].Quantity < ConsumeQuantity)
 		{
-			UE_LOG(LogInventorySystem, Warning, TEXT("Use effect succeeded but consumable quantity changed before consumption for %s."), *GetNameSafe(ItemDefinition));
+			UE_LOG(LogInventorySystem, Warning, TEXT("Use effect succeeded but the original item instance changed before consumption for %s."), *GetNameSafe(ItemDefinition));
 			return EInventoryOperationResult::Success;
 		}
-		RemoveItemAtSlot(SlotIndex, ConsumeQuantity);
+		RemoveItemAtSlot(ConsumeSlotIndex, ConsumeQuantity);
 	}
 	else
 	{

@@ -137,7 +137,10 @@ void UJMPrototypeTravelTransitionSubsystem::PrepareLoadingScreen(const TArray<FT
 
 void UJMPrototypeTravelTransitionSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
 {
-	if (!LoadedWorld || IsRunningDedicatedServer() || !bArrivalPending)
+	if (!LoadedWorld
+		|| LoadedWorld->GetGameInstance() != GetGameInstance()
+		|| IsRunningDedicatedServer()
+		|| !bArrivalPending)
 	{
 		return;
 	}

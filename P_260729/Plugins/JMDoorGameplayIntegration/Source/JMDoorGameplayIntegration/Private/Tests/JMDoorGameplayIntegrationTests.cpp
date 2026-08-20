@@ -6,6 +6,7 @@
 #include "Components/InventoryComponent.h"
 #include "Components/JMDoorInteractableAdapterComponent.h"
 #include "Components/JMDoorInventoryAgentComponent.h"
+#include "Subsystems/JMDoorInteractionWorldSubsystem.h"
 #include "Data/JMDoorConfigData.h"
 #include "Door/JMDoorComponent.h"
 #include "Door/JMDoorTags.h"
@@ -131,6 +132,20 @@ bool FJMDoorInventoryOldKeyFlowTest::RunTest(const FString& Parameters)
 
     World->DestroyWorld(false);
     return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FJMDoorIntegrationWorldTypeTest,
+	"JM.Door.Integration.RuntimeWorldTypesOnly",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FJMDoorIntegrationWorldTypeTest::RunTest(const FString& Parameters)
+{
+	const UJMDoorInteractionWorldSubsystem* Defaults = GetDefault<UJMDoorInteractionWorldSubsystem>();
+	TestTrue(TEXT("Game worlds are supported"), Defaults->DoesSupportWorldType(EWorldType::Game));
+	TestTrue(TEXT("PIE worlds are supported"), Defaults->DoesSupportWorldType(EWorldType::PIE));
+	TestFalse(TEXT("Editor worlds are excluded"), Defaults->DoesSupportWorldType(EWorldType::Editor));
+	return true;
 }
 
 #endif

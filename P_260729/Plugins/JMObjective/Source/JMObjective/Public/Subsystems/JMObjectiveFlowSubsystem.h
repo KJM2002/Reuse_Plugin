@@ -81,8 +81,8 @@ private:
     void BindObjectiveDelegates();
     void UnbindObjectiveDelegates();
     bool PrepareObjectives(UJMObjectiveFlowDefinition* Definition, bool bResetExisting);
-    bool ActivateCurrentStep(FJMObjectiveFlowRuntimeState& RuntimeState, bool bBroadcastStepChanged);
-    bool AdvanceFlow(FJMObjectiveFlowRuntimeState& RuntimeState);
+    bool ActivateCurrentStep(FGameplayTag FlowId, bool bBroadcastStepChanged);
+    bool AdvanceFlow(FGameplayTag FlowId);
     bool DoesAnotherActiveFlowUseObjective(FGameplayTag FlowId, FGameplayTag ObjectiveId) const;
     void PublishFlowEvent(FGameplayTag EventTag, const FJMObjectiveFlowRuntimeState& RuntimeState) const;
 

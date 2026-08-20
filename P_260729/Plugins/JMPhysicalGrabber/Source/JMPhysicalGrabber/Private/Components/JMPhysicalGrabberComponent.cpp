@@ -51,7 +51,8 @@ void UJMPhysicalGrabberComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 bool UJMPhysicalGrabberComponent::TryGrab()
 {
-    if (IsHoldingObject())
+    UWorld* World = GetWorld();
+    if (!IsValid(GetOwner()) || !World || World->bIsTearingDown || IsHoldingObject())
     {
         return false;
     }
@@ -66,14 +67,14 @@ bool UJMPhysicalGrabberComponent::TryGrab()
     const FVector TraceEnd = ViewLocation + ViewDirection * GrabDistance;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(JMPhysicalGrabberTrace), false, GetOwner());
     FHitResult Hit;
-    const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, TraceChannel, Params);
+    const bool bHit = World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, TraceChannel, Params);
 
     if (bDrawDebug)
     {
-        DrawDebugLine(GetWorld(), ViewLocation, TraceEnd, bHit ? FColor::Green : FColor::Red, false, 1.0f, 0, 1.5f);
+        DrawDebugLine(World, ViewLocation, TraceEnd, bHit ? FColor::Green : FColor::Red, false, 1.0f, 0, 1.5f);
         if (bHit)
         {
-            DrawDebugSphere(GetWorld(), Hit.ImpactPoint, 8.0f, 12, FColor::Green, false, 1.0f);
+            DrawDebugSphere(World, Hit.ImpactPoint, 8.0f, 12, FColor::Green, false, 1.0f);
         }
     }
 

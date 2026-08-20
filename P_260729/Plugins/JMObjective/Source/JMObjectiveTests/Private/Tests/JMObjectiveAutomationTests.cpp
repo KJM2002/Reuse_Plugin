@@ -172,3 +172,61 @@ bool FJMObjectiveSequentialIntegrationTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("All objective subscriptions released"), Fixture.Events->GetSubscriptionCount(), 0);
     return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FJMObjectiveActivationReentrancyTest, "JM.Objective.Reentrancy.ActivationUnregister", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FJMObjectiveActivationReentrancyTest::RunTest(const FString& Parameters)
+{
+    FObjectiveFixture Fixture;
+    UJMObjectiveDefinition* Definition = Fixture.MakeDefinition(TAG_Objective_Key, TAG_Event_Item, TEXT("Item.Key.Office"));
+    TestTrue(TEXT("Objective registers"), Fixture.Objectives->RegisterObjectiveInactive(Definition));
+    TStrongObjectPtr<UJMObjectiveReentrancyReceiver> Receiver{NewObject<UJMObjectiveReentrancyReceiver>()};
+    Receiver->Objectives = Fixture.Objectives.Get();
+    Fixture.Objectives->OnObjectiveActivated.AddDynamic(Receiver.Get(), &UJMObjectiveReentrancyReceiver::UnregisterOnState);
+
+    TestTrue(TEXT("Activation mutation itself succeeds"), Fixture.Objectives->ActivateObjective(TAG_Objective_Key));
+    FJMObjectiveRuntimeState State;
+    TestFalse(TEXT("Reentrant unregister removes the Objective"), Fixture.Objectives->GetObjectiveState(TAG_Objective_Key, State));
+    TestEqual(TEXT("Activation callback runs once"), Receiver->CallbackCount, 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FJMObjectiveProgressReentrancyTest, "JM.Objective.Reentrancy.ProgressMutations", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FJMObjectiveProgressReentrancyTest::RunTest(const FString& Parameters)
+{
+    for (int32 Action = 1; Action <= 3; ++Action)
+    {
+        FObjectiveFixture Fixture;
+        UJMObjectiveDefinition* Definition = Fixture.MakeDefinition(TAG_Objective_Key, TAG_Event_Item, TEXT("Item.Key.Office"), 1);
+        TestTrue(TEXT("Objective registers"), Fixture.Objectives->RegisterObjectiveInactive(Definition));
+        TestTrue(TEXT("Objective activates"), Fixture.Objectives->ActivateObjective(TAG_Objective_Key));
+
+        TStrongObjectPtr<UJMObjectiveReentrancyReceiver> Receiver{NewObject<UJMObjectiveReentrancyReceiver>()};
+        Receiver->Objectives = Fixture.Objectives.Get();
+        Receiver->ProgressAction = Action;
+        if (Action == 2)
+        {
+            Receiver->ReplacementDefinition = Fixture.MakeDefinition(TAG_Objective_Key, TAG_Event_Item, TEXT("Item.Key.Replacement"), 2);
+        }
+        Fixture.Objectives->OnObjectiveProgressed.AddDynamic(Receiver.Get(), &UJMObjectiveReentrancyReceiver::MutateOnProgress);
+
+        TestTrue(TEXT("Progress mutation succeeds"), Fixture.Objectives->AddObjectiveProgress(TAG_Objective_Key, 1));
+        FJMObjectiveRuntimeState State;
+        if (Action == 1)
+        {
+            TestFalse(TEXT("Unregistered Objective stays removed"), Fixture.Objectives->GetObjectiveState(TAG_Objective_Key, State));
+        }
+        else if (Action == 2)
+        {
+            TestTrue(TEXT("Replacement Objective remains registered"), Fixture.Objectives->GetObjectiveState(TAG_Objective_Key, State));
+            TestEqual(TEXT("Replacement Objective is not completed by stale progress"), State.State, EJMObjectiveState::Inactive);
+            TestEqual(TEXT("Replacement Objective keeps its own target count"), State.RequiredCount, 2);
+        }
+        else
+        {
+            TestTrue(TEXT("Reentrant completion keeps Objective available"), Fixture.Objectives->GetObjectiveState(TAG_Objective_Key, State));
+            TestEqual(TEXT("Objective completes exactly once"), State.State, EJMObjectiveState::Completed);
+        }
+        TestEqual(TEXT("Progress callback runs once"), Receiver->CallbackCount, 1);
+    }
+    return true;
+}

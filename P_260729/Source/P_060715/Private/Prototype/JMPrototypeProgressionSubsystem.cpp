@@ -20,7 +20,6 @@ const FString UJMPrototypeProgressionSubsystem::InventoryCheckpointSlot = TEXT("
 void UJMPrototypeProgressionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
-	FCoreUObjectDelegates::PreLoadMap.AddUObject(this, &UJMPrototypeProgressionSubsystem::HandlePreLoadMap);
 }
 
 void UJMPrototypeProgressionSubsystem::Deinitialize()
@@ -30,7 +29,6 @@ void UJMPrototypeProgressionSubsystem::Deinitialize()
 		TrackedBaseInventory->OnInventoryChanged.RemoveDynamic(this, &ThisClass::HandleTrackedBaseInventoryChanged);
 	}
 	TrackedBaseInventory.Reset();
-	FCoreUObjectDelegates::PreLoadMap.RemoveAll(this);
 	Super::Deinitialize();
 }
 
@@ -556,6 +554,12 @@ void UJMPrototypeProgressionSubsystem::HandlePreLoadMap(const FString& MapName)
 void UJMPrototypeProgressionSubsystem::MarkLevelTravelPending()
 {
 	bLevelTravelPending = true;
+}
+
+void UJMPrototypeProgressionSubsystem::MarkLevelTravelPending(FName DestinationMap)
+{
+	bLevelTravelPending = true;
+	HandlePreLoadMap(DestinationMap.ToString());
 }
 
 bool UJMPrototypeProgressionSubsystem::ConsumeLevelTravelPending()

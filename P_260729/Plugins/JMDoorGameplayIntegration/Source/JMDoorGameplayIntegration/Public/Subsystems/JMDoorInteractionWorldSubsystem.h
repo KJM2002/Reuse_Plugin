@@ -11,6 +11,7 @@ class JMDOORGAMEPLAYINTEGRATION_API UJMDoorInteractionWorldSubsystem final : pub
     GENERATED_BODY()
 
 public:
+	virtual bool DoesSupportWorldType(EWorldType::Type WorldType) const override;
     virtual void Initialize(FSubsystemCollectionBase& Collection) override;
     virtual void Deinitialize() override;
     virtual void OnWorldBeginPlay(UWorld& InWorld) override;
