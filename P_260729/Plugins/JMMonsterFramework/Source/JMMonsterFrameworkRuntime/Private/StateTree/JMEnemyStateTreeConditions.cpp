@@ -1,6 +1,8 @@
 #include "StateTree/JMEnemyStateTreeConditions.h"
 
 #include "Action/JMEnemyActionComponent.h"
+#include "Core/JMEnemyBase.h"
+#include "Core/JMEnemyDefinition.h"
 #include "GameFramework/Pawn.h"
 #include "Memory/JMEnemyMemoryComponent.h"
 #include "Perception/JMEnemyPerceptionComponent.h"
@@ -69,7 +71,7 @@ bool FJMStateTreeActorVisionCondition::TestCondition(FStateTreeExecutionContext&
     const FInstanceDataType& Data = Context.GetInstanceData(*this);
     const UJMEnemyMemoryComponent& Memory = Context.GetExternalData(MemoryHandle);
     const AActor* Actor = Data.bUseLastSeenSource ? Memory.GetLastSeenSource() : Data.Actor.Get();
-    return Memory.CanCurrentlySeeActor(Actor);
+    return Data.bInvert != Memory.CanCurrentlySeeActor(Actor);
 }
 bool FJMStateTreeRecentHearingCondition::Link(FStateTreeLinker& Linker) { Linker.LinkExternalData(MemoryHandle); return true; }
 bool FJMStateTreeRecentHearingCondition::TestCondition(FStateTreeExecutionContext& Context) const
@@ -77,6 +79,13 @@ bool FJMStateTreeRecentHearingCondition::TestCondition(FStateTreeExecutionContex
     const FInstanceDataType& Data = Context.GetInstanceData(*this);
     return Data.bInvert != JMEnemyStateTreeConditions::HasRecentHearing(
         Context.GetExternalData(MemoryHandle), Data.MaximumAge);
+}
+bool FJMStateTreeHearingStrengthCondition::Link(FStateTreeLinker& Linker) { Linker.LinkExternalData(MemoryHandle); return true; }
+bool FJMStateTreeHearingStrengthCondition::TestCondition(FStateTreeExecutionContext& Context) const
+{
+    const FInstanceDataType& Data = Context.GetInstanceData(*this);
+    return JMEnemyStateTreeConditions::Compare(Context.GetExternalData(MemoryHandle).GetLastHeardStrength(),
+        Data.Strength, Data.Comparison);
 }
 bool FJMStateTreeGazeCondition::Link(FStateTreeLinker& Linker) { Linker.LinkExternalData(PerceptionHandle); return true; }
 bool FJMStateTreeGazeCondition::TestCondition(FStateTreeExecutionContext& Context) const
@@ -139,6 +148,24 @@ void FJMStateTreeContextEvaluator::Tick(FStateTreeExecutionContext& Context, flo
     Data.EncounterCount = Memory.GetEncounterCount();
     Data.TimeSinceLastHeard = static_cast<float>(Memory.GetTimeSinceLastHeard());
     Data.TimeSinceLastSeen = static_cast<float>(Memory.GetTimeSinceLastSeen());
+    Data.LastHeardStrength = Memory.GetLastHeardStrength();
+    if (const AJMEnemyBase* Enemy = Cast<AJMEnemyBase>(Memory.GetOwner()))
+    {
+        if (const UJMEnemyDefinition* Definition = Enemy->GetEnemyDefinition())
+        {
+            const FJMEnemyBehaviorTuning& Tuning = Definition->BehaviorTuning;
+            Data.AcquireGraceTime = Tuning.AcquireGraceTime;
+            Data.LostSightPursuitDuration = Tuning.LostSightPursuitDuration;
+            Data.LostSightGraceTime = Tuning.LostSightGraceTime;
+            Data.LastKnownLocationPause = Tuning.LastKnownLocationPause;
+            Data.SearchDuration = Tuning.SearchDuration;
+            Data.SearchPointCount = Tuning.SearchPointCount;
+            Data.SearchRadius = Tuning.SearchRadius;
+            Data.StrongHearingStrength = Tuning.StrongHearingStrength;
+            Data.HideMinimumDuration = Tuning.HideMinimumDuration;
+            Data.FrenzySearchDuration = Tuning.FrenzySearchDuration;
+        }
+    }
 }
 
 bool FJMStateTreeCombatTargetCondition::Link(FStateTreeLinker& Linker)

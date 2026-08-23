@@ -64,6 +64,7 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeActorVisionInstanceData
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, Category=Parameter) TObjectPtr<AActor> Actor;
     UPROPERTY(EditAnywhere, Category=Parameter) bool bUseLastSeenSource = false;
+    UPROPERTY(EditAnywhere, Category=Parameter) bool bInvert = false;
 };
 
 USTRUCT(meta=(DisplayName="Can See Actor", Category="JM Monster Framework|Perception"))
@@ -209,6 +210,17 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeContextInstanceData
     UPROPERTY(VisibleAnywhere, Category=Output) int32 EncounterCount = 0;
     UPROPERTY(VisibleAnywhere, Category=Output) float TimeSinceLastHeard = -1.0f;
     UPROPERTY(VisibleAnywhere, Category=Output) float TimeSinceLastSeen = -1.0f;
+    UPROPERTY(VisibleAnywhere, Category=Output) float LastHeardStrength = 0.0f;
+    UPROPERTY(VisibleAnywhere, Category=Behavior) float AcquireGraceTime = 0.35f;
+    UPROPERTY(VisibleAnywhere, Category=Behavior) float LostSightPursuitDuration = 5.0f;
+    UPROPERTY(VisibleAnywhere, Category=Behavior) float LostSightGraceTime = 0.35f;
+    UPROPERTY(VisibleAnywhere, Category=Behavior) float LastKnownLocationPause = 3.0f;
+    UPROPERTY(VisibleAnywhere, Category=Behavior) float SearchDuration = 5.0f;
+    UPROPERTY(VisibleAnywhere, Category=Behavior) int32 SearchPointCount = 2;
+    UPROPERTY(VisibleAnywhere, Category=Behavior) float SearchRadius = 600.0f;
+    UPROPERTY(VisibleAnywhere, Category=Behavior) float StrongHearingStrength = 0.85f;
+    UPROPERTY(VisibleAnywhere, Category=Behavior) float HideMinimumDuration = 0.0f;
+    UPROPERTY(VisibleAnywhere, Category=Behavior) float FrenzySearchDuration = 8.0f;
 };
 
 USTRUCT(meta=(DisplayName="JM Enemy Context", Category="JM Monster Framework|Context"))
@@ -241,6 +253,25 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeCombatTargetCondition : public 
 {
     GENERATED_BODY()
     using FInstanceDataType = FJMStateTreeCombatTargetInstanceData;
+    virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
+    virtual bool Link(FStateTreeLinker& Linker) override;
+    virtual bool TestCondition(FStateTreeExecutionContext& Context) const override;
+    TStateTreeExternalDataHandle<UJMEnemyMemoryComponent> MemoryHandle;
+};
+
+USTRUCT()
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeHearingStrengthInstanceData
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0.0")) float Strength = 0.5f;
+    UPROPERTY(EditAnywhere, Category=Parameter) EJMStateTreeCompare Comparison = EJMStateTreeCompare::GreaterOrEqual;
+};
+
+USTRUCT(meta=(DisplayName="Last Hearing Strength", Category="JM Monster Framework|Memory"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeHearingStrengthCondition : public FStateTreeConditionCommonBase
+{
+    GENERATED_BODY()
+    using FInstanceDataType = FJMStateTreeHearingStrengthInstanceData;
     virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
     virtual bool Link(FStateTreeLinker& Linker) override;
     virtual bool TestCondition(FStateTreeExecutionContext& Context) const override;

@@ -10,6 +10,7 @@ class UJMEnemyDebugComponent;
 class UJMEnemyActionComponent;
 class UJMEnemyMemoryComponent;
 class UJMEnemyLocomotionComponent;
+class UJMEnemyPatrolComponent;
 class UJMEnemyPerceptionComponent;
 class UJMEnemyStateComponent;
 
@@ -36,6 +37,9 @@ public:
 
     UFUNCTION(BlueprintPure, Category="JM Enemy|Core")
     UJMEnemyLocomotionComponent* GetEnemyLocomotionComponent() const { return LocomotionComponent; }
+
+    UFUNCTION(BlueprintPure, Category="JM Enemy|Core")
+    UJMEnemyPatrolComponent* GetEnemyPatrolComponent() const { return PatrolComponent; }
 
     UFUNCTION(BlueprintPure, Category="JM Enemy|Core")
     UJMEnemyActionComponent* GetEnemyActionComponent() const { return ActionComponent; }
@@ -83,6 +87,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="JM Enemy|Core")
     TObjectPtr<UJMEnemyLocomotionComponent> LocomotionComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="JM Enemy|Core")
+    TObjectPtr<UJMEnemyPatrolComponent> PatrolComponent;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="JM Enemy|Core")
     TObjectPtr<UJMEnemyActionComponent> ActionComponent;

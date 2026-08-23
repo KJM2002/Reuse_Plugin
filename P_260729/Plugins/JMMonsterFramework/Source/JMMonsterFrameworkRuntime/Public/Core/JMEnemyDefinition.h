@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
+#include "Core/JMEnemyBehaviorTuning.h"
 #include "Perception/JMEnemyPerceptionTypes.h"
 #include "JMEnemyDefinition.generated.h"
 
@@ -37,6 +38,10 @@ public:
     /** Sense-by-sense configuration. No enemy-type flags are stored here. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="JM Monster|Perception")
     FJMEnemyPerceptionConfig Perception;
+
+    /** Timings and distances exposed to designers; StateTrees bind these rather than hard-coding behavior values. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="JM Monster|Behavior")
+    FJMEnemyBehaviorTuning BehaviorTuning;
 
     /** Optional profile collection. Leaving both movement fields empty preserves engine defaults. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="JM Monster|Movement")

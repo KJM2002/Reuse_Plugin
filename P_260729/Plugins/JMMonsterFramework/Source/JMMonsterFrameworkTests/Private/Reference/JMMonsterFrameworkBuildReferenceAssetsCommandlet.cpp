@@ -134,8 +134,9 @@ namespace JMListenerAssets
         UStateTreeState& Chase = Root.AddChildState(TEXT("Chase"));
         UStateTreeState& Attack = Root.AddChildState(TEXT("Attack"));
         UStateTreeState& Search = Root.AddChildState(TEXT("Search"));
+        UStateTreeState& SearchPause = Root.AddChildState(TEXT("PauseAtLastHeard"));
         UStateTreeState& SearchAround = Root.AddChildState(TEXT("SearchAround"));
-        for (UStateTreeState* State : {&Patrol, &Investigate, &Confirm, &Chase, &Attack, &Search, &SearchAround})
+        for (UStateTreeState* State : {&Patrol, &Investigate, &Confirm, &Chase, &Attack, &Search, &SearchPause, &SearchAround})
         {
             State->TasksCompletion = EStateTreeTaskCompletionType::All;
         }
@@ -143,13 +144,11 @@ namespace JMListenerAssets
         SetStateTask<FJMStateTreeSetStateTask>(Patrol, JMEnemyTags::State_Patrol);
         SetProfileTask(Patrol, TEXT("Patrol"));
         Patrol.AddTask<FJMStateTreeClearTargetTask>();
-        auto& PatrolMove = Patrol.AddTask<FJMStateTreeMoveRandomTask>();
-        PatrolMove.GetInstanceData().Radius = 900.0f;
-        PatrolMove.GetInstanceData().bUseHomeAsCenter = true;
-        PatrolMove.GetInstanceData().MinWaitTime = 0.75f;
-        PatrolMove.GetInstanceData().MaxWaitTime = 1.75f;
-        PatrolMove.GetInstanceData().RetryBackoff = 0.25f;
-        PatrolMove.GetInstanceData().MaxRetries = 3;
+        Patrol.AddTask<FJMStateTreeMovePatrolTask>();
+        FStateTreeTransition& StrongHearing = TickTo(Patrol, Confirm, EStateTreeTransitionPriority::Critical);
+        StrongHearing.AddCondition<FJMStateTreeRecentHearingCondition>().GetInstanceData().MaximumAge = 1.5f;
+        auto& StrongHearingStrength = StrongHearing.AddCondition<FJMStateTreeHearingStrengthCondition>();
+        EditorData->AddPropertyBinding(Context, TEXT("StrongHearingStrength"), StrongHearingStrength, TEXT("Strength"));
         auto& PatrolHearing = TickTo(Patrol, Investigate, EStateTreeTransitionPriority::High)
             .AddCondition<FJMStateTreeRecentHearingCondition>();
         PatrolHearing.GetInstanceData().MaximumAge = 1.5f;
@@ -181,8 +180,11 @@ namespace JMListenerAssets
 
         SetStateTask<FJMStateTreeSetStateTask>(Chase, JMEnemyTags::State_Chase);
         SetProfileTask(Chase, TEXT("Chase"));
-        auto& ChaseMove = Chase.AddTask<FJMStateTreeMoveToActorTask>();
-        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), ChaseMove, TEXT("TargetActor"));
+        // Hearing-only enemies never follow an actor transform: every leg uses recorded sound memory.
+        auto& ChaseMove = Chase.AddTask<FJMStateTreeMoveToLocationTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastHeardLocation"), ChaseMove, TEXT("Location"));
+        // The task retargets its bound sound location in-place. A self transition
+        // would abort movement on every footstep and create stop/start motion.
         FStateTreeTransition& AttackTransition = TickTo(Chase, Attack, EStateTreeTransitionPriority::Critical);
         auto& AttackReady = AttackTransition.AddCondition<FJMStateTreeActionReadyCondition>();
         AttackReady.GetInstanceData().ActionId = JMEnemyTags::Action_Melee;
@@ -211,27 +213,33 @@ namespace JMListenerAssets
         SetProfileTask(Search, TEXT("Investigate"));
         auto& SearchMove = Search.AddTask<FJMStateTreeMoveToLocationTask>();
         EditorData->AddPropertyBinding(Context, TEXT("LastKnownLocation"), SearchMove, TEXT("Location"));
-        CompletedTo(Search, SearchAround, EStateTreeTransitionTrigger::OnStateCompleted);
+        CompletedTo(Search, SearchPause, EStateTreeTransitionTrigger::OnStateCompleted);
+
+        SetStateTask<FJMStateTreeSetStateTask>(SearchPause, JMEnemyTags::State_Search);
+        auto& HeardPause = SearchPause.AddTask<FJMStateTreeWaitTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastKnownLocationPause"), HeardPause, TEXT("Duration"));
+        CompletedTo(SearchPause, SearchAround);
 
         SetStateTask<FJMStateTreeSetStateTask>(SearchAround, JMEnemyTags::State_Search);
         SetProfileTask(SearchAround, TEXT("Investigate"));
         auto& RandomSearch = SearchAround.AddTask<FJMStateTreeMoveRandomTask>();
         RandomSearch.GetInstanceData().bUseHomeAsCenter = false;
         RandomSearch.GetInstanceData().bUseOwnerAsCenter = false;
-        RandomSearch.GetInstanceData().Radius = 650.0f;
+        RandomSearch.GetInstanceData().MinWaitTime = 0.0f;
+        RandomSearch.GetInstanceData().MaxWaitTime = 0.0f;
         EditorData->AddPropertyBinding(Context, TEXT("LastKnownLocation"), RandomSearch, TEXT("Center"));
+        EditorData->AddPropertyBinding(Context, TEXT("SearchRadius"), RandomSearch, TEXT("Radius"));
+        EditorData->AddPropertyBinding(Context, TEXT("SearchPointCount"), RandomSearch, TEXT("NumberOfLocations"));
+        auto& ListenerSearchTimer = SearchAround.AddTask<FJMStateTreeWaitTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("SearchDuration"), ListenerSearchTimer, TEXT("Duration"));
         auto& SearchTargetSound = TickTo(SearchAround, Chase, EStateTreeTransitionPriority::Critical)
             .AddCondition<FJMStateTreeTargetHearingCondition>();
         SearchTargetSound.GetInstanceData().MaximumAge = 1.5f;
         auto& SearchAnySound = TickTo(SearchAround, Investigate, EStateTreeTransitionPriority::High)
             .AddCondition<FJMStateTreeRecentHearingCondition>();
         SearchAnySound.GetInstanceData().MaximumAge = 1.5f;
-        auto& SearchTimeout = TickTo(SearchAround, Patrol, EStateTreeTransitionPriority::Normal)
-            .AddCondition<FJMStateTreeTargetHearingCondition>();
-        SearchTimeout.GetInstanceData().MaximumAge = 12.0f;
-        SearchTimeout.GetInstanceData().bInvert = true;
-        CompletedTo(SearchAround, SearchAround);
-        CompletedTo(SearchAround, SearchAround, EStateTreeTransitionTrigger::OnStateFailed);
+        CompletedTo(SearchAround, Patrol);
+        CompletedTo(SearchAround, Patrol, EStateTreeTransitionTrigger::OnStateFailed);
 
         FStateTreeCompilerLog Log;
         if (!UStateTreeEditingSubsystem::CompileStateTree(Tree, Log))
@@ -356,7 +364,7 @@ namespace JMWatcherAssets
     void ConfigureGaze(FJMStateTreeGazeInstanceData& Data, const bool bInvert = false)
     {
         Data.MinimumStrength = 0.90f;
-        Data.MinimumDuration = 0.05f;
+        Data.MinimumDuration = 0.15f;
         Data.bInvert = bInvert;
     }
 
@@ -393,8 +401,10 @@ namespace JMWatcherAssets
         UStateTreeState& Acquire = Root.AddChildState(TEXT("AcquireTarget"));
         UStateTreeState& Chase = Root.AddChildState(TEXT("Chase"));
         UStateTreeState& Frozen = Root.AddChildState(TEXT("Frozen"));
+        UStateTreeState& Pursue = Root.AddChildState(TEXT("PursueLastSeen"));
+        UStateTreeState& Search = Root.AddChildState(TEXT("Search"));
         UStateTreeState& Attack = Root.AddChildState(TEXT("Attack"));
-        for (UStateTreeState* State : {&Patrol, &Acquire, &Chase, &Frozen, &Attack})
+        for (UStateTreeState* State : {&Patrol, &Acquire, &Chase, &Frozen, &Pursue, &Search, &Attack})
         {
             State->TasksCompletion = EStateTreeTaskCompletionType::All;
         }
@@ -402,13 +412,7 @@ namespace JMWatcherAssets
         SetStateTask<FJMStateTreeSetStateTask>(Patrol, JMEnemyTags::State_Patrol);
         SetProfileTask(Patrol, TEXT("Patrol"));
         Patrol.AddTask<FJMStateTreeClearTargetTask>();
-        auto& PatrolMove = Patrol.AddTask<FJMStateTreeMoveRandomTask>();
-        PatrolMove.GetInstanceData().Radius = 900.0f;
-        PatrolMove.GetInstanceData().bUseHomeAsCenter = true;
-        PatrolMove.GetInstanceData().MinWaitTime = 0.5f;
-        PatrolMove.GetInstanceData().MaxWaitTime = 1.25f;
-        PatrolMove.GetInstanceData().RetryBackoff = 0.25f;
-        PatrolMove.GetInstanceData().MaxRetries = 3;
+        Patrol.AddTask<FJMStateTreeMovePatrolTask>();
         FStateTreeTransition& AcquireTransition = TickTo(Patrol, Acquire, EStateTreeTransitionPriority::Critical);
         auto& VisibleCandidate = AcquireTransition.AddCondition<FJMStateTreeActorVisionCondition>();
         VisibleCandidate.GetInstanceData().bUseLastSeenSource = true;
@@ -421,6 +425,12 @@ namespace JMWatcherAssets
 
         auto& SetTarget = Acquire.AddTask<FJMStateTreeSetTargetTask>();
         SetTarget.GetInstanceData().bUseLastSeenSource = true;
+        auto& AcquireGrace = Acquire.AddTask<FJMStateTreeWaitTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("AcquireGraceTime"), AcquireGrace, TEXT("Duration"));
+        FStateTreeTransition& LostDuringAcquire = StimulusTo(Acquire, Patrol, EStateTreeTransitionPriority::Critical);
+        auto& NoLongerVisible = LostDuringAcquire.AddCondition<FJMStateTreeActorVisionCondition>();
+        NoLongerVisible.GetInstanceData().bUseLastSeenSource = true;
+        NoLongerVisible.GetInstanceData().bInvert = true;
         EditorData->AddPropertyBinding(Context, TEXT("LastSeenSource"), SetTarget, TEXT("TargetActor"));
         CompletedTo(Acquire, Chase);
         CompletedTo(Acquire, Patrol, EStateTreeTransitionTrigger::OnStateFailed);
@@ -436,25 +446,52 @@ namespace JMWatcherAssets
             .AddCondition<FJMStateTreeActionReadyCondition>();
         AttackReady.GetInstanceData().ActionId = JMEnemyTags::Action_Melee;
         EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), AttackReady, TEXT("TargetActor"));
-        auto& ChaseLost = TickTo(Chase, Patrol, EStateTreeTransitionPriority::Normal)
+        auto& ChaseLost = TickTo(Chase, Pursue, EStateTreeTransitionPriority::Normal)
             .AddCondition<FJMStateTreeRecentVisionCondition>();
-        ChaseLost.GetInstanceData().MaximumAge = 1.5f;
+        EditorData->AddPropertyBinding(Context, TEXT("LostSightGraceTime"), ChaseLost, TEXT("MaximumAge"));
         ChaseLost.GetInstanceData().bInvert = true;
         CompletedTo(Chase, Chase);
-        CompletedTo(Chase, Patrol, EStateTreeTransitionTrigger::OnStateFailed);
+        CompletedTo(Chase, Pursue, EStateTreeTransitionTrigger::OnStateFailed);
 
         SetStateTask<FJMStateTreeSetStateTask>(Frozen, JMEnemyTags::State_Watcher_Frozen);
         Frozen.AddTask<FJMStateTreeStopMovementTask>();
         auto& FrozenFace = Frozen.AddTask<FJMStateTreeFaceActorTask>();
         EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), FrozenFace, TEXT("TargetActor"));
         Frozen.AddTask<FJMStateTreeWaitForTransitionTask>();
-        auto& FrozenLost = TickTo(Frozen, Patrol, EStateTreeTransitionPriority::Critical)
+        auto& FrozenLost = TickTo(Frozen, Pursue, EStateTreeTransitionPriority::Critical)
             .AddCondition<FJMStateTreeRecentVisionCondition>();
-        FrozenLost.GetInstanceData().MaximumAge = 1.5f;
+        EditorData->AddPropertyBinding(Context, TEXT("LostSightGraceTime"), FrozenLost, TEXT("MaximumAge"));
         FrozenLost.GetInstanceData().bInvert = true;
         auto& GazeReleased = TickTo(Frozen, Chase, EStateTreeTransitionPriority::High)
             .AddCondition<FJMStateTreeGazeCondition>();
         ConfigureGaze(GazeReleased.GetInstanceData(), true);
+
+        SetStateTask<FJMStateTreeSetStateTask>(Pursue, JMEnemyTags::State_Search);
+        SetProfileTask(Pursue, TEXT("Chase"));
+        auto& PursueMove = Pursue.AddTask<FJMStateTreeMoveToLocationTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastSeenLocation"), PursueMove, TEXT("Location"));
+        auto& PursueTimer = Pursue.AddTask<FJMStateTreeWaitTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("LostSightPursuitDuration"), PursueTimer, TEXT("Duration"));
+        auto& PursueSeen = StimulusTo(Pursue, Chase, EStateTreeTransitionPriority::Critical)
+            .AddCondition<FJMStateTreeCanSeeTargetCondition>();
+        Pursue.AddTransition(EStateTreeTransitionTrigger::OnStateSucceeded, EStateTreeTransitionType::GotoState, &Search);
+        Pursue.AddTransition(EStateTreeTransitionTrigger::OnStateFailed, EStateTreeTransitionType::GotoState, &Search);
+
+        SetStateTask<FJMStateTreeSetStateTask>(Search, JMEnemyTags::State_Search);
+        SetProfileTask(Search, TEXT("Patrol"));
+        auto& SearchMove = Search.AddTask<FJMStateTreeMoveRandomTask>();
+        SearchMove.GetInstanceData().bUseHomeAsCenter = false;
+        SearchMove.GetInstanceData().MinWaitTime = 0.0f;
+        SearchMove.GetInstanceData().MaxWaitTime = 0.0f;
+        EditorData->AddPropertyBinding(Context, TEXT("LastSeenLocation"), SearchMove, TEXT("Center"));
+        EditorData->AddPropertyBinding(Context, TEXT("SearchRadius"), SearchMove, TEXT("Radius"));
+        EditorData->AddPropertyBinding(Context, TEXT("SearchPointCount"), SearchMove, TEXT("NumberOfLocations"));
+        auto& SearchTimer = Search.AddTask<FJMStateTreeWaitTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("SearchDuration"), SearchTimer, TEXT("Duration"));
+        auto& SearchSeen = StimulusTo(Search, Chase, EStateTreeTransitionPriority::Critical)
+            .AddCondition<FJMStateTreeCanSeeTargetCondition>();
+        Search.AddTransition(EStateTreeTransitionTrigger::OnStateSucceeded, EStateTreeTransitionType::GotoState, &Patrol);
+        Search.AddTransition(EStateTreeTransitionTrigger::OnStateFailed, EStateTreeTransitionType::GotoState, &Patrol);
 
         SetStateTask<FJMStateTreeSetStateTask>(Attack, JMEnemyTags::State_Attack);
         Attack.AddTask<FJMStateTreeStopMovementTask>();
@@ -466,7 +503,7 @@ namespace JMWatcherAssets
         auto& FreezeAttack = TickTo(Attack, Frozen, EStateTreeTransitionPriority::Critical)
             .AddCondition<FJMStateTreeGazeCondition>();
         ConfigureGaze(FreezeAttack.GetInstanceData());
-        auto& AttackLost = TickTo(Attack, Patrol, EStateTreeTransitionPriority::High)
+        auto& AttackLost = TickTo(Attack, Pursue, EStateTreeTransitionPriority::High)
             .AddCondition<FJMStateTreeRecentVisionCondition>();
         AttackLost.GetInstanceData().MaximumAge = 1.5f;
         AttackLost.GetInstanceData().bInvert = true;
@@ -663,7 +700,7 @@ namespace JMCrawlerAssets
     void ConfigureGaze(FJMStateTreeGazeInstanceData& Data)
     {
         Data.MinimumStrength = 0.85f;
-        Data.MinimumDuration = 0.05f;
+        Data.MinimumDuration = 0.15f;
     }
 
     void AddTargetLost(UStateTreeState& From, UStateTreeState& Roam,
@@ -723,9 +760,10 @@ namespace JMCrawlerAssets
         UStateTreeState& ReApproach = Root.AddChildState(TEXT("ReApproach"));
         UStateTreeState& Enrage = Root.AddChildState(TEXT("Enrage"));
         UStateTreeState& Frenzy = Root.AddChildState(TEXT("FrenzyChase"));
+        UStateTreeState& FrenzySearch = Root.AddChildState(TEXT("FrenzySearch"));
         UStateTreeState& Attack = Root.AddChildState(TEXT("Attack"));
         for (UStateTreeState* State : {&Roam, &Acquire, &Stalk, &Flee, &Hide,
-            &ReApproach, &Enrage, &Frenzy, &Attack})
+            &ReApproach, &Enrage, &Frenzy, &FrenzySearch, &Attack})
         {
             State->TasksCompletion = EStateTreeTaskCompletionType::All;
         }
@@ -733,13 +771,7 @@ namespace JMCrawlerAssets
         SetState<FJMStateTreeSetStateTask>(Roam, JMEnemyTags::State_Patrol);
         SetProfile(Roam, TEXT("Roam"));
         Roam.AddTask<FJMStateTreeClearTargetTask>();
-        auto& RoamMove = Roam.AddTask<FJMStateTreeMoveRandomTask>();
-        RoamMove.GetInstanceData().Radius = 700.0f;
-        RoamMove.GetInstanceData().bUseHomeAsCenter = true;
-        RoamMove.GetInstanceData().MinWaitTime = 0.25f;
-        RoamMove.GetInstanceData().MaxWaitTime = 0.75f;
-        RoamMove.GetInstanceData().RetryBackoff = 0.25f;
-        RoamMove.GetInstanceData().MaxRetries = 3;
+        Roam.AddTask<FJMStateTreeMovePatrolTask>();
         FStateTreeTransition& AcquireTransition = TickTo(Roam, Acquire, EStateTreeTransitionPriority::Critical);
         auto& Visible = AcquireTransition.AddCondition<FJMStateTreeActorVisionCondition>();
         Visible.GetInstanceData().bUseLastSeenSource = true;
@@ -782,8 +814,8 @@ namespace JMCrawlerAssets
         SetState<FJMStateTreeSetStateTask>(Hide, JMEnemyTags::State_Hide);
         Hide.AddTask<FJMStateTreeStopMovementTask>();
         Hide.AddTask<FJMStateTreeIncrementEncounterTask>();
-        auto& HideWait = Hide.AddTask<FJMStateTreeWaitTask>();
-        HideWait.GetInstanceData().Duration = 3.0f;
+        auto& HideWait = Hide.AddTask<FJMStateTreeWaitForGazeReleaseTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("HideMinimumDuration"), HideWait, TEXT("MinimumDuration"));
         CompletedTo(Hide, ReApproach, EStateTreeTransitionTrigger::OnStateCompleted);
 
         SetState<FJMStateTreeSetStateTask>(ReApproach, JMEnemyTags::State_Crawler_ReApproach);
@@ -791,10 +823,9 @@ namespace JMCrawlerAssets
         auto& ReturnMove = ReApproach.AddTask<FJMStateTreeMoveToActorTask>();
         ReturnMove.GetInstanceData().Options.AcceptanceRadius = 900.0f;
         EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), ReturnMove, TEXT("TargetActor"));
-        AddEncounterGaze(*EditorData, ReApproach, Enrage, EJMStateTreeCompare::GreaterOrEqual, 1,
-            EStateTreeTransitionPriority::Critical);
         AddTargetLost(ReApproach, Roam);
-        CompletedTo(ReApproach, ReApproach);
+        // A second gaze only counts once this return leg has completed and the crawler is stalking again.
+        CompletedTo(ReApproach, Stalk);
         CompletedTo(ReApproach, Roam, EStateTreeTransitionTrigger::OnStateFailed);
 
         SetState<FJMStateTreeSetStateTask>(Enrage, JMEnemyTags::State_Enraged);
@@ -814,9 +845,27 @@ namespace JMCrawlerAssets
             .AddCondition<FJMStateTreeActionReadyCondition>();
         AttackReady.GetInstanceData().ActionId = JMEnemyTags::Action_Melee;
         EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), AttackReady, TEXT("TargetActor"));
-        AddTargetLost(Frenzy, Roam, EStateTreeTransitionPriority::High);
+        AddTargetLost(Frenzy, FrenzySearch, EStateTreeTransitionPriority::High);
         CompletedTo(Frenzy, Frenzy);
-        CompletedTo(Frenzy, Roam, EStateTreeTransitionTrigger::OnStateFailed);
+        CompletedTo(Frenzy, FrenzySearch, EStateTreeTransitionTrigger::OnStateFailed);
+
+        // Frenzy does not instantly give up on line-of-sight loss: it checks a few
+        // points around the last sighting for its own, designer-configurable duration.
+        SetState<FJMStateTreeSetStateTask>(FrenzySearch, JMEnemyTags::State_Search);
+        SetProfile(FrenzySearch, TEXT("Frenzy"));
+        auto& FrenzySearchMove = FrenzySearch.AddTask<FJMStateTreeMoveRandomTask>();
+        FrenzySearchMove.GetInstanceData().bUseHomeAsCenter = false;
+        FrenzySearchMove.GetInstanceData().MinWaitTime = 0.0f;
+        FrenzySearchMove.GetInstanceData().MaxWaitTime = 0.0f;
+        EditorData->AddPropertyBinding(Context, TEXT("LastSeenLocation"), FrenzySearchMove, TEXT("Center"));
+        EditorData->AddPropertyBinding(Context, TEXT("SearchRadius"), FrenzySearchMove, TEXT("Radius"));
+        EditorData->AddPropertyBinding(Context, TEXT("SearchPointCount"), FrenzySearchMove, TEXT("NumberOfLocations"));
+        auto& FrenzySearchTimer = FrenzySearch.AddTask<FJMStateTreeWaitTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("FrenzySearchDuration"), FrenzySearchTimer, TEXT("Duration"));
+        auto& FrenzyReacquired = StimulusTo(FrenzySearch, Frenzy, EStateTreeTransitionPriority::Critical)
+            .AddCondition<FJMStateTreeCanSeeTargetCondition>();
+        CompletedTo(FrenzySearch, Roam);
+        CompletedTo(FrenzySearch, Roam, EStateTreeTransitionTrigger::OnStateFailed);
 
         SetState<FJMStateTreeSetStateTask>(Attack, JMEnemyTags::State_Attack);
         Attack.AddTask<FJMStateTreeStopMovementTask>();
@@ -949,6 +998,199 @@ namespace JMCrawlerAssets
     }
 }
 
+namespace JMBasicHunterAssets
+{
+    constexpr TCHAR RootPath[] = TEXT("/JMMonsterFramework/Reference/BasicHunter");
+
+    template<typename T>
+    T* CreateAsset(const TCHAR* Name)
+    {
+        const FString PackageName = FString::Printf(TEXT("%s/%s"), RootPath, Name);
+        const FString ObjectPath = FString::Printf(TEXT("%s.%s"), *PackageName, Name);
+        if (T* Existing = LoadObject<T>(nullptr, *ObjectPath)) return Existing;
+        UPackage* Package = CreatePackage(*PackageName);
+        if (T* Existing = FindObject<T>(Package, Name)) return Existing;
+        T* Asset = NewObject<T>(Package, T::StaticClass(), Name, RF_Public | RF_Standalone | RF_Transactional);
+        FAssetRegistryModule::AssetCreated(Asset);
+        return Asset;
+    }
+
+    bool SaveAsset(UObject* Asset)
+    {
+        if (!Asset) return false;
+        UPackage* Package = Asset->GetOutermost();
+        Package->MarkPackageDirty();
+        const FString Filename = FPackageName::LongPackageNameToFilename(Package->GetName(), FPackageName::GetAssetPackageExtension());
+        FSavePackageArgs Args;
+        Args.TopLevelFlags = RF_Public | RF_Standalone;
+        Args.SaveFlags = SAVE_NoError;
+        return UPackage::SavePackage(Package, Asset, *Filename, Args);
+    }
+
+    FStateTreeTransition& TickTo(UStateTreeState& From, UStateTreeState& To,
+        const EStateTreeTransitionPriority Priority = EStateTreeTransitionPriority::Normal)
+    {
+        FStateTreeTransition& Transition = From.AddTransition(EStateTreeTransitionTrigger::OnTick,
+            EStateTreeTransitionType::GotoState, &To);
+        Transition.Priority = Priority;
+        return Transition;
+    }
+
+    FStateTreeTransition& StimulusTo(UStateTreeState& From, UStateTreeState& To,
+        const EStateTreeTransitionPriority Priority = EStateTreeTransitionPriority::Normal)
+    {
+        FStateTreeTransition& Transition = From.AddTransition(EStateTreeTransitionTrigger::OnEvent,
+            JMEnemyTags::Event_Stimulus, EStateTreeTransitionType::GotoState, &To);
+        Transition.Priority = Priority;
+        return Transition;
+    }
+
+    UStateTree* BuildStateTree()
+    {
+        const FName AssetName(TEXT("ST_BasicHunter"));
+        const FString PackageName = FString::Printf(TEXT("%s/%s"), RootPath, *AssetName.ToString());
+        UStateTree* Tree = LoadObject<UStateTree>(nullptr, *FString::Printf(TEXT("%s.%s"), *PackageName, *AssetName.ToString()));
+        UPackage* Package = Tree ? Tree->GetOutermost() : CreatePackage(*PackageName);
+        if (!Tree)
+        {
+            UStateTreeFactory* Factory = NewObject<UStateTreeFactory>();
+            Factory->SetSchemaClass(UStateTreeAIComponentSchema::StaticClass());
+            Tree = Cast<UStateTree>(Factory->FactoryCreateNew(UStateTree::StaticClass(), Package, AssetName,
+                RF_Public | RF_Standalone | RF_Transactional, nullptr, GWarn));
+            if (!Tree) return nullptr;
+            FAssetRegistryModule::AssetCreated(Tree);
+        }
+        UStateTreeEditorData* EditorData = CastChecked<UStateTreeEditorData>(Tree->EditorData);
+        UStateTreeState& Root = *EditorData->SubTrees[0];
+        EditorData->Evaluators.Reset(); EditorData->GlobalTasks.Reset();
+        Root.EnterConditions.Reset(); Root.Tasks.Reset(); Root.Transitions.Reset(); Root.Children.Reset();
+        Root.Name = TEXT("Root");
+        Root.SelectionBehavior = EStateTreeStateSelectionBehavior::TrySelectChildrenInOrder;
+        auto& Context = EditorData->AddEvaluator<FJMStateTreeContextEvaluator>();
+        UStateTreeState& Patrol = Root.AddChildState(TEXT("Patrol"));
+        UStateTreeState& Acquire = Root.AddChildState(TEXT("AcquireTarget"));
+        UStateTreeState& Chase = Root.AddChildState(TEXT("Chase"));
+        UStateTreeState& Pursue = Root.AddChildState(TEXT("PursueLastSeen"));
+        UStateTreeState& Search = Root.AddChildState(TEXT("Search"));
+        for (UStateTreeState* State : {&Patrol, &Acquire, &Chase, &Pursue, &Search})
+            State->TasksCompletion = EStateTreeTaskCompletionType::All;
+
+        Patrol.AddTask<FJMStateTreeSetStateTask>().GetInstanceData().State = JMEnemyTags::State_Patrol;
+        Patrol.AddTask<FJMStateTreeMovementProfileTask>().GetInstanceData().ProfileName = TEXT("Patrol");
+        Patrol.AddTask<FJMStateTreeClearTargetTask>();
+        Patrol.AddTask<FJMStateTreeMovePatrolTask>();
+        auto& Detect = TickTo(Patrol, Acquire, EStateTreeTransitionPriority::Critical);
+        auto& Visible = Detect.AddCondition<FJMStateTreeActorVisionCondition>();
+        Visible.GetInstanceData().bUseLastSeenSource = true;
+        auto& Eligible = Detect.AddCondition<FJMStateTreeCombatTargetCondition>();
+        Eligible.GetInstanceData().bUseLastSeenSource = true;
+
+        auto& SetTarget = Acquire.AddTask<FJMStateTreeSetTargetTask>();
+        SetTarget.GetInstanceData().bUseLastSeenSource = true;
+        Acquire.AddTransition(EStateTreeTransitionTrigger::OnStateSucceeded, EStateTreeTransitionType::GotoState, &Chase);
+        Acquire.AddTransition(EStateTreeTransitionTrigger::OnStateFailed, EStateTreeTransitionType::GotoState, &Patrol);
+
+        Chase.AddTask<FJMStateTreeSetStateTask>().GetInstanceData().State = JMEnemyTags::State_Chase;
+        Chase.AddTask<FJMStateTreeMovementProfileTask>().GetInstanceData().ProfileName = TEXT("Chase");
+        auto& ChaseMove = Chase.AddTask<FJMStateTreeMoveToActorTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("CurrentTarget"), ChaseMove, TEXT("TargetActor"));
+        auto& LostSight = TickTo(Chase, Pursue, EStateTreeTransitionPriority::High)
+            .AddCondition<FJMStateTreeRecentVisionCondition>();
+        EditorData->AddPropertyBinding(Context, TEXT("AcquireGraceTime"), LostSight, TEXT("MaximumAge"));
+        LostSight.GetInstanceData().bInvert = true;
+        Chase.AddTransition(EStateTreeTransitionTrigger::OnStateSucceeded, EStateTreeTransitionType::GotoState, &Chase);
+        Chase.AddTransition(EStateTreeTransitionTrigger::OnStateFailed, EStateTreeTransitionType::GotoState, &Pursue);
+
+        Pursue.AddTask<FJMStateTreeSetStateTask>().GetInstanceData().State = JMEnemyTags::State_Search;
+        Pursue.AddTask<FJMStateTreeMovementProfileTask>().GetInstanceData().ProfileName = TEXT("Investigate");
+        auto& PursueMove = Pursue.AddTask<FJMStateTreeMoveToLocationTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastSeenLocation"), PursueMove, TEXT("Location"));
+        auto& PursuitTimer = Pursue.AddTask<FJMStateTreeWaitTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("LostSightPursuitDuration"), PursuitTimer, TEXT("Duration"));
+        auto& Reacquire = StimulusTo(Pursue, Chase, EStateTreeTransitionPriority::Critical)
+            .AddCondition<FJMStateTreeCanSeeTargetCondition>();
+        UStateTreeState& LastKnownPause = Root.AddChildState(TEXT("PauseAtLastKnownLocation"));
+        LastKnownPause.TasksCompletion = EStateTreeTaskCompletionType::All;
+        LastKnownPause.AddTask<FJMStateTreeSetStateTask>().GetInstanceData().State = JMEnemyTags::State_Search;
+        auto& PauseTask = LastKnownPause.AddTask<FJMStateTreeWaitTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("LastKnownLocationPause"), PauseTask, TEXT("Duration"));
+        Pursue.AddTransition(EStateTreeTransitionTrigger::OnStateSucceeded, EStateTreeTransitionType::GotoState, &LastKnownPause);
+        Pursue.AddTransition(EStateTreeTransitionTrigger::OnStateFailed, EStateTreeTransitionType::GotoState, &Search);
+        LastKnownPause.AddTransition(EStateTreeTransitionTrigger::OnStateSucceeded, EStateTreeTransitionType::GotoState, &Search);
+
+        Search.AddTask<FJMStateTreeSetStateTask>().GetInstanceData().State = JMEnemyTags::State_Search;
+        Search.AddTask<FJMStateTreeMovementProfileTask>().GetInstanceData().ProfileName = TEXT("Investigate");
+        auto& SearchMove = Search.AddTask<FJMStateTreeMoveRandomTask>();
+        SearchMove.GetInstanceData().bUseHomeAsCenter = false;
+        SearchMove.GetInstanceData().MinWaitTime = 0.0f;
+        SearchMove.GetInstanceData().MaxWaitTime = 0.0f;
+        EditorData->AddPropertyBinding(Context, TEXT("LastSeenLocation"), SearchMove, TEXT("Center"));
+        EditorData->AddPropertyBinding(Context, TEXT("SearchRadius"), SearchMove, TEXT("Radius"));
+        EditorData->AddPropertyBinding(Context, TEXT("SearchPointCount"), SearchMove, TEXT("NumberOfLocations"));
+        auto& SearchTimer = Search.AddTask<FJMStateTreeWaitTask>();
+        EditorData->AddPropertyBinding(Context, TEXT("SearchDuration"), SearchTimer, TEXT("Duration"));
+        auto& SearchSeen = StimulusTo(Search, Chase, EStateTreeTransitionPriority::Critical)
+            .AddCondition<FJMStateTreeCanSeeTargetCondition>();
+        Search.AddTransition(EStateTreeTransitionTrigger::OnStateSucceeded, EStateTreeTransitionType::GotoState, &Patrol);
+        Search.AddTransition(EStateTreeTransitionTrigger::OnStateFailed, EStateTreeTransitionType::GotoState, &Patrol);
+
+        FStateTreeCompilerLog Log;
+        if (!UStateTreeEditingSubsystem::CompileStateTree(Tree, Log))
+        {
+            UE_LOG(LogTemp, Error, TEXT("Failed to compile ST_BasicHunter"));
+            return nullptr;
+        }
+        return Tree;
+    }
+
+    UBlueprint* BuildBlueprint(UJMEnemyDefinition* Definition)
+    {
+        const FName AssetName(TEXT("BP_Enemy_BasicHunter"));
+        const FString PackageName = FString::Printf(TEXT("%s/%s"), RootPath, *AssetName.ToString());
+        UPackage* Package = CreatePackage(*PackageName);
+        UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *FString::Printf(TEXT("%s.%s"), *PackageName, *AssetName.ToString()));
+        if (!Blueprint)
+        {
+            Blueprint = FKismetEditorUtilities::CreateBlueprint(AJMEnemyBase::StaticClass(), Package, AssetName,
+                BPTYPE_Normal, UBlueprint::StaticClass(), UBlueprintGeneratedClass::StaticClass(), FName(TEXT("JMBasicHunterBuilder")));
+            if (Blueprint) FAssetRegistryModule::AssetCreated(Blueprint);
+        }
+        if (!Blueprint || !Blueprint->GeneratedClass) return nullptr;
+        FKismetEditorUtilities::CompileBlueprint(Blueprint);
+        AJMEnemyBase* CDO = Cast<AJMEnemyBase>(Blueprint->GeneratedClass->GetDefaultObject());
+        if (FObjectProperty* Property = FindFProperty<FObjectProperty>(AJMEnemyBase::StaticClass(), TEXT("EnemyDefinition")))
+        {
+            CDO->Modify();
+            Property->SetObjectPropertyValue_InContainer(CDO, Definition);
+        }
+        return Blueprint;
+    }
+
+    bool BuildAndSave()
+    {
+        UJMEnemyMovementSet* Movement = CreateAsset<UJMEnemyMovementSet>(TEXT("DA_BasicHunter_Movement"));
+        Movement->Profiles.Reset();
+        for (const TPair<FName, float>& Profile : {TPair<FName, float>(TEXT("Patrol"), 300.0f),
+            TPair<FName, float>(TEXT("Investigate"), 425.0f), TPair<FName, float>(TEXT("Chase"), 600.0f)})
+        {
+            FJMEnemyMovementProfile& Added = Movement->Profiles.AddDefaulted_GetRef();
+            Added.ProfileName = Profile.Key; Added.MaxSpeed = Profile.Value; Added.MaxAcceleration = 1800.0f; Added.AcceptanceRadius = 75.0f;
+        }
+        UStateTree* Tree = BuildStateTree();
+        UJMEnemyDefinition* Definition = CreateAsset<UJMEnemyDefinition>(TEXT("DA_Enemy_BasicHunter"));
+        Definition->EnemyId = TEXT("BasicHunter.Reference");
+        Definition->DisplayName = FText::FromString(TEXT("Basic Hunter Reference Enemy"));
+        Definition->InitialState = JMEnemyTags::State_Patrol;
+        Definition->Perception.Vision.bEnabled = true;
+        Definition->Perception.Vision.SightRadius = 2200.0f;
+        Definition->Perception.Vision.LoseSightRadius = 2500.0f;
+        Definition->Perception.Hearing.bEnabled = false;
+        Definition->MovementSet = Movement; Definition->DefaultMovementProfile = TEXT("Patrol"); Definition->StateTree = Tree;
+        UBlueprint* Blueprint = BuildBlueprint(Definition);
+        return SaveAsset(Movement) && SaveAsset(Tree) && SaveAsset(Definition) && SaveAsset(Blueprint);
+    }
+}
+
 UJMMonsterFrameworkBuildReferenceAssetsCommandlet::UJMMonsterFrameworkBuildReferenceAssetsCommandlet()
 {
     IsClient = false;
@@ -1023,5 +1265,6 @@ int32 UJMMonsterFrameworkBuildReferenceAssetsCommandlet::Main(const FString& Par
     UE_LOG(LogTemp, Display, TEXT("JM_LISTENER_REFERENCE_ASSETS=%s"), bSaved ? TEXT("SUCCESS") : TEXT("FAILED"));
     const bool bWatcherSaved = JMWatcherAssets::BuildAndSave();
     const bool bCrawlerSaved = JMCrawlerAssets::BuildAndSave();
-    return bSaved && bWatcherSaved && bCrawlerSaved ? 0 : 1;
+    const bool bBasicHunterSaved = JMBasicHunterAssets::BuildAndSave();
+    return bSaved && bWatcherSaved && bCrawlerSaved && bBasicHunterSaved ? 0 : 1;
 }

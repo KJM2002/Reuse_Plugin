@@ -9,6 +9,7 @@
 #include "Debug/JMEnemyDebugComponent.h"
 #include "Locomotion/JMEnemyLocomotionComponent.h"
 #include "Memory/JMEnemyMemoryComponent.h"
+#include "Patrol/JMEnemyPatrolComponent.h"
 #include "Perception/JMEnemyPerceptionComponent.h"
 #include "State/JMEnemyStateComponent.h"
 #include "Engine/World.h"
@@ -27,6 +28,7 @@ AJMEnemyBase::AJMEnemyBase(const FObjectInitializer& ObjectInitializer)
     PerceptionComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyPerceptionComponent>(this, TEXT("EnemyPerception"));
     MemoryComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyMemoryComponent>(this, TEXT("EnemyMemory"));
     LocomotionComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyLocomotionComponent>(this, TEXT("EnemyLocomotion"));
+    PatrolComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyPatrolComponent>(this, TEXT("EnemyPatrol"));
     ActionComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyActionComponent>(this, TEXT("EnemyActions"));
     AudioComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyAudioComponent>(this, TEXT("EnemyAudio"));
     DebugComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyDebugComponent>(this, TEXT("EnemyDebug"));
@@ -153,6 +155,12 @@ void AJMEnemyBase::ApplyDefinition(const UJMEnemyDefinition& Definition)
     if (PerceptionComponent)
     {
         PerceptionComponent->ApplyConfig(Definition.Perception);
+    }
+
+    if (PatrolComponent)
+    {
+        PatrolComponent->MinWaitTime = Definition.BehaviorTuning.PatrolMinWaitTime;
+        PatrolComponent->MaxWaitTime = Definition.BehaviorTuning.PatrolMaxWaitTime;
     }
 
     if (LocomotionComponent && Definition.MovementSet &&

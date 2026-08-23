@@ -12,6 +12,8 @@ class UJMEnemyAction;
 class UJMEnemyActionComponent;
 class UJMEnemyLocomotionComponent;
 class UJMEnemyMemoryComponent;
+class UJMEnemyPatrolComponent;
+class UJMEnemyPerceptionComponent;
 class UJMEnemyStateComponent;
 
 USTRUCT()
@@ -101,6 +103,8 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeMoveToLocationInstanceData
     UPROPERTY(EditAnywhere, Category=Parameter) FJMEnemyMoveOptions Options;
     FAIRequestID RequestID = FAIRequestID::InvalidRequest;
     FDelegateHandle DelegateHandle;
+    FVector SubmittedLocation = FVector::ZeroVector;
+    bool bRetargeting = false;
     bool bEntering = false;
     bool bCompletedDuringEnter = false;
     EJMEnemyMoveStatus Completion = EJMEnemyMoveStatus::Idle;
@@ -115,6 +119,7 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeMoveToLocationTask : public FSt
     virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
     virtual bool Link(FStateTreeLinker& Linker) override;
     virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult&) const override;
+    virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
     virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult&) const override;
     TStateTreeExternalDataHandle<UJMEnemyLocomotionComponent> LocomotionHandle;
 };
@@ -247,6 +252,28 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeSetTargetInstanceData
     UPROPERTY(EditAnywhere, Category=Parameter) bool bUseLastSeenSource = false;
 };
 
+USTRUCT()
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeWaitForGazeReleaseInstanceData
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0.0")) float MinimumDuration = 0.0f;
+    float Elapsed = 0.0f;
+};
+
+/** Finishes only after the minimum hide time has elapsed and the player is no longer observing the enemy. */
+USTRUCT(meta=(DisplayName="Wait For Gaze Release", Category="JM Monster Framework|Perception"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeWaitForGazeReleaseTask : public FStateTreeTaskCommonBase
+{
+    GENERATED_BODY()
+    using FInstanceDataType = FJMStateTreeWaitForGazeReleaseInstanceData;
+    FJMStateTreeWaitForGazeReleaseTask();
+    virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
+    virtual bool Link(FStateTreeLinker& Linker) override;
+    virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext&, const FStateTreeTransitionResult&) const override;
+    virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, float DeltaTime) const override;
+    TStateTreeExternalDataHandle<UJMEnemyPerceptionComponent> PerceptionHandle;
+};
+
 USTRUCT(meta=(DisplayName="Set Current Target", Category="JM Monster Framework|Target"))
 struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeSetTargetTask : public FStateTreeTaskCommonBase
 {
@@ -283,11 +310,14 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeMoveRandomInstanceData
     UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0.0")) float MaxWaitTime = 1.0f;
     UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0.01")) float RetryBackoff = 0.25f;
     UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0", ClampMax="10")) int32 MaxRetries = 3;
+    /** Number of destinations to inspect before this task succeeds. One preserves legacy patrol behavior. */
+    UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="1", ClampMax="8")) int32 NumberOfLocations = 1;
     UPROPERTY(EditAnywhere, Category=Parameter) FJMEnemyMoveOptions Options;
     UPROPERTY(VisibleAnywhere, Category=Output) FVector ChosenLocation = FVector::ZeroVector;
     FAIRequestID RequestID = FAIRequestID::InvalidRequest;
     float RemainingTime = 0.0f;
     int32 RetryCount = 0;
+    int32 CompletedLocations = 0;
     uint8 Phase = 0;
     EJMEnemyMoveRequestResult LastRequestResult = EJMEnemyMoveRequestResult::RequestFailed;
 };
@@ -305,4 +335,34 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeMoveRandomTask : public FStateT
     virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, float DeltaTime) const override;
     virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult&) const override;
     TStateTreeExternalDataHandle<UJMEnemyLocomotionComponent> LocomotionHandle;
+};
+
+USTRUCT()
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreePatrolInstanceData
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0.01")) float RetryBackoff = 0.25f;
+    UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0", ClampMax="10")) int32 MaxRetries = 3;
+    UPROPERTY(EditAnywhere, Category=Parameter) FJMEnemyMoveOptions Options;
+    UPROPERTY(VisibleAnywhere, Category=Output) FVector ChosenLocation = FVector::ZeroVector;
+    float RemainingTime = 0.0f;
+    int32 RetryCount = 0;
+    FAIRequestID RequestID = FAIRequestID::InvalidRequest;
+    uint8 Phase = 0;
+};
+
+/** Executes exactly one destination supplied by Patrol, then waits once. */
+USTRUCT(meta=(DisplayName="Move Along Patrol", Category="JM Monster Framework|Patrol"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeMovePatrolTask : public FStateTreeTaskCommonBase
+{
+    GENERATED_BODY()
+    using FInstanceDataType = FJMStateTreePatrolInstanceData;
+    FJMStateTreeMovePatrolTask();
+    virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
+    virtual bool Link(FStateTreeLinker& Linker) override;
+    virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult&) const override;
+    virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, float DeltaTime) const override;
+    virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult&) const override;
+    TStateTreeExternalDataHandle<UJMEnemyLocomotionComponent> LocomotionHandle;
+    TStateTreeExternalDataHandle<UJMEnemyPatrolComponent> PatrolHandle;
 };
