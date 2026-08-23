@@ -59,6 +59,16 @@ protected:
     /** Applies definition-owned state, perception, movement, and action configuration once. */
     virtual void ApplyDefinition(const UJMEnemyDefinition& Definition);
 
+    /**
+     * Runtime-generated navigation should normally treat an enemy as an agent, not as moving world geometry.
+     * This policy disables navigation influence on the enemy's movable primitive components by default.
+     */
+    void ApplyNavigationInfluencePolicy();
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="JM Monster|Navigation",
+        meta=(ToolTip="Enable only when this enemy's primitive components are intentionally meant to modify runtime NavMesh. Leave disabled for normal moving enemies."))
+    bool bPrimitiveComponentsAffectNavigation = false;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="JM Enemy|Core")
     TObjectPtr<UJMEnemyDefinition> EnemyDefinition;
 

@@ -73,6 +73,14 @@ public:
     UFUNCTION(BlueprintPure, Category="JM Enemy|Locomotion")
     FAIRequestID GetCurrentRequestID() const { return ActiveRequestID; }
 
+    /** True when an existing active request already represents this actor-follow intent. */
+    UFUNCTION(BlueprintPure, Category="JM Enemy|Locomotion")
+    bool IsMovingToActor(AActor* TargetActor) const;
+
+    /** True when an existing location request is already close enough to the supplied destination. */
+    UFUNCTION(BlueprintPure, Category="JM Enemy|Locomotion")
+    bool IsMovingToLocation(FVector Destination, float Tolerance = 10.0f) const;
+
     /** Stable spawn anchor used by autonomous movement so repeated patrol legs cannot drift forever. */
     UFUNCTION(BlueprintPure, Category="JM Enemy|Locomotion")
     FVector GetHomeLocation() const;
@@ -99,15 +107,25 @@ protected:
     /** Ground backend seam. A future surface component can override execution while keeping the public intent API. */
     virtual EJMEnemyMoveRequestResult SubmitMoveRequest(AActor* TargetActor, const FVector& Destination,
         const FJMEnemyMoveOptions& Options);
+
     AAIController* ResolveController();
     void BindController(AAIController* Controller);
     void FinishActiveMove(EJMEnemyMoveStatus Result);
     float ResolveAcceptanceRadius(const FJMEnemyMoveOptions& Options) const;
+
+    /**
+     * Returns true when a new call expresses the same active movement intent.
+     * Ground MoveToActor is intentionally idempotent so a behavior reevaluation cannot restart pathfinding every frame.
+     */
+    bool IsEquivalentActiveMove(AActor* TargetActor, const FVector& Destination,
+        const FJMEnemyMoveOptions& Options) const;
+
+    void RememberActiveMoveOptions(const FJMEnemyMoveOptions& Options);
+
     FAIRequestID BeginBackendMove(AActor* TargetActor, const FVector& Destination);
     void UpdateBackendDestination(const FVector& Destination) { CurrentDestination = Destination; }
 
 private:
-
     UFUNCTION()
     void HandleMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::Type Result);
 
@@ -123,8 +141,14 @@ private:
     FVector CurrentDestination = FVector::ZeroVector;
     FName CurrentMovementProfile;
     float ProfileAcceptanceRadius = 75.0f;
+
+    FJMEnemyMoveOptions ActiveMoveOptions;
+    float ActiveResolvedAcceptanceRadius = -1.0f;
+    bool bHasActiveMoveOptions = false;
+
     EJMEnemyMoveStatus MoveStatus = EJMEnemyMoveStatus::Idle;
     EJMEnemyMoveStatus LastMoveResult = EJMEnemyMoveStatus::Idle;
+
     FVector HomeLocation = FVector::ZeroVector;
     bool bHasHomeLocation = false;
 };

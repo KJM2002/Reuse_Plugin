@@ -2,6 +2,7 @@
 
 #include "Action/JMEnemyActionComponent.h"
 #include "Audio/JMEnemyAudioComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "Core/JMEnemyDefinition.h"
 #include "Core/JMEnemyAIController.h"
 #include "JMMonsterFrameworkRuntime.h"
@@ -10,7 +11,6 @@
 #include "Memory/JMEnemyMemoryComponent.h"
 #include "Perception/JMEnemyPerceptionComponent.h"
 #include "State/JMEnemyStateComponent.h"
-
 #include "Engine/World.h"
 #include "HAL/PlatformTime.h"
 
@@ -22,6 +22,7 @@ AJMEnemyBase::AJMEnemyBase(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
     PrimaryActorTick.bCanEverTick = false;
+
     StateComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyStateComponent>(this, TEXT("EnemyState"));
     PerceptionComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyPerceptionComponent>(this, TEXT("EnemyPerception"));
     MemoryComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyMemoryComponent>(this, TEXT("EnemyMemory"));
@@ -29,13 +30,22 @@ AJMEnemyBase::AJMEnemyBase(const FObjectInitializer& ObjectInitializer)
     ActionComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyActionComponent>(this, TEXT("EnemyActions"));
     AudioComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyAudioComponent>(this, TEXT("EnemyAudio"));
     DebugComponent = ObjectInitializer.CreateDefaultSubobject<UJMEnemyDebugComponent>(this, TEXT("EnemyDebug"));
+
     AIControllerClass = AJMEnemyAIController::StaticClass();
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+
+    // A moving enemy is a navigation agent, not moving level geometry.
+    // APawn itself defaults to not affecting navigation, but primitive components can still be nav-relevant.
+    SetCanAffectNavigationGeneration(false, false);
 }
 
 void AJMEnemyBase::PostInitializeComponents()
 {
     Super::PostInitializeComponents();
+
+    // Blueprint/SCS primitive components exist by this point, so the policy also covers
+    // extra collision and mesh components added by a concrete enemy Blueprint.
+    ApplyNavigationInfluencePolicy();
     InitializeEnemy();
 }
 
@@ -55,6 +65,27 @@ void AJMEnemyBase::BeginPlay()
     }
 }
 
+void AJMEnemyBase::ApplyNavigationInfluencePolicy()
+{
+    SetCanAffectNavigationGeneration(bPrimitiveComponentsAffectNavigation, false);
+
+    if (bPrimitiveComponentsAffectNavigation)
+    {
+        return;
+    }
+
+    TInlineComponentArray<UPrimitiveComponent*> PrimitiveComponents;
+    GetComponents(PrimitiveComponents);
+
+    for (UPrimitiveComponent* Primitive : PrimitiveComponents)
+    {
+        if (IsValid(Primitive) && Primitive->CanEverAffectNavigation())
+        {
+            Primitive->SetCanEverAffectNavigation(false);
+        }
+    }
+}
+
 void AJMEnemyBase::InitializeEnemy()
 {
     if (bFrameworkInitialized)
@@ -63,6 +94,7 @@ void AJMEnemyBase::InitializeEnemy()
     }
 
     bFrameworkInitialized = true;
+
     if (EnemyDefinition)
     {
         ApplyDefinition(*EnemyDefinition);
@@ -79,13 +111,13 @@ void AJMEnemyBase::InitializeEnemy()
         PerceptionComponent->OnStimulusReceived.AddUniqueDynamic(
             MemoryComponent, &UJMEnemyMemoryComponent::HandleStimulus);
     }
-
 }
 
 float AJMEnemyBase::TakeDamage(const float DamageAmount, const FDamageEvent& DamageEvent,
     AController* EventInstigator, AActor* DamageCauser)
 {
     const float AppliedDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
     if (AppliedDamage > 0.0f && PerceptionComponent)
     {
         AActor* Source = DamageCauser;
@@ -104,6 +136,7 @@ float AJMEnemyBase::TakeDamage(const float DamageAmount, const FDamageEvent& Dam
         Stimulus.bSuccessfullySensed = true;
         PerceptionComponent->SubmitStimulus(Stimulus);
     }
+
     return AppliedDamage;
 }
 
@@ -140,12 +173,14 @@ void AJMEnemyBase::ApplyDefinition(const UJMEnemyDefinition& Definition)
 EDataValidationResult AJMEnemyBase::IsDataValid(FDataValidationContext& Context) const
 {
     EDataValidationResult Result = Super::IsDataValid(Context);
+
     if (!EnemyDefinition)
     {
         Context.AddError(NSLOCTEXT("JMMonsterFramework", "MissingEnemyDefinition",
             "Enemy Definition is required for a configured JM Enemy."));
         return EDataValidationResult::Invalid;
     }
+
     return Result == EDataValidationResult::NotValidated ? EDataValidationResult::Valid : Result;
 }
 #endif
