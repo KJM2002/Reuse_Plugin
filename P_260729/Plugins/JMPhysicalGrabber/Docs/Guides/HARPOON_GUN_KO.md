@@ -459,6 +459,12 @@ Enhanced Input 연결 순서:
 | `On Player Grapple Started` | Projectile | 플레이어 당김이 실제로 시작된 직후 |
 | `On Player Grapple Ended` | Projectile, End Reason | 해제, 도착, 회수, 앵커 유실, 시간 초과, 막힘, 기능 Off로 당김이 끝날 때 |
 
+Player Grapple이 실제로 시작되면 당김 방향과 관계없이 Character Movement는
+Walking을 벗어납니다. 따라서 보행 상태와 이동 거리로 재생되는 발소리는 당김을
+달리기로 오인하지 않습니다. 이후 전용 오디오를 붙일 때는 `On Harpoon Fired`에
+발사 One-shot을, `On Player Grapple Started/Ended`에 윈치 Loop의 시작/정지를
+연결하면 됩니다.
+
 이 이벤트에 사운드, 카메라 셰이크, Niagara, UI, 게임 규칙을 연결하면 C++ 핵심 로직을 수정하지 않고 타격감을 확장할 수 있다.
 
 ## 10. C++ 수정 위치

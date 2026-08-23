@@ -1,0 +1,12 @@
+# Project-scoped NarshaMCP configuration for P_060715.
+# This takes precedence when Codex opens this trusted project.
+
+[mcp_servers.narshamcp]
+command = "D:/HDD_UnrealEngine/UE_5.7/UE_5.7/Engine/Plugins/Marketplace/NarshaADb0a51a29e8f5V1/Source/ThirdParty/bin/narshamcp.exe"
+args = ["serve", "--project-path", "C:/Users/RealJaemin/OneDrive/Documents/GitHub/Reuse_Plugin/P_260729", "--engine-path", "D:/HDD_UnrealEngine/UE_5.7/UE_5.7", "--no-gui"]
+startup_timeout_sec = 30
+tool_timeout_sec = 120
+enabled = true
+
+[mcp_servers.narshamcp.env]
+RUST_LOG = "error"

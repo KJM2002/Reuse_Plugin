@@ -1,0 +1,13 @@
+{
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "narshamcp"
+  ],
+  "permissions": {
+    "allow": [
+      "mcp__narshamcp"
+    ],
+    "ask": [],
+    "deny": []
+  }
+}

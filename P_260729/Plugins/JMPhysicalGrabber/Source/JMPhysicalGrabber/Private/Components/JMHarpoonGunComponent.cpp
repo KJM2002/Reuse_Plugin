@@ -191,6 +191,16 @@ bool UJMHarpoonGunComponent::StartPlayerGrapple()
     Movement->GroundFriction = FMath::Min(Movement->GroundFriction, 0.5f);
     Movement->BrakingFrictionFactor = 0.0f;
 
+    // A grapple pull is not grounded locomotion, even when the anchor is level
+    // with or below the player. Leaving CharacterMovement in Walking makes
+    // distance-driven footstep systems interpret the winch velocity as a very
+    // fast run. Falling also preserves the existing gravity-based grapple
+    // model and naturally returns to Walking when the character lands.
+    if (Movement->IsMovingOnGround())
+    {
+        Movement->SetMovementMode(MOVE_Falling);
+    }
+
     if (!bPlayerGrappleFOVActive)
     {
         GrappleCamera = GetOwner()->FindComponentByClass<UCameraComponent>();
@@ -416,7 +426,7 @@ void UJMHarpoonGunComponent::UpdatePlayerGrapple(float DeltaTime)
 
     Movement->GravityScale = PlayerGrappleGravityScale;
     Movement->Velocity = NewVelocity;
-    if (Movement->IsMovingOnGround() && PullDirection.Z > 0.15f)
+    if (Movement->IsMovingOnGround())
     {
         Movement->SetMovementMode(MOVE_Falling);
     }
