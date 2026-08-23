@@ -63,6 +63,7 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeActorVisionInstanceData
 {
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, Category=Parameter) TObjectPtr<AActor> Actor;
+    UPROPERTY(EditAnywhere, Category=Parameter) bool bUseLastSeenSource = false;
 };
 
 USTRUCT(meta=(DisplayName="Can See Actor", Category="JM Monster Framework|Perception"))
@@ -228,6 +229,7 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeCombatTargetInstanceData
 {
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, Category=Parameter) TObjectPtr<AActor> Actor;
+    UPROPERTY(EditAnywhere, Category=Parameter) bool bUseLastSeenSource = false;
     UPROPERTY(EditAnywhere, Category=Policy) bool bRequirePawn = true;
     UPROPERTY(EditAnywhere, Category=Policy) bool bRequirePlayerControlled = true;
     UPROPERTY(EditAnywhere, Category=Policy) bool bRequireDamageable = true;
@@ -240,7 +242,9 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeCombatTargetCondition : public 
     GENERATED_BODY()
     using FInstanceDataType = FJMStateTreeCombatTargetInstanceData;
     virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
+    virtual bool Link(FStateTreeLinker& Linker) override;
     virtual bool TestCondition(FStateTreeExecutionContext& Context) const override;
+    TStateTreeExternalDataHandle<UJMEnemyMemoryComponent> MemoryHandle;
 };
 
 USTRUCT()

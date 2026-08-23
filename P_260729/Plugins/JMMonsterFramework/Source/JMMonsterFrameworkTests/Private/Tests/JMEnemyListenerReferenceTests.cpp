@@ -18,10 +18,12 @@
 #include "Engine/World.h"
 #include "Engine/WorldInitializationValues.h"
 #include "GameFramework/PlayerController.h"
+#include "HAL/PlatformProcess.h"
 #include "Locomotion/JMEnemyMovementSet.h"
 #include "Locomotion/JMEnemyLocomotionComponent.h"
 #include "Memory/JMEnemyMemoryComponent.h"
 #include "NavigationSystem.h"
+#include "NavigationData.h"
 #include "Perception/AISense_Hearing.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AIPerceptionSystem.h"
@@ -33,6 +35,7 @@
 #include "Tests/JMEnemyCoreTestTypes.h"
 #include "Types/JMEnemyTags.h"
 #include "TimerManager.h"
+#include "UObject/UnrealType.h"
 
 namespace JMListenerReferenceTests
 {
@@ -40,6 +43,19 @@ namespace JMListenerReferenceTests
         TEXT("/JMMonsterFramework/Reference/Listener/DA_Enemy_Listener.DA_Enemy_Listener");
     constexpr TCHAR BlueprintPath[] =
         TEXT("/JMMonsterFramework/Reference/Listener/BP_Enemy_Listener.BP_Enemy_Listener");
+
+    void EnableDynamicGeneration(UNavigationSystemV1& Navigation)
+    {
+        ANavigationData* NavData = Navigation.GetDefaultNavDataInstance(FNavigationSystem::Create);
+        FEnumProperty* Property = FindFProperty<FEnumProperty>(ANavigationData::StaticClass(), TEXT("RuntimeGeneration"));
+        if (NavData && Property)
+        {
+            Property->GetUnderlyingProperty()->SetIntPropertyValue(
+                Property->ContainerPtrToValuePtr<void>(NavData),
+                static_cast<int64>(ERuntimeGenerationType::Dynamic));
+            NavData->OnNavigationBoundsChanged();
+        }
+    }
 
     void TickWorld(UWorld& World, const float Seconds)
     {
@@ -50,6 +66,18 @@ namespace JMListenerReferenceTests
             World.Tick(LEVELTICK_All, Step);
             World.GetTimerManager().Tick(Step);
         }
+    }
+
+    void WaitForNavigation(UWorld& World, UNavigationSystemV1& Navigation)
+    {
+        const double Deadline = FPlatformTime::Seconds() + 5.0;
+        do
+        {
+            World.Tick(LEVELTICK_All, 0.05f);
+            FPlatformProcess::Sleep(0.01f);
+        }
+        while ((Navigation.IsNavigationBuildInProgress() ||
+            Navigation.GetNumRemainingBuildTasks() > 0) && FPlatformTime::Seconds() < Deadline);
     }
 
     bool SubmitHearing(AJMEnemyBase& Listener, AActor& Source)
@@ -156,7 +184,9 @@ bool FJMEnemyListenerVerticalSliceTest::RunTest(const FString& Parameters)
     UWorld::InitializationValues Init;
     Init.AllowAudioPlayback(false).RequiresHitProxies(false).CreateNavigation(true)
         .CreateAISystem(true).ShouldSimulatePhysics(false).SetTransactional(false).CreateFXSystem(false);
-    UWorld* World = UWorld::CreateWorld(EWorldType::Game, true, TEXT("JMListenerVerticalSlice"),
+    const FName WorldName = MakeUniqueObjectName(
+        GetTransientPackage(), UWorld::StaticClass(), TEXT("JMListenerVerticalSlice"));
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, true, WorldName,
         GetTransientPackage(), true, ERHIFeatureLevel::Num, &Init);
     if (!TestNotNull(TEXT("Integration world is created"), World)) return false;
     FWorldContext& WorldContext = GEngine->CreateNewWorldContext(EWorldType::Game);
@@ -166,6 +196,7 @@ bool FJMEnemyListenerVerticalSliceTest::RunTest(const FString& Parameters)
     Floor->GetStaticMeshComponent()->SetStaticMesh(
         LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
     Floor->SetActorScale3D(FVector(30.0f, 30.0f, 1.0f));
+    Floor->GetStaticMeshComponent()->SetCanEverAffectNavigation(true);
     Floor->ReregisterAllComponents();
     ANavMeshBoundsVolume* Bounds = World->SpawnActor<ANavMeshBoundsVolume>(FVector::ZeroVector, FRotator::ZeroRotator);
     Bounds->Brush = NewObject<UModel>(Bounds, NAME_None, RF_Transient);
@@ -176,6 +207,7 @@ bool FJMEnemyListenerVerticalSliceTest::RunTest(const FString& Parameters)
     BoundsBuilder->Y = 6000.0f;
     BoundsBuilder->Z = 1000.0f;
     BoundsBuilder->Build(World, Bounds);
+    Bounds->GetBrushComponent()->SetCanEverAffectNavigation(true);
     Bounds->ReregisterAllComponents();
     World->InitializeActorsForPlay(FURL());
     UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
@@ -187,10 +219,13 @@ bool FJMEnemyListenerVerticalSliceTest::RunTest(const FString& Parameters)
     JMListenerReferenceTests::TickWorld(*World, 0.1f);
     if (Navigation)
     {
+        JMListenerReferenceTests::EnableDynamicGeneration(*Navigation);
+        Navigation->OnNavigationBoundsUpdated(Bounds);
         UNavigationSystemV1::UpdateActorAndComponentsInNavOctree(*Floor);
         Navigation->Build();
+        JMListenerReferenceTests::WaitForNavigation(*World, *Navigation);
     }
-    JMListenerReferenceTests::TickWorld(*World, 1.0f);
+    JMListenerReferenceTests::TickWorld(*World, 2.0f);
 
     AJMEnemyBase* Listener = World->SpawnActor<AJMEnemyBase>(Blueprint->GeneratedClass,
         FVector(0.0, 0.0, 100.0), FRotator::ZeroRotator);
@@ -208,12 +243,13 @@ bool FJMEnemyListenerVerticalSliceTest::RunTest(const FString& Parameters)
             }
         }
     }
-    AActor* Throwable = World->SpawnActor<AActor>(FVector(500.0, 0.0, 100.0), FRotator::ZeroRotator);
-    AJMEnemyPlayerDamageTarget* Player = World->SpawnActor<AJMEnemyPlayerDamageTarget>(
-        FVector(300.0, 0.0, 100.0), FRotator::ZeroRotator);
-    APlayerController* PlayerController = World->SpawnActor<APlayerController>();
-    PlayerController->Possess(Player);
     TestNotNull(TEXT("Reference Listener spawns"), Listener);
+    if (!Listener)
+    {
+        GEngine->DestroyWorldContext(World);
+        World->DestroyWorld(false);
+        return false;
+    }
     TestNotNull(TEXT("AIController possession is established"), Listener ? Listener->GetController() : nullptr);
     const AJMEnemyAIController* FrameworkController = Listener
         ? Cast<AJMEnemyAIController>(Listener->GetController()) : nullptr;
@@ -225,6 +261,25 @@ bool FJMEnemyListenerVerticalSliceTest::RunTest(const FString& Parameters)
     }
     TestTrue(TEXT("Listener StateTree runner is active"), FrameworkController &&
         FrameworkController->GetEnemyStateTreeComponent()->IsRunning());
+
+    const FVector ListenerHome = Listener ? Listener->GetActorLocation() : FVector::ZeroVector;
+    TestNull(TEXT("Autonomous Patrol starts without CurrentTarget"),
+        Listener ? Listener->GetEnemyMemoryComponent()->GetCurrentTarget() : nullptr);
+    JMListenerReferenceTests::TickListener(*World, *Listener, 6.0f);
+    TestTrue(TEXT("Listener enters Patrol without a player"),
+        Listener->GetEnemyStateComponent()->IsInState(JMEnemyTags::State_Patrol));
+    TestEqual(TEXT("Listener applies the Patrol movement profile"),
+        Listener->GetEnemyLocomotionComponent()->GetCurrentMovementProfile(), FName(TEXT("Patrol")));
+    TestEqual(TEXT("Listener preserves its spawn Home anchor"),
+        Listener->GetEnemyLocomotionComponent()->GetHomeLocation(), ListenerHome);
+    TestTrue(TEXT("Listener remains inside its Home patrol envelope"),
+        FVector::Dist2D(ListenerHome, Listener->GetActorLocation()) <= 1100.0f);
+
+    AActor* Throwable = World->SpawnActor<AActor>(FVector(500.0, 0.0, 100.0), FRotator::ZeroRotator);
+    AJMEnemyPlayerDamageTarget* Player = World->SpawnActor<AJMEnemyPlayerDamageTarget>(
+        FVector(300.0, 0.0, 100.0), FRotator::ZeroRotator);
+    APlayerController* PlayerController = World->SpawnActor<APlayerController>();
+    PlayerController->Possess(Player);
     if (!Listener || !Throwable || !Player)
     {
         GEngine->DestroyWorldContext(World);

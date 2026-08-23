@@ -1,10 +1,12 @@
 #include "Locomotion/JMEnemyLocomotionComponent.h"
 
 #include "AIController.h"
+#include "JMMonsterFrameworkRuntime.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Locomotion/JMEnemyMovementSet.h"
+#include "AI/Navigation/NavAgentInterface.h"
 #include "NavigationPath.h"
 #include "NavigationSystem.h"
 
@@ -16,6 +18,11 @@ UJMEnemyLocomotionComponent::UJMEnemyLocomotionComponent()
 void UJMEnemyLocomotionComponent::BeginPlay()
 {
     Super::BeginPlay();
+    if (const AActor* Owner = GetOwner())
+    {
+        HomeLocation = Owner->GetActorLocation();
+        bHasHomeLocation = true;
+    }
     ResolveController();
 }
 
@@ -139,14 +146,67 @@ bool UJMEnemyLocomotionComponent::FindRandomReachableLocation(
     const UWorld* World = GetWorld();
     UNavigationSystemV1* Navigation = World
         ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(const_cast<UWorld*>(World)) : nullptr;
-    FNavLocation RandomLocation;
+    FNavLocation ProjectedCenter;
+    const FVector ProjectionExtent(250.0f, 250.0f, 500.0f);
     if (!Navigation || Radius <= 0.0f ||
-        !Navigation->GetRandomReachablePointInRadius(Center, Radius, RandomLocation))
+        !Navigation->ProjectPointToNavigation(Center, ProjectedCenter, ProjectionExtent))
     {
         return false;
     }
-    OutLocation = RandomLocation.Location;
-    return true;
+
+    const AActor* Owner = GetOwner();
+    const INavAgentInterface* NavAgent = Cast<INavAgentInterface>(Owner);
+    const FVector PathStart = NavAgent ? NavAgent->GetNavAgentLocation() :
+        (Owner ? Owner->GetActorLocation() : ProjectedCenter.Location);
+    FNavLocation ProjectedPathStart;
+    const FVector QueryPathStart = Navigation->ProjectPointToNavigation(
+        PathStart, ProjectedPathStart, ProjectionExtent) ? ProjectedPathStart.Location : PathStart;
+    static constexpr int32 MaxCandidateAttempts = 8;
+    FVector LastRandomLocation = ProjectedCenter.Location;
+    bool bHasRandomLocation = false;
+    for (int32 Attempt = 0; Attempt < MaxCandidateAttempts; ++Attempt)
+    {
+        FNavLocation RandomLocation;
+        if (!Navigation->GetRandomReachablePointInRadius(ProjectedCenter.Location, Radius, RandomLocation))
+        {
+            continue;
+        }
+        LastRandomLocation = RandomLocation.Location;
+        bHasRandomLocation = true;
+        UNavigationPath* Path = Owner ? UNavigationSystemV1::FindPathToLocationSynchronously(
+            const_cast<UWorld*>(World), QueryPathStart, RandomLocation.Location,
+            const_cast<AActor*>(Owner)) : nullptr;
+        if (Path && Path->IsValid() && !Path->IsPartial())
+        {
+            OutLocation = RandomLocation.Location;
+            return true;
+        }
+    }
+    if (Owner && FVector::Dist2D(PathStart, ProjectedCenter.Location) <= 250.0f)
+    {
+        OutLocation = bHasRandomLocation ? LastRandomLocation : ProjectedCenter.Location;
+        return true;
+    }
+    return false;
+}
+
+FVector UJMEnemyLocomotionComponent::GetHomeLocation() const
+{
+    const AActor* Owner = GetOwner();
+    return bHasHomeLocation ? HomeLocation : (Owner ? Owner->GetActorLocation() : FVector::ZeroVector);
+}
+
+bool UJMEnemyLocomotionComponent::IsControllerReady() const
+{
+    const APawn* Pawn = Cast<APawn>(GetOwner());
+    const AAIController* Controller = Pawn ? Cast<AAIController>(Pawn->GetController()) : nullptr;
+    return Controller && Controller->GetPawn() == Pawn && Pawn->GetMovementComponent();
+}
+
+bool UJMEnemyLocomotionComponent::IsNavigationReady() const
+{
+    const UWorld* World = GetWorld();
+    return World && FNavigationSystem::GetCurrent<UNavigationSystemV1>(const_cast<UWorld*>(World));
 }
 
 void UJMEnemyLocomotionComponent::StopMovement()
@@ -246,7 +306,7 @@ EJMEnemyMoveRequestResult UJMEnemyLocomotionComponent::SubmitMoveRequest(
     else
     {
         Request.SetGoalLocation(Destination);
-        Request.SetProjectGoalLocation(true);
+        Request.SetProjectGoalLocation(Options.bProjectGoalLocation);
         Request.SetRequireNavigableEndLocation(true);
     }
     Request.SetAcceptanceRadius(ResolveAcceptanceRadius(Options));
@@ -262,6 +322,50 @@ EJMEnemyMoveRequestResult UJMEnemyLocomotionComponent::SubmitMoveRequest(
         MoveStatus = EJMEnemyMoveStatus::Moving;
         OnMoveStarted.Broadcast(ActiveRequestID, TargetActor, Destination);
         return EJMEnemyMoveRequestResult::RequestStarted;
+    }
+
+    // A placed pawn can be slightly outside the first nav polygon even though a nearby Home
+    // projection is valid. Recover only to that nearby polygon; never direct-move to the random goal.
+    if (Result.Code == EPathFollowingRequestResult::Failed && !TargetActor && Options.bUsePathfinding)
+    {
+        UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+        FNavLocation RecoveryLocation;
+        const FVector RecoveryExtent(250.0f, 250.0f, 500.0f);
+        const FVector NavAgentLocation = Pawn->GetNavAgentLocation();
+        if (Navigation && Navigation->ProjectPointToNavigation(
+                Pawn->GetActorLocation(), RecoveryLocation, RecoveryExtent) &&
+            FVector::Dist2D(NavAgentLocation, RecoveryLocation.Location) <= 250.0f)
+        {
+            FVector RecoveryGoal = RecoveryLocation.Location;
+            const FVector RecoveryDirection = (Destination - RecoveryGoal).GetSafeNormal2D();
+            FNavLocation DeeperRecoveryLocation;
+            if (!RecoveryDirection.IsNearlyZero() && Navigation->ProjectPointToNavigation(
+                    RecoveryGoal + RecoveryDirection * 100.0f, DeeperRecoveryLocation,
+                    FVector(75.0f, 75.0f, 100.0f)))
+            {
+                RecoveryGoal = DeeperRecoveryLocation.Location;
+            }
+            FAIMoveRequest RecoveryRequest;
+            RecoveryRequest.SetGoalLocation(RecoveryGoal);
+            RecoveryRequest.SetUsePathfinding(false);
+            RecoveryRequest.SetProjectGoalLocation(false);
+            RecoveryRequest.SetRequireNavigableEndLocation(false);
+            RecoveryRequest.SetAcceptanceRadius(5.0f);
+            RecoveryRequest.SetReachTestIncludesAgentRadius(false);
+            const FPathFollowingRequestResult RecoveryResult = Controller->MoveTo(RecoveryRequest);
+            if (RecoveryResult.Code == EPathFollowingRequestResult::RequestSuccessful)
+            {
+                CurrentDestination = RecoveryGoal;
+                ActiveRequestID = RecoveryResult.MoveId;
+                MoveStatus = EJMEnemyMoveStatus::Moving;
+                UE_LOG(LogJMMonsterFramework, Verbose,
+                    TEXT("Locomotion starting nearby Nav recovery: Enemy=%s From=%s To=%s"),
+                    *Pawn->GetName(), *NavAgentLocation.ToCompactString(),
+                    *RecoveryLocation.Location.ToCompactString());
+                OnMoveStarted.Broadcast(ActiveRequestID, nullptr, CurrentDestination);
+                return EJMEnemyMoveRequestResult::RequestStarted;
+            }
+        }
     }
 
     ActiveRequestID = Result.MoveId;

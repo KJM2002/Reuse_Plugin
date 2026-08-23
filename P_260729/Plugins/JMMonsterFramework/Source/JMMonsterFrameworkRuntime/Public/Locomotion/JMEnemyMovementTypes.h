@@ -74,4 +74,8 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMEnemyMoveOptions
     /** Conservative V1 default: an unreachable final goal is a failure. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement")
     bool bAllowPartialPath = false;
+
+    /** Disable only when the caller has already produced an exact navigable point. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement")
+    bool bProjectGoalLocation = true;
 };

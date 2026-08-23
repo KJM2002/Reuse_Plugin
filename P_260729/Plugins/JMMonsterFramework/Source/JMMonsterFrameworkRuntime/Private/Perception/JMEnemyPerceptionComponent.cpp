@@ -1,6 +1,8 @@
 #include "Perception/JMEnemyPerceptionComponent.h"
 
 #include "AIController.h"
+#include "Core/JMEnemyAIController.h"
+#include "Core/JMEnemyBase.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/PlatformTime.h"
@@ -55,6 +57,14 @@ void UJMEnemyPerceptionComponent::HandlePerceptionStimulus(AActor* SourceActor, 
         {
             return;
         }
+
+        // Reference enemies are allies for target-selection purposes. AIPerception may report
+        // every neutral pawn when no GenericTeamAgent setup exists, but those observations must
+        // not overwrite the player candidate or emit a misleading StateTree stimulus event.
+        if (SourceActor && SourceActor != GetOwner() && SourceActor->IsA<AJMEnemyBase>())
+        {
+            return;
+        }
         Normalized.Type = EJMStimulusType::Vision;
     }
     else if (EngineStimulus.Type == UAISense::GetSenseID<UAISense_Hearing>())
@@ -83,6 +93,13 @@ bool UJMEnemyPerceptionComponent::SubmitStimulus(FJMStimulus Stimulus)
 
     LastStimuli.Add(Stimulus.Type, Stimulus);
     OnStimulusReceived.Broadcast(Stimulus);
+    if (const AJMEnemyBase* Enemy = Cast<AJMEnemyBase>(GetOwner()))
+    {
+        if (AJMEnemyAIController* Controller = Cast<AJMEnemyAIController>(Enemy->GetController()))
+        {
+            Controller->NotifyFrameworkStimulus(Stimulus);
+        }
+    }
     return true;
 }
 

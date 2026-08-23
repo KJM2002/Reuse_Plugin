@@ -67,7 +67,9 @@ bool FJMStateTreeActorVisionCondition::Link(FStateTreeLinker& Linker) { Linker.L
 bool FJMStateTreeActorVisionCondition::TestCondition(FStateTreeExecutionContext& Context) const
 {
     const FInstanceDataType& Data = Context.GetInstanceData(*this);
-    return Context.GetExternalData(MemoryHandle).CanCurrentlySeeActor(Data.Actor);
+    const UJMEnemyMemoryComponent& Memory = Context.GetExternalData(MemoryHandle);
+    const AActor* Actor = Data.bUseLastSeenSource ? Memory.GetLastSeenSource() : Data.Actor.Get();
+    return Memory.CanCurrentlySeeActor(Actor);
 }
 bool FJMStateTreeRecentHearingCondition::Link(FStateTreeLinker& Linker) { Linker.LinkExternalData(MemoryHandle); return true; }
 bool FJMStateTreeRecentHearingCondition::TestCondition(FStateTreeExecutionContext& Context) const
@@ -139,10 +141,17 @@ void FJMStateTreeContextEvaluator::Tick(FStateTreeExecutionContext& Context, flo
     Data.TimeSinceLastSeen = static_cast<float>(Memory.GetTimeSinceLastSeen());
 }
 
+bool FJMStateTreeCombatTargetCondition::Link(FStateTreeLinker& Linker)
+{
+    Linker.LinkExternalData(MemoryHandle);
+    return true;
+}
+
 bool FJMStateTreeCombatTargetCondition::TestCondition(FStateTreeExecutionContext& Context) const
 {
     const FInstanceDataType& Data = Context.GetInstanceData(*this);
-    AActor* Actor = Data.Actor;
+    AActor* Actor = Data.bUseLastSeenSource
+        ? Context.GetExternalData(MemoryHandle).GetLastSeenSource() : Data.Actor.Get();
     if (!IsValid(Actor) || Actor->IsActorBeingDestroyed())
     {
         return false;

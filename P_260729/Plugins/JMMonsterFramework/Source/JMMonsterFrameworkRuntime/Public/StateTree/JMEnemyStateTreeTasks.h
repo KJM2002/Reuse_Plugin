@@ -244,6 +244,7 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeSetTargetInstanceData
 {
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, Category=Parameter) TObjectPtr<AActor> TargetActor;
+    UPROPERTY(EditAnywhere, Category=Parameter) bool bUseLastSeenSource = false;
 };
 
 USTRUCT(meta=(DisplayName="Set Current Target", Category="JM Monster Framework|Target"))
@@ -273,15 +274,22 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeMoveRandomInstanceData
 {
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, Category=Parameter) FVector Center = FVector::ZeroVector;
-    UPROPERTY(EditAnywhere, Category=Parameter) bool bUseOwnerAsCenter = true;
+    /** Uses the locomotion component's spawn anchor. Preferred for patrol/roam loops. */
+    UPROPERTY(EditAnywhere, Category=Parameter) bool bUseHomeAsCenter = true;
+    /** Legacy/current-position mode for search behavior. Ignored when bUseHomeAsCenter is true. */
+    UPROPERTY(EditAnywhere, Category=Parameter) bool bUseOwnerAsCenter = false;
     UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="1.0")) float Radius = 600.0f;
+    UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0.0")) float MinWaitTime = 0.25f;
+    UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0.0")) float MaxWaitTime = 1.0f;
+    UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0.01")) float RetryBackoff = 0.25f;
+    UPROPERTY(EditAnywhere, Category=Parameter, meta=(ClampMin="0", ClampMax="10")) int32 MaxRetries = 3;
     UPROPERTY(EditAnywhere, Category=Parameter) FJMEnemyMoveOptions Options;
     UPROPERTY(VisibleAnywhere, Category=Output) FVector ChosenLocation = FVector::ZeroVector;
     FAIRequestID RequestID = FAIRequestID::InvalidRequest;
-    FDelegateHandle DelegateHandle;
-    bool bEntering = false;
-    bool bCompletedDuringEnter = false;
-    EJMEnemyMoveStatus Completion = EJMEnemyMoveStatus::Idle;
+    float RemainingTime = 0.0f;
+    int32 RetryCount = 0;
+    uint8 Phase = 0;
+    EJMEnemyMoveRequestResult LastRequestResult = EJMEnemyMoveRequestResult::RequestFailed;
 };
 
 /** Selects and moves to a reachable point as one atomic async command, suitable for patrol/search loops. */
@@ -294,6 +302,7 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMStateTreeMoveRandomTask : public FStateT
     virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
     virtual bool Link(FStateTreeLinker& Linker) override;
     virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult&) const override;
+    virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, float DeltaTime) const override;
     virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult&) const override;
     TStateTreeExternalDataHandle<UJMEnemyLocomotionComponent> LocomotionHandle;
 };

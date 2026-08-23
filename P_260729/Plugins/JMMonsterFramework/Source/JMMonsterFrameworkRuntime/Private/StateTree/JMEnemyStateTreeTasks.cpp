@@ -4,6 +4,7 @@
 #include "Action/JMEnemyActionComponent.h"
 #include "Core/JMEnemyBase.h"
 #include "Core/JMEnemyDefinition.h"
+#include "JMMonsterFrameworkRuntime.h"
 #include "Locomotion/JMEnemyLocomotionComponent.h"
 #include "Memory/JMEnemyMemoryComponent.h"
 #include "NavigationSystem.h"
@@ -18,6 +19,56 @@ namespace JMStateTree
     {
         return Status == EJMEnemyMoveStatus::Succeeded
             ? EStateTreeRunStatus::Succeeded : EStateTreeRunStatus::Failed;
+    }
+
+    enum class ERandomMovePhase : uint8
+    {
+        Selecting,
+        Backoff,
+        Moving,
+        Waiting
+    };
+
+    static const TCHAR* MoveRequestResultName(const EJMEnemyMoveRequestResult Result)
+    {
+        switch (Result)
+        {
+        case EJMEnemyMoveRequestResult::RequestStarted: return TEXT("RequestStarted");
+        case EJMEnemyMoveRequestResult::AlreadyAtGoal: return TEXT("AlreadyAtGoal");
+        default: return TEXT("RequestFailed");
+        }
+    }
+
+    static FString EnemyStateName(const UJMEnemyLocomotionComponent& Locomotion)
+    {
+        const AJMEnemyBase* Enemy = Cast<AJMEnemyBase>(Locomotion.GetOwner());
+        const UJMEnemyStateComponent* State = Enemy ? Enemy->GetEnemyStateComponent() : nullptr;
+        return State ? State->GetCurrentState().ToString() : TEXT("Unknown");
+    }
+
+    static void LogRandomMoveFailure(const UJMEnemyLocomotionComponent& Locomotion,
+        const FVector& Center, const float Radius, const EJMEnemyMoveRequestResult Result,
+        const int32 RetryCount, const int32 MaxRetries, const TCHAR* Reason, const bool bFinal)
+    {
+        const AActor* Owner = Locomotion.GetOwner();
+        if (bFinal)
+        {
+            UE_LOG(LogJMMonsterFramework, Warning,
+                TEXT("AutonomousMove %s: Enemy=%s State=%s Center=%s Radius=%.1f Controller=%s NavSystem=%s Request=%s Retry=%d/%d"),
+                Reason, Owner ? *Owner->GetName() : TEXT("None"), *EnemyStateName(Locomotion),
+                *Center.ToCompactString(), Radius, Locomotion.IsControllerReady() ? TEXT("Valid") : TEXT("Invalid"),
+                Locomotion.IsNavigationReady() ? TEXT("Valid") : TEXT("Invalid"), MoveRequestResultName(Result),
+                RetryCount, MaxRetries);
+        }
+        else
+        {
+            UE_LOG(LogJMMonsterFramework, Verbose,
+                TEXT("AutonomousMove %s; retrying: Enemy=%s State=%s Center=%s Radius=%.1f Controller=%s NavSystem=%s Request=%s Retry=%d/%d"),
+                Reason, Owner ? *Owner->GetName() : TEXT("None"), *EnemyStateName(Locomotion),
+                *Center.ToCompactString(), Radius, Locomotion.IsControllerReady() ? TEXT("Valid") : TEXT("Invalid"),
+                Locomotion.IsNavigationReady() ? TEXT("Valid") : TEXT("Invalid"), MoveRequestResultName(Result),
+                RetryCount, MaxRetries);
+        }
     }
 }
 
@@ -410,11 +461,12 @@ EStateTreeRunStatus FJMStateTreeSetTargetTask::EnterState(
 {
     const FInstanceDataType& Data = Context.GetInstanceData(*this);
     UJMEnemyMemoryComponent& Memory = Context.GetExternalData(MemoryHandle);
-    if (!IsValid(Data.TargetActor) || Data.TargetActor->IsActorBeingDestroyed())
+    AActor* TargetActor = Data.bUseLastSeenSource ? Memory.GetLastSeenSource() : Data.TargetActor.Get();
+    if (!IsValid(TargetActor) || TargetActor->IsActorBeingDestroyed())
     {
         return EStateTreeRunStatus::Failed;
     }
-    return (Memory.SetCurrentTarget(Data.TargetActor) || Memory.GetCurrentTarget() == Data.TargetActor)
+    return (Memory.SetCurrentTarget(TargetActor) || Memory.GetCurrentTarget() == TargetActor)
         ? EStateTreeRunStatus::Succeeded : EStateTreeRunStatus::Failed;
 }
 
@@ -433,7 +485,7 @@ EStateTreeRunStatus FJMStateTreeClearTargetTask::EnterState(
 
 FJMStateTreeMoveRandomTask::FJMStateTreeMoveRandomTask()
 {
-    bShouldCallTick = false;
+    bShouldCallTick = true;
     bShouldCopyBoundPropertiesOnTick = false;
 }
 
@@ -449,56 +501,138 @@ EStateTreeRunStatus FJMStateTreeMoveRandomTask::EnterState(
     FInstanceDataType& Data = Context.GetInstanceData(*this);
     UJMEnemyLocomotionComponent& Locomotion = Context.GetExternalData(LocomotionHandle);
     const AActor* Owner = Locomotion.GetOwner();
-    UWorld* World = Owner ? Owner->GetWorld() : nullptr;
-    const FVector Origin = Data.bUseOwnerAsCenter && Owner ? Owner->GetActorLocation() : Data.Center;
-    if (!World || Data.Radius <= 0.0f ||
+    const FVector Origin = Data.bUseHomeAsCenter ? Locomotion.GetHomeLocation() :
+        (Data.bUseOwnerAsCenter && Owner ? Owner->GetActorLocation() : Data.Center);
+
+    Data.RequestID = FAIRequestID::InvalidRequest;
+    Data.RetryCount = 0;
+    Data.RemainingTime = 0.0f;
+    Data.Phase = static_cast<uint8>(JMStateTree::ERandomMovePhase::Selecting);
+    Data.LastRequestResult = EJMEnemyMoveRequestResult::RequestFailed;
+
+    if (Data.Radius <= 0.0f ||
         !Locomotion.FindRandomReachableLocation(Origin, Data.Radius, Data.ChosenLocation))
+    {
+        Data.RetryCount = 1;
+        Data.RemainingTime = FMath::Max(Data.RetryBackoff, 0.01f);
+        Data.Phase = static_cast<uint8>(JMStateTree::ERandomMovePhase::Backoff);
+        JMStateTree::LogRandomMoveFailure(Locomotion, Origin, Data.Radius, Data.LastRequestResult,
+            Data.RetryCount, Data.MaxRetries, TEXT("destination selection failed"), Data.MaxRetries <= 0);
+        return Data.MaxRetries > 0 ? EStateTreeRunStatus::Running : EStateTreeRunStatus::Failed;
+    }
+
+    FJMEnemyMoveOptions ReachableOptions = Data.Options;
+    ReachableOptions.bProjectGoalLocation = false;
+    Data.LastRequestResult = Locomotion.MoveToLocation(Data.ChosenLocation, ReachableOptions);
+    if (Data.LastRequestResult == EJMEnemyMoveRequestResult::RequestStarted)
+    {
+        Data.RequestID = Locomotion.GetCurrentRequestID();
+        Data.Phase = static_cast<uint8>(JMStateTree::ERandomMovePhase::Moving);
+        return EStateTreeRunStatus::Running;
+    }
+    if (Data.LastRequestResult == EJMEnemyMoveRequestResult::AlreadyAtGoal)
+    {
+        Data.RemainingTime = FMath::FRandRange(FMath::Min(Data.MinWaitTime, Data.MaxWaitTime),
+            FMath::Max(Data.MinWaitTime, Data.MaxWaitTime));
+        Data.Phase = static_cast<uint8>(JMStateTree::ERandomMovePhase::Waiting);
+        return Data.RemainingTime > 0.0f ? EStateTreeRunStatus::Running : EStateTreeRunStatus::Succeeded;
+    }
+
+    Data.RetryCount = 1;
+    Data.RemainingTime = FMath::Max(Data.RetryBackoff, 0.01f);
+    Data.Phase = static_cast<uint8>(JMStateTree::ERandomMovePhase::Backoff);
+    JMStateTree::LogRandomMoveFailure(Locomotion, Origin, Data.Radius, Data.LastRequestResult,
+        Data.RetryCount, Data.MaxRetries, TEXT("MoveTo request failed"), Data.MaxRetries <= 0);
+    return Data.MaxRetries > 0 ? EStateTreeRunStatus::Running : EStateTreeRunStatus::Failed;
+}
+
+EStateTreeRunStatus FJMStateTreeMoveRandomTask::Tick(
+    FStateTreeExecutionContext& Context, const float DeltaTime) const
+{
+    FInstanceDataType& Data = Context.GetInstanceData(*this);
+    UJMEnemyLocomotionComponent& Locomotion = Context.GetExternalData(LocomotionHandle);
+    const AActor* Owner = Locomotion.GetOwner();
+    const FVector Origin = Data.bUseHomeAsCenter ? Locomotion.GetHomeLocation() :
+        (Data.bUseOwnerAsCenter && Owner ? Owner->GetActorLocation() : Data.Center);
+    const JMStateTree::ERandomMovePhase Phase = static_cast<JMStateTree::ERandomMovePhase>(Data.Phase);
+
+    if (Phase == JMStateTree::ERandomMovePhase::Moving)
+    {
+        if (Data.RequestID.IsValid() && Locomotion.GetCurrentRequestID().IsEquivalent(Data.RequestID) &&
+            Locomotion.GetMoveStatus() == EJMEnemyMoveStatus::Moving)
+        {
+            return EStateTreeRunStatus::Running;
+        }
+        if (Locomotion.GetLastMoveResult() == EJMEnemyMoveStatus::Succeeded)
+        {
+            Data.RemainingTime = FMath::FRandRange(FMath::Min(Data.MinWaitTime, Data.MaxWaitTime),
+                FMath::Max(Data.MinWaitTime, Data.MaxWaitTime));
+            Data.Phase = static_cast<uint8>(JMStateTree::ERandomMovePhase::Waiting);
+            return Data.RemainingTime > 0.0f ? EStateTreeRunStatus::Running : EStateTreeRunStatus::Succeeded;
+        }
+        Data.LastRequestResult = EJMEnemyMoveRequestResult::RequestFailed;
+        ++Data.RetryCount;
+        JMStateTree::LogRandomMoveFailure(Locomotion, Origin, Data.Radius, Data.LastRequestResult,
+            Data.RetryCount, Data.MaxRetries, TEXT("asynchronous move failed"), Data.RetryCount > Data.MaxRetries);
+        if (Data.RetryCount > Data.MaxRetries)
+        {
+            return EStateTreeRunStatus::Failed;
+        }
+        Data.RemainingTime = FMath::Max(Data.RetryBackoff * Data.RetryCount, 0.01f);
+        Data.Phase = static_cast<uint8>(JMStateTree::ERandomMovePhase::Backoff);
+        return EStateTreeRunStatus::Running;
+    }
+
+    Data.RemainingTime = FMath::Max(0.0f, Data.RemainingTime - DeltaTime);
+    if (Data.RemainingTime > 0.0f)
+    {
+        return EStateTreeRunStatus::Running;
+    }
+    if (Phase == JMStateTree::ERandomMovePhase::Waiting)
+    {
+        return EStateTreeRunStatus::Succeeded;
+    }
+
+    if (!Locomotion.FindRandomReachableLocation(Origin, Data.Radius, Data.ChosenLocation))
+    {
+        ++Data.RetryCount;
+        JMStateTree::LogRandomMoveFailure(Locomotion, Origin, Data.Radius, Data.LastRequestResult,
+            Data.RetryCount, Data.MaxRetries, TEXT("destination retry failed"), Data.RetryCount > Data.MaxRetries);
+        if (Data.RetryCount > Data.MaxRetries)
+        {
+            return EStateTreeRunStatus::Failed;
+        }
+        Data.RemainingTime = FMath::Max(Data.RetryBackoff * Data.RetryCount, 0.01f);
+        return EStateTreeRunStatus::Running;
+    }
+
+    FJMEnemyMoveOptions ReachableOptions = Data.Options;
+    ReachableOptions.bProjectGoalLocation = false;
+    Data.LastRequestResult = Locomotion.MoveToLocation(Data.ChosenLocation, ReachableOptions);
+    if (Data.LastRequestResult == EJMEnemyMoveRequestResult::RequestStarted)
+    {
+        Data.RequestID = Locomotion.GetCurrentRequestID();
+        Data.Phase = static_cast<uint8>(JMStateTree::ERandomMovePhase::Moving);
+        return EStateTreeRunStatus::Running;
+    }
+    if (Data.LastRequestResult == EJMEnemyMoveRequestResult::AlreadyAtGoal)
+    {
+        Data.RemainingTime = FMath::FRandRange(FMath::Min(Data.MinWaitTime, Data.MaxWaitTime),
+            FMath::Max(Data.MinWaitTime, Data.MaxWaitTime));
+        Data.Phase = static_cast<uint8>(JMStateTree::ERandomMovePhase::Waiting);
+        return Data.RemainingTime > 0.0f ? EStateTreeRunStatus::Running : EStateTreeRunStatus::Succeeded;
+    }
+
+    ++Data.RetryCount;
+    JMStateTree::LogRandomMoveFailure(Locomotion, Origin, Data.Radius, Data.LastRequestResult,
+        Data.RetryCount, Data.MaxRetries, TEXT("MoveTo retry failed"), Data.RetryCount > Data.MaxRetries);
+    if (Data.RetryCount > Data.MaxRetries)
     {
         return EStateTreeRunStatus::Failed;
     }
-    Data.RequestID = FAIRequestID::InvalidRequest;
-    Data.bEntering = true;
-    Data.bCompletedDuringEnter = false;
-    Data.Completion = EJMEnemyMoveStatus::Idle;
-    Data.DelegateHandle = Locomotion.OnMoveFinishedNative.AddLambda(
-        [WeakContext = Context.MakeWeakExecutionContext()](const FAIRequestID FinishedID,
-            const EJMEnemyMoveStatus Result, AActor*, FVector)
-        {
-            const FStateTreeStrongExecutionContext Strong = WeakContext.MakeStrongExecutionContext();
-            FInstanceDataType* Instance = Strong.GetInstanceDataPtr<FInstanceDataType>();
-            if (!Instance || (!Instance->RequestID.IsValid() && FinishedID.IsValid()) ||
-                (Instance->RequestID.IsValid() && !Instance->RequestID.IsEquivalent(FinishedID)))
-            {
-                return;
-            }
-            if (Instance->bEntering)
-            {
-                Instance->bCompletedDuringEnter = true;
-                Instance->Completion = Result;
-            }
-            else
-            {
-                Strong.FinishTask(Result == EJMEnemyMoveStatus::Succeeded
-                    ? EStateTreeFinishTaskType::Succeeded : EStateTreeFinishTaskType::Failed);
-            }
-        });
-    const EJMEnemyMoveRequestResult Result = Locomotion.MoveToLocation(Data.ChosenLocation, Data.Options);
-    if (Result == EJMEnemyMoveRequestResult::RequestStarted)
-    {
-        Data.RequestID = Locomotion.GetCurrentRequestID();
-    }
-    Data.bEntering = false;
-    if (Data.bCompletedDuringEnter)
-    {
-        Locomotion.OnMoveFinishedNative.Remove(Data.DelegateHandle);
-        return JMStateTree::ToMoveStatus(Data.Completion);
-    }
-    if (Result != EJMEnemyMoveRequestResult::RequestStarted)
-    {
-        Locomotion.OnMoveFinishedNative.Remove(Data.DelegateHandle);
-    }
-    return Result == EJMEnemyMoveRequestResult::RequestStarted ? EStateTreeRunStatus::Running :
-        (Result == EJMEnemyMoveRequestResult::AlreadyAtGoal ? EStateTreeRunStatus::Succeeded : EStateTreeRunStatus::Failed);
+    Data.RemainingTime = FMath::Max(Data.RetryBackoff * Data.RetryCount, 0.01f);
+    Data.Phase = static_cast<uint8>(JMStateTree::ERandomMovePhase::Backoff);
+    return EStateTreeRunStatus::Running;
 }
 
 void FJMStateTreeMoveRandomTask::ExitState(
@@ -506,7 +640,6 @@ void FJMStateTreeMoveRandomTask::ExitState(
 {
     FInstanceDataType& Data = Context.GetInstanceData(*this);
     UJMEnemyLocomotionComponent& Locomotion = Context.GetExternalData(LocomotionHandle);
-    Locomotion.OnMoveFinishedNative.Remove(Data.DelegateHandle);
     if (Data.RequestID.IsValid() && Locomotion.GetCurrentRequestID().IsEquivalent(Data.RequestID))
     {
         Locomotion.StopMovement();

@@ -73,6 +73,16 @@ public:
     UFUNCTION(BlueprintPure, Category="JM Enemy|Locomotion")
     FAIRequestID GetCurrentRequestID() const { return ActiveRequestID; }
 
+    /** Stable spawn anchor used by autonomous movement so repeated patrol legs cannot drift forever. */
+    UFUNCTION(BlueprintPure, Category="JM Enemy|Locomotion")
+    FVector GetHomeLocation() const;
+
+    UFUNCTION(BlueprintPure, Category="JM Enemy|Locomotion")
+    bool IsControllerReady() const;
+
+    UFUNCTION(BlueprintPure, Category="JM Enemy|Locomotion")
+    bool IsNavigationReady() const;
+
     UPROPERTY(BlueprintAssignable, Category="JM Enemy|Locomotion")
     FJMEnemyMoveStartedSignature OnMoveStarted;
 
@@ -115,4 +125,6 @@ private:
     float ProfileAcceptanceRadius = 75.0f;
     EJMEnemyMoveStatus MoveStatus = EJMEnemyMoveStatus::Idle;
     EJMEnemyMoveStatus LastMoveResult = EJMEnemyMoveStatus::Idle;
+    FVector HomeLocation = FVector::ZeroVector;
+    bool bHasHomeLocation = false;
 };

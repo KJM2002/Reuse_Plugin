@@ -40,7 +40,11 @@ void UJMEnemyMemoryComponent::HandleStimulus(FJMStimulus Stimulus)
 
     if (Stimulus.Type == EJMStimulusType::Vision)
     {
-        if (Stimulus.bSuccessfullySensed && Stimulus.Timestamp >= LastSeenTime)
+        // Once a target is selected, unrelated vision stimuli must not replace its recency data.
+        // Otherwise one nearby pawn makes HasSeenTargetRecently() fail immediately and aborts
+        // Chase/Stalk even though the actual target is still visible.
+        const bool bMayUpdateSeenSource = !CurrentTarget.IsValid() || Source == CurrentTarget.Get();
+        if (Stimulus.bSuccessfullySensed && bMayUpdateSeenSource && Stimulus.Timestamp >= LastSeenTime)
         {
             LastSeenSource = Source;
             LastSeenLocation = Stimulus.WorldLocation;

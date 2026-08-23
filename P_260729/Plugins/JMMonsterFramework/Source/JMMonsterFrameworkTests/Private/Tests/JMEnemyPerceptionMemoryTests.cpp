@@ -56,6 +56,13 @@ bool FJMEnemyPerceptionNormalizationTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("World location is preserved"), Normalized.WorldLocation, SeenAt);
     TestEqual(TEXT("Strength is preserved"), Normalized.Strength, 0.75f);
     TestTrue(TEXT("Successful sense remains active"), Normalized.bSuccessfullySensed);
+
+    TStrongObjectPtr<AJMEnemyCoreTestEnemy> FriendlyEnemy(NewObject<AJMEnemyCoreTestEnemy>());
+    Perception->HandlePerceptionStimulus(FriendlyEnemy.Get(), SightStimulus);
+    TestTrue(TEXT("Vision evidence remains available after an allied enemy observation"),
+        Perception->GetLastStimulus(EJMStimulusType::Vision, Normalized));
+    TestEqual(TEXT("Allied enemies do not replace the vision candidate"),
+        Normalized.SourceActor.Get(), Source.Get());
     TestFalse(TEXT("Disabled hearing rejects direct evidence"), Perception->IsSenseEnabled(EJMStimulusType::Hearing));
     TestTrue(TEXT("Damage channel remains available independently"), Perception->IsSenseEnabled(EJMStimulusType::Damage));
     return true;
@@ -91,6 +98,17 @@ bool FJMEnemyMemoryPolicyTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Seen position becomes last-known target position"),
         Memory->GetLastKnownTargetLocation(), Vision.WorldLocation);
     TestTrue(TEXT("Recent target vision is computed without Tick"), Memory->HasSeenTargetRecently(1.0f));
+
+    TStrongObjectPtr<AActor> Distractor(NewObject<AActor>());
+    FJMStimulus DistractorVision = Vision;
+    DistractorVision.SourceActor = Distractor.Get();
+    DistractorVision.WorldLocation = FVector(400.0, 500.0, 600.0);
+    DistractorVision.Timestamp = Now + 0.005;
+    Memory->HandleStimulus(DistractorVision);
+    TestEqual(TEXT("A distractor cannot replace the selected target's vision record"),
+        Memory->GetLastSeenSource(), Target.Get());
+    TestTrue(TEXT("A distractor cannot terminate recent target vision"),
+        Memory->HasSeenTargetRecently(1.0f));
 
     FJMStimulus LostVision = Vision;
     LostVision.WorldLocation = FVector(999.0, 999.0, 999.0);

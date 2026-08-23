@@ -39,7 +39,9 @@ namespace JMCrawlerReferenceTests
         UWorld::InitializationValues Init;
         Init.AllowAudioPlayback(false).RequiresHitProxies(false).CreateNavigation(false)
             .CreateAISystem(true).ShouldSimulatePhysics(false).SetTransactional(false).CreateFXSystem(false);
-        UWorld* World = UWorld::CreateWorld(EWorldType::Game, true, Name,
+        const FName WorldName = MakeUniqueObjectName(
+            GetTransientPackage(), UWorld::StaticClass(), FName(Name));
+        UWorld* World = UWorld::CreateWorld(EWorldType::Game, true, WorldName,
             GetTransientPackage(), true, ERHIFeatureLevel::Num, &Init);
         if (World)
         {
@@ -294,11 +296,38 @@ bool FJMEnemyCrawlerWorldVerticalSliceTest::RunTest(const FString& Parameters)
     AJMEnemyBase* Crawler = World->SpawnActor<AJMEnemyBase>(Blueprint->GeneratedClass,
         FVector(0.0, 0.0, 90.0), FRotator::ZeroRotator);
     if (Crawler && !Crawler->GetController()) Crawler->SpawnDefaultController();
+    if (!TestNotNull(TEXT("Crawler spawns"), Crawler))
+    {
+        JMCrawlerReferenceTests::DestroyWorld(World);
+        return false;
+    }
+    JMCrawlerReferenceTests::TickWorld(*World, 0.1f);
+    AJMEnemyAIController* AutonomousController = Cast<AJMEnemyAIController>(Crawler->GetController());
+    TestTrue(TEXT("Crawler AIController possesses the pawn"), AutonomousController &&
+        AutonomousController->GetPawn() == Crawler);
+    if (AutonomousController && !AutonomousController->GetEnemyStateTreeComponent()->IsRunning())
+    {
+        AutonomousController->GetEnemyStateTreeComponent()->StartFrameworkTree(
+            Crawler->GetEnemyDefinition()->StateTree.Get());
+    }
+    TestTrue(TEXT("Crawler StateTree starts without a player"), AutonomousController &&
+        AutonomousController->GetEnemyStateTreeComponent()->IsRunning());
+    const FVector CrawlerHome = Crawler->GetActorLocation();
+    TestNull(TEXT("Crawler Roam does not require CurrentTarget"),
+        Crawler->GetEnemyMemoryComponent()->GetCurrentTarget());
+    JMCrawlerReferenceTests::TickWorld(*World, 6.0f);
+    TestEqual(TEXT("Crawler applies the Roam movement profile"),
+        Crawler->GetEnemyLocomotionComponent()->GetCurrentMovementProfile(), FName(TEXT("Roam")));
+    TestEqual(TEXT("Crawler preserves its spawn Home anchor"),
+        Crawler->GetEnemyLocomotionComponent()->GetHomeLocation(), CrawlerHome);
+    TestTrue(TEXT("Crawler remains inside its Home roam envelope"),
+        FVector::Dist2D(CrawlerHome, Crawler->GetActorLocation()) <= 900.0f);
+
     AJMEnemyPlayerDamageTarget* Player = World->SpawnActor<AJMEnemyPlayerDamageTarget>(
         FVector(700.0, 0.0, 90.0), FRotator::ZeroRotator);
     APlayerController* PlayerController = World->SpawnActor<APlayerController>();
     PlayerController->Possess(Player);
-    if (!TestNotNull(TEXT("Crawler spawns"), Crawler) || !TestNotNull(TEXT("Player spawns"), Player))
+    if (!TestNotNull(TEXT("Player spawns"), Player))
     {
         JMCrawlerReferenceTests::DestroyWorld(World);
         return false;

@@ -2,6 +2,8 @@
 
 #include "Core/JMEnemyBase.h"
 #include "Core/JMEnemyDefinition.h"
+#include "JMMonsterFrameworkRuntime.h"
+#include "Memory/JMEnemyMemoryComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -16,6 +18,11 @@ AJMEnemyAIController::AJMEnemyAIController()
     HearingConfig = CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("HearingConfig"));
     EnemyStateTree = CreateDefaultSubobject<UJMEnemyStateTreeComponent>(TEXT("EnemyStateTree"));
     SetPerceptionComponent(*EnemyPerception);
+
+    // Seed the component before registration. UAIPerceptionComponent::OnRegister only creates a
+    // listener when at least one sense config already exists.
+    EnemyPerception->ConfigureSense(*SightConfig);
+    EnemyPerception->ConfigureSense(*HearingConfig);
 }
 
 void AJMEnemyAIController::BeginPlay()
@@ -40,34 +47,68 @@ void AJMEnemyAIController::OnPossess(APawn* InPawn)
 
 void AJMEnemyAIController::OnUnPossess()
 {
-    if (FrameworkPerception.IsValid())
-    {
-        FrameworkPerception->OnStimulusReceived.RemoveDynamic(
-            this, &ThisClass::HandleFrameworkStimulus);
-    }
+    GetWorldTimerManager().ClearTimer(PerceptionConfigurationTimer);
+    GetWorldTimerManager().ClearTimer(StimulusEventTimer);
+    bStimulusEventQueued = false;
     if (EnemyStateTree)
     {
         EnemyStateTree->StopFrameworkTree(TEXT("Enemy unpossessed"));
     }
     FrameworkPerception.Reset();
+    PerceptionConfigurationAttempts = 0;
+    bBehaviorStarted = false;
     Super::OnUnPossess();
 }
 
 void AJMEnemyAIController::ConfigureFromPawn()
 {
     const AJMEnemyBase* Enemy = Cast<AJMEnemyBase>(GetPawn());
-    if (FrameworkPerception.IsValid())
-    {
-        FrameworkPerception->OnStimulusReceived.RemoveDynamic(
-            this, &ThisClass::HandleFrameworkStimulus);
-    }
     FrameworkPerception = Enemy ? Enemy->GetEnemyPerceptionComponent() : nullptr;
     if (!FrameworkPerception.IsValid())
     {
         return;
     }
-    FrameworkPerception->OnStimulusReceived.AddUniqueDynamic(
-        this, &ThisClass::HandleFrameworkStimulus);
+
+    // StateTree event conditions read the memory written by this same stimulus. Dynamic multicast
+    // delegates execute in registration order, so make that order explicit even when Controller
+    // BeginPlay happens before the possessed pawn's BeginPlay.
+    if (UJMEnemyMemoryComponent* Memory = Enemy->GetEnemyMemoryComponent())
+    {
+        FrameworkPerception->OnStimulusReceived.RemoveDynamic(
+            Memory, &UJMEnemyMemoryComponent::HandleStimulus);
+        FrameworkPerception->OnStimulusReceived.AddUniqueDynamic(
+            Memory, &UJMEnemyMemoryComponent::HandleStimulus);
+    }
+    StartBehaviorFromPawn(*Enemy);
+    TryConfigurePerception();
+}
+
+void AJMEnemyAIController::StartBehaviorFromPawn(const AJMEnemyBase& Enemy)
+{
+    if (bBehaviorStarted || !EnemyStateTree)
+    {
+        return;
+    }
+    const UJMEnemyDefinition* Definition = Enemy.GetEnemyDefinition();
+    bBehaviorStarted = EnemyStateTree->StartFrameworkTree(Definition ? Definition->StateTree.Get() : nullptr);
+}
+
+void AJMEnemyAIController::TryConfigurePerception()
+{
+    if (!FrameworkPerception.IsValid() || !EnemyPerception || !SightConfig || !HearingConfig ||
+        GetPawn() == nullptr)
+    {
+        return;
+    }
+
+    if (!EnemyPerception->GetListenerId().IsValid())
+    {
+        SchedulePerceptionConfigurationRetry();
+        return;
+    }
+
+    GetWorldTimerManager().ClearTimer(PerceptionConfigurationTimer);
+    PerceptionConfigurationAttempts = 0;
 
     const FJMEnemyPerceptionConfig& Config = FrameworkPerception->GetConfig();
     SightConfig->SightRadius = Config.Vision.SightRadius;
@@ -97,11 +138,23 @@ void AJMEnemyAIController::ConfigureFromPawn()
         EnemyPerception->SetDominantSense(UAISenseConfig_Hearing::StaticClass());
     }
     EnemyPerception->RequestStimuliListenerUpdate();
+}
 
-    const UJMEnemyDefinition* Definition = Enemy->GetEnemyDefinition();
-    if (EnemyStateTree)
+void AJMEnemyAIController::SchedulePerceptionConfigurationRetry()
+{
+    static constexpr int32 MaxRegistrationAttempts = 20;
+    if (++PerceptionConfigurationAttempts > MaxRegistrationAttempts)
     {
-        EnemyStateTree->StartFrameworkTree(Definition ? Definition->StateTree.Get() : nullptr);
+        UE_LOG(LogJMMonsterFramework, Warning,
+            TEXT("Perception listener registration did not become valid: Controller=%s Pawn=%s Attempts=%d"),
+            *GetName(), GetPawn() ? *GetPawn()->GetName() : TEXT("None"), PerceptionConfigurationAttempts - 1);
+        return;
+    }
+
+    if (!GetWorldTimerManager().IsTimerActive(PerceptionConfigurationTimer))
+    {
+        GetWorldTimerManager().SetTimer(PerceptionConfigurationTimer, this,
+            &ThisClass::TryConfigurePerception, 0.05f, false);
     }
 }
 
@@ -113,8 +166,22 @@ void AJMEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimu
     }
 }
 
-void AJMEnemyAIController::HandleFrameworkStimulus(FJMStimulus Stimulus)
+void AJMEnemyAIController::NotifyFrameworkStimulus(const FJMStimulus& Stimulus)
 {
+    if (!bStimulusEventQueued && EnemyStateTree && EnemyStateTree->IsRunning())
+    {
+        // The StateTree context evaluator snapshots Memory once per AI tick. Queue the event for
+        // the next frame so transition bindings observe the stimulus that Memory just recorded.
+        // Multiple perception callbacks in one frame intentionally collapse into one reevaluation.
+        bStimulusEventQueued = true;
+        StimulusEventTimer = GetWorldTimerManager().SetTimerForNextTick(
+            FTimerDelegate::CreateUObject(this, &ThisClass::FlushFrameworkStimulusEvent));
+    }
+}
+
+void AJMEnemyAIController::FlushFrameworkStimulusEvent()
+{
+    bStimulusEventQueued = false;
     if (EnemyStateTree && EnemyStateTree->IsRunning())
     {
         EnemyStateTree->SendStateTreeEvent(JMEnemyTags::Event_Stimulus);
