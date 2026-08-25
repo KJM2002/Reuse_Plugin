@@ -109,7 +109,7 @@ Plugin 문서는 단독 복사·배포 가능성을 보존하기 위해 각 `Plu
 | JMHideInteractionIntegration | 1.0.0 | [README](../Plugins/JMHideInteractionIntegration/Docs/README_KO.md) | 분류 완료, 내용 재검증 필요 |
 | JMInteraction | 1.1.1 | [README](../Plugins/JMInteraction/Docs/README_KO.md) | 분류 완료, 내용 재검증 필요 |
 | JMJumpScare | 2.0.0 | [README](../Plugins/JMJumpScare/Docs/README_KO.md) | 분류 완료, 내용 재검증 필요 |
-| JMMonsterFramework | 1.0.0 | [README](../Plugins/JMMonsterFramework/Docs/README.md) | Phase 0 최소 Enemy와 AIController 자동 Possession |
+| JMMonsterFramework | 1.1.0 | [README](../Plugins/JMMonsterFramework/Docs/README.md) | Phase 0 자동 Possession + Phase 1 플레이어 Sight 감지 |
 | JMObjective | 1.1.1 | [README](../Plugins/JMObjective/Docs/README_KO.md) | 분류 완료, 내용 재검증 필요 |
 | JMPhysicalGrabber | 1.8.0 | [README](../Plugins/JMPhysicalGrabber/Docs/README.md) | 분류 완료, 내용 재검증 필요 |
 | JMRecon | 1.1.0 | [README](../Plugins/JMRecon/Docs/README.md) | 분류 완료, 내용 재검증 필요 |

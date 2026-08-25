@@ -11,6 +11,15 @@ owners:
 
 # Changelog
 
+## 1.1.0 - 2026-08-25
+
+### Added
+
+- 플레이어 제어 Pawn만 감지하는 AI Sight
+- Blueprint 읽기 전용 `TargetActor`, `bCanSeeTarget`
+- Detected/Lost 전환 로그
+- 20회 반복 상태 전환 자동화 테스트와 수동 Sight 테스트 절차
+
 ## 1.0.0 - 2026-08-25
 
 ### Added

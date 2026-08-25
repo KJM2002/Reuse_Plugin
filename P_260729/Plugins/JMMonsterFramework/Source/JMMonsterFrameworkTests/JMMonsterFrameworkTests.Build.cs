@@ -14,5 +14,10 @@ public class JMMonsterFrameworkTests : ModuleRules
             "AIModule",
             "JMMonsterFrameworkRuntime"
         });
+
+        if (Target.bBuildDeveloperTools)
+        {
+            PrivateDependencyModuleNames.Add("AutomationController");
+        }
     }
 }
