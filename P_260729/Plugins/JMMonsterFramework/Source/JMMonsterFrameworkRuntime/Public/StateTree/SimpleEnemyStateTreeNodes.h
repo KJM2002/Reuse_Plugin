@@ -28,6 +28,16 @@ struct FJMSimpleEnemyMoveToLastSeenLocationInstanceData
     GENERATED_BODY()
 };
 
+/** Runtime timer for the finite in-place search. */
+USTRUCT()
+struct FJMSimpleEnemySearchInstanceData
+{
+    GENERATED_BODY()
+
+    UPROPERTY(Transient)
+    float ElapsedTime = 0.0f;
+};
+
 /** Selects a state when the owning SimpleEnemy controller's sight flag matches the expected value. */
 USTRUCT(meta = (DisplayName = "Can See Target", Category = "JM Monster Framework"))
 struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyCanSeeTargetCondition : public FStateTreeAIConditionBase
@@ -107,4 +117,34 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyMoveToLastSeenLocationTask : 
 
     UPROPERTY(EditAnywhere, Category = "Movement", meta = (ClampMin = "0.0"))
     float AcceptanceRadius = 75.0f;
+};
+
+/** Rotates in place for a fixed duration so AI Sight can scan the surroundings. */
+USTRUCT(meta = (DisplayName = "Search Surroundings", Category = "JM Monster Framework"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemySearchTask : public FStateTreeAIActionTaskBase
+{
+    GENERATED_BODY()
+
+    using FInstanceDataType = FJMSimpleEnemySearchInstanceData;
+
+    FJMSimpleEnemySearchTask();
+
+    virtual const UStruct* GetInstanceDataType() const override
+    {
+        return FInstanceDataType::StaticStruct();
+    }
+
+    virtual EStateTreeRunStatus EnterState(
+        FStateTreeExecutionContext& Context,
+        const FStateTreeTransitionResult& Transition) const override;
+
+    virtual EStateTreeRunStatus Tick(
+        FStateTreeExecutionContext& Context,
+        float DeltaTime) const override;
+
+    UPROPERTY(EditAnywhere, Category = "Search", meta = (ClampMin = "0.0"))
+    float SearchDuration = 4.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Search", meta = (ClampMin = "0.0"))
+    float RotationSpeedDegrees = 90.0f;
 };

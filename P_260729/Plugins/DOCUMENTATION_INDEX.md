@@ -39,7 +39,7 @@ related:
 | JMHideInteractionIntegration | 1.0.0 | [문서](JMHideInteractionIntegration/Docs/README_KO.md) | 1 | 0 | 0 | 0 | 0 | 0 |
 | JMInteraction | 1.1.1 | [문서](JMInteraction/Docs/README_KO.md) | 5 | 1 | 0 | 0 | 0 | 1 |
 | JMJumpScare | 2.0.0 | [문서](JMJumpScare/Docs/README_KO.md) | 6 | 2 | 0 | 0 | 0 | 0 |
-| JMMonsterFramework | 1.3.0 | [문서](JMMonsterFramework/Docs/README.md) | 7 | 0 | 0 | 4 | 0 | 0 |
+| JMMonsterFramework | 1.4.0 | [문서](JMMonsterFramework/Docs/README.md) | 8 | 0 | 0 | 5 | 0 | 0 |
 | JMObjective | 1.1.1 | [문서](JMObjective/Docs/README_KO.md) | 7 | 3 | 0 | 1 | 0 | 0 |
 | JMPhysicalGrabber | 1.8.0 | [문서](JMPhysicalGrabber/Docs/README.md) | 5 | 2 | 0 | 0 | 0 | 0 |
 | JMRecon | 1.1.0 | [문서](JMRecon/Docs/README.md) | 4 | 1 | 0 | 0 | 0 | 0 |
@@ -195,6 +195,7 @@ related:
 | Testing | [Phase 1 Sight Test](JMMonsterFramework/Docs/Testing/PHASE1_SIGHT_TEST_KO.md) | `Current` | `Guide` |
 | Testing | [Phase 2 Chase Test](JMMonsterFramework/Docs/Testing/PHASE2_CHASE_TEST_KO.md) | `Current` | `Guide` |
 | Testing | [Phase 3 Last Seen Location Test](JMMonsterFramework/Docs/Testing/PHASE3_LAST_SEEN_TEST_KO.md) | `Current` | `Guide` |
+| Testing | [Phase 4 Search Test](JMMonsterFramework/Docs/Testing/PHASE4_SEARCH_TEST_KO.md) | `Current` | `Guide` |
 
 ### JMObjective
 

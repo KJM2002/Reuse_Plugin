@@ -19,7 +19,7 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FJMSimpleEnemyStateTreeAssetTest,
-    "JM.MonsterFramework.Phase3.BuildAndValidateStateTree",
+    "JM.MonsterFramework.Phase4.BuildAndValidateStateTree",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
@@ -61,6 +61,7 @@ bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
     UStateTreeState& Chase = Root.AddChildState(TEXT("Chase"));
     UStateTreeState& Idle = Root.AddChildState(TEXT("Idle"));
     UStateTreeState& Investigate = Root.AddChildState(TEXT("InvestigateLastLocation"));
+    UStateTreeState& Search = Root.AddChildState(TEXT("Search"));
 
     Chase.AddEnterCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
     Chase.AddTask<FJMSimpleEnemyMoveToTargetTask>();
@@ -73,7 +74,14 @@ bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
     Investigate.AddTask<FJMSimpleEnemyMoveToLastSeenLocationTask>();
     Investigate.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
         .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
-    Investigate.AddTransition(EStateTreeTransitionTrigger::OnStateCompleted, EStateTreeTransitionType::GotoState, &Idle);
+    Investigate.AddTransition(EStateTreeTransitionTrigger::OnStateCompleted, EStateTreeTransitionType::GotoState, &Search);
+
+    FJMSimpleEnemySearchTask& SearchTask = Search.AddTask<FJMSimpleEnemySearchTask>().GetNode();
+    SearchTask.SearchDuration = 4.0f;
+    SearchTask.RotationSpeedDegrees = 90.0f;
+    Search.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
+        .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    Search.AddTransition(EStateTreeTransitionTrigger::OnStateCompleted, EStateTreeTransitionType::GotoState, &Idle);
 
     FStateTreeCompilerLog CompilerLog;
     FStateTreeCompiler Compiler(CompilerLog);
@@ -84,11 +92,14 @@ bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
     }
     TestTrue(TEXT("StateTree compiles"), bCompiled);
     TestTrue(TEXT("StateTree is ready to run"), StateTree->IsReadyToRun());
-    TestEqual(TEXT("Root contains Chase, Idle, and InvestigateLastLocation"), Root.Children.Num(), 3);
+    TestEqual(TEXT("Root contains the four Phase 4 states"), Root.Children.Num(), 4);
     TestEqual(TEXT("Chase has one condition"), Chase.EnterConditions.Num(), 1);
     TestEqual(TEXT("Chase has one movement task"), Chase.Tasks.Num(), 1);
     TestEqual(TEXT("Investigate has one location movement task"), Investigate.Tasks.Num(), 1);
-    TestEqual(TEXT("Investigate can reacquire or finish at Idle"), Investigate.Transitions.Num(), 2);
+    TestEqual(TEXT("Investigate can reacquire or enter Search"), Investigate.Transitions.Num(), 2);
+    TestEqual(TEXT("Search has one finite rotation task"), Search.Tasks.Num(), 1);
+    TestEqual(TEXT("Search can reacquire or finish at Idle"), Search.Transitions.Num(), 2);
+    TestTrue(TEXT("Search duration is finite and positive"), SearchTask.SearchDuration > 0.0f);
 
     if (HasAnyErrors())
     {

@@ -11,6 +11,15 @@ owners:
 
 # Changelog
 
+## 1.4.0 - 2026-08-26
+
+### Added
+
+- StateTree `Search` 상태
+- 4초 동안 한 바퀴 제자리 회전하는 유한 Search Task
+- Search 중 Sight 재감지 시 Chase, 시간 종료 시 Idle 전이
+- Phase 4 StateTree 컴파일 검사와 수동 테스트 절차
+
 ## 1.3.0 - 2026-08-26
 
 ### Added

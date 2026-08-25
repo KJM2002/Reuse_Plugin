@@ -16,7 +16,7 @@ related:
 ## 자동 검사
 
 - `JM.MonsterFramework.Phase1.SightStateTransitions`: 20회 감지·상실 동안 마지막 관측 위치 보존 검사
-- `JM.MonsterFramework.Phase3.BuildAndValidateStateTree`: 3상태 구조, 조사 Task, 재감지·완료 전이 컴파일 검사
+- `JM.MonsterFramework.Phase4.BuildAndValidateStateTree`: LastSeenLocation 조사 Task와 전이 컴파일 검사
 
 ## Level_TestAI 수동 검사
 

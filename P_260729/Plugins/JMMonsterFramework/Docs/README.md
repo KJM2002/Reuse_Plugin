@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 3"
+title: "JMMonsterFramework Phase 4"
 status: Current
 authority: Guide
-scope: "JMMonsterFramework Phase 0-3 setup and usage"
+scope: "JMMonsterFramework Phase 0-4 setup and usage"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -14,19 +14,21 @@ related:
   - "Testing/PHASE1_SIGHT_TEST_KO.md"
   - "Testing/PHASE2_CHASE_TEST_KO.md"
   - "Testing/PHASE3_LAST_SEEN_TEST_KO.md"
+  - "Testing/PHASE4_SEARCH_TEST_KO.md"
 ---
 
-# JMMonsterFramework Phase 3
+# JMMonsterFramework Phase 4
 
-현재 범위는 Enemy 자동 Possession, 플레이어 Sight, StateTree Chase, 마지막 관측 위치 조사다.
+현재 범위는 Enemy 자동 Possession, 플레이어 Sight, StateTree Chase, 마지막 관측 위치 조사와 유한 Search다.
 
 ## 포함 기능
 
 - `ASimpleEnemyCharacter`: Capsule, Mesh, CharacterMovement를 사용하는 최소 Enemy
 - `ASimpleEnemyAIController`: Sight 상태와 `LastSeenLocation`, StateTree 실행 소유
-- `ST_SimpleEnemy`: `Idle`, `Chase`, `InvestigateLastLocation`
+- `ST_SimpleEnemy`: `Idle`, `Chase`, `InvestigateLastLocation`, `Search`
 - `Chase`: 보이는 `TargetActor`를 NavMesh로 추적
-- `InvestigateLastLocation`: 시야를 잃은 순간의 실제 마지막 관측 위치까지만 이동 후 정지
+- `InvestigateLastLocation`: 시야를 잃은 순간의 실제 마지막 관측 위치까지만 이동
+- `Search`: 도착 후 4초 동안 제자리에서 한 바퀴 탐색하고 미발견 시 Idle
 
 ## 사용
 

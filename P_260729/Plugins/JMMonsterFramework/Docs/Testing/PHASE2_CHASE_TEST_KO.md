@@ -15,7 +15,7 @@ related:
 
 ## 자동 검사
 
-Automation 창의 `JM.MonsterFramework.Phase3.BuildAndValidateStateTree`가 Phase 2 Chase 노드까지 함께 컴파일하고 검증한다.
+Automation 창의 `JM.MonsterFramework.Phase4.BuildAndValidateStateTree`가 Phase 2 Chase 노드까지 함께 컴파일하고 검증한다.
 
 ## Level_TestAI 수동 검사
 

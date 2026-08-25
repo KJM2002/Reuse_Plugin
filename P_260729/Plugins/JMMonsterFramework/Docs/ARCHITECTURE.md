@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 3 Architecture"
+title: "JMMonsterFramework Phase 4 Architecture"
 status: Current
 authority: Canonical
-scope: "JMMonsterFramework Phase 0-3 runtime architecture"
+scope: "JMMonsterFramework Phase 0-4 runtime architecture"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -10,6 +10,7 @@ owners:
 related:
   - "README.md"
   - "Testing/PHASE3_LAST_SEEN_TEST_KO.md"
+  - "Testing/PHASE4_SEARCH_TEST_KO.md"
 ---
 
 # JMMonsterFramework Architecture
@@ -20,6 +21,7 @@ related:
 - Phase 1: 플레이어 전용 AI Sight와 `TargetActor`, `bCanSeeTarget`
 - Phase 2: StateTree 기반 Chase와 NavMesh 이동
 - Phase 3: `LastSeenLocation` 기억과 마지막 관측 위치 조사
+- Phase 4: 마지막 위치 도착 후 제한 시간 동안 제자리 회전 Search
 
 ## 비책임
 
@@ -40,10 +42,12 @@ AI Sight가 플레이어 Pawn을 감지하면 Controller가 `TargetActor`, `bCan
 Idle -- 보임 --> Chase
 Chase -- 시야 상실 --> InvestigateLastLocation
 InvestigateLastLocation -- 다시 보임 --> Chase
-InvestigateLastLocation -- 위치 도착/경로 실패 --> Idle
+InvestigateLastLocation -- 위치 도착/경로 실패 --> Search
+Search -- 다시 보임 --> Chase
+Search -- 제한 시간 종료 --> Idle
 ```
 
-Chase는 `MoveToActor`로 가시 Actor를 동적으로 추적한다. Investigate는 `MoveToLocation`에 `LastSeenLocation` 값만 전달하므로 벽 뒤의 Actor를 추적하지 않는다. 두 이동 모두 NavMesh pathfinding을 사용하며 상태 이탈 시 현재 이동을 중단한다.
+Chase는 `MoveToActor`로 가시 Actor를 동적으로 추적한다. Investigate는 `MoveToLocation`에 `LastSeenLocation` 값만 전달하므로 벽 뒤의 Actor를 추적하지 않는다. Search는 4초 동안 초당 90도로 Pawn과 Controller 시선을 함께 회전시켜 한 바퀴만 확인한다. Search Task의 경과 시간은 StateTree 인스턴스 데이터에만 존재하며 완료 시 폐기된다.
 
 ## 수명과 실패 동작
 

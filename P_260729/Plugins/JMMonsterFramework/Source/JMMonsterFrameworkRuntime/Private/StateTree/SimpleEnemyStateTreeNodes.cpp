@@ -1,6 +1,7 @@
 #include "StateTree/SimpleEnemyStateTreeNodes.h"
 
 #include "AI/SimpleEnemyAIController.h"
+#include "GameFramework/Pawn.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "StateTreeExecutionContext.h"
 
@@ -149,4 +150,59 @@ void FJMSimpleEnemyMoveToLastSeenLocationTask::ExitState(
     {
         Controller->StopMovement();
     }
+}
+
+FJMSimpleEnemySearchTask::FJMSimpleEnemySearchTask()
+{
+    bShouldCallTick = true;
+}
+
+EStateTreeRunStatus FJMSimpleEnemySearchTask::EnterState(
+    FStateTreeExecutionContext& Context,
+    const FStateTreeTransitionResult& Transition) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    if (!IsValid(Controller) || !IsValid(Controller->GetPawn()))
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    Controller->StopMovement();
+    Context.GetInstanceData(*this).ElapsedTime = 0.0f;
+
+    return SearchDuration <= 0.0f
+        ? EStateTreeRunStatus::Succeeded
+        : EStateTreeRunStatus::Running;
+}
+
+EStateTreeRunStatus FJMSimpleEnemySearchTask::Tick(
+    FStateTreeExecutionContext& Context,
+    const float DeltaTime) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    APawn* ControlledPawn = IsValid(Controller) ? Controller->GetPawn() : nullptr;
+    if (!IsValid(Controller) || !IsValid(ControlledPawn))
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    // Keep Search running for this tick so its sight transition can win immediately.
+    if (Controller->bCanSeeTarget && IsValid(Controller->TargetActor))
+    {
+        return EStateTreeRunStatus::Running;
+    }
+
+    FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
+    InstanceData.ElapsedTime += FMath::Max(DeltaTime, 0.0f);
+    if (InstanceData.ElapsedTime >= SearchDuration)
+    {
+        return EStateTreeRunStatus::Succeeded;
+    }
+
+    const float DeltaYaw = RotationSpeedDegrees * FMath::Max(DeltaTime, 0.0f);
+    const FRotator SearchRotation(0.0f, ControlledPawn->GetActorRotation().Yaw + DeltaYaw, 0.0f);
+    ControlledPawn->SetActorRotation(SearchRotation);
+    Controller->SetControlRotation(SearchRotation);
+
+    return EStateTreeRunStatus::Running;
 }
