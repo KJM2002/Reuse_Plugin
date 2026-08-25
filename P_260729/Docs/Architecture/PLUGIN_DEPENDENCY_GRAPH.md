@@ -3,8 +3,8 @@ title: Plugin / Module Dependency Graph
 status: Current
 authority: Canonical
 scope: Project
-last_verified: 2026-08-19
-verified_against: working-tree-2026-08-19
+last_verified: 2026-08-25
+verified_against: working-tree-2026-08-25
 owners:
   - Project Architecture
 related:
@@ -14,7 +14,7 @@ related:
 
 # Plugin / Module Dependency Graph
 
-> 기준: 2026-08-19의 실제 `.uplugin`과 `Build.cs`  
+> 기준: 2026-08-25의 실제 `.uplugin`과 `Build.cs`
 > 화살표 `A --> B`는 **A가 B를 의존**한다는 뜻이다.
 
 ## 1. 전체 Plugin 그래프
@@ -60,8 +60,7 @@ flowchart LR
   ThrowableGame --> Inventory
   ThrowableGame --> EnhancedInput
 
-  Monster["JMMonsterFramework"] --> StateTree["StateTree (Engine Plugin)"]
-  Monster --> GameplayStateTree["GameplayStateTree (Engine Plugin)"]
+  Monster["JMMonsterFramework"]
 
   Footstep["JMFootstep"]
   RoomGrid["JMRoomGrid"]
@@ -71,7 +70,7 @@ flowchart LR
   classDef engine fill:#6c757d,color:#fff,stroke:#343a40;
   class Event,Interaction contract;
   class DoorGame,ReconGame,DoorRecon,HideInteraction,HideDoor,ThrowableGame integration;
-  class EnhancedInput,Cable,Proc,Niagara,StateTree,GameplayStateTree engine;
+  class EnhancedInput,Cable,Proc,Niagara engine;
 ```
 
 ### 해석

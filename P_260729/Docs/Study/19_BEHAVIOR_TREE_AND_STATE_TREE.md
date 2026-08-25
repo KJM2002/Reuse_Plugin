@@ -1,10 +1,10 @@
 ---
 title: "19. BehaviorTree와 StateTree 경계"
-status: Current
+status: ReviewRequired
 authority: Guide
 scope: Study
-last_verified: 2026-08-20
-verified_against: "7c765f0348e2d6a766b83ccacf936e14d3122971"
+last_reviewed: 2026-08-25
+review_reason: "JMMonsterFramework가 Phase 0 최소 Possession 구조로 재작성되어 기존 StateTree 설명을 재작성해야 함"
 owners:
   - Project Documentation
 related:

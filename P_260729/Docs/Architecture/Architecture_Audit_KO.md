@@ -1,10 +1,10 @@
 ---
 title: P_260729 Unreal Engine 프로젝트 아키텍처 감사
-status: Current
+status: ReviewRequired
 authority: Canonical
 scope: Project
-last_verified: 2026-08-19
-verified_against: working-tree-2026-08-19
+last_reviewed: 2026-08-25
+review_reason: "JMMonsterFramework Phase 0 재작성 내용을 프로젝트 전체 감사에 다시 반영해야 함"
 owners:
   - Project Architecture
 related:

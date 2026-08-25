@@ -1,10 +1,10 @@
 ---
 title: Gameplay Event / Delegate Flow
-status: Current
+status: ReviewRequired
 authority: Canonical
 scope: Project
-last_verified: 2026-08-19
-verified_against: working-tree-2026-08-19
+last_reviewed: 2026-08-25
+review_reason: "JMMonsterFramework Phase 0에는 Gameplay Tag 및 이벤트 흐름이 없으므로 기존 항목 제거 필요"
 owners:
   - Project Architecture
 related:
