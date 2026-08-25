@@ -1,6 +1,7 @@
 #include "AI/SimpleEnemyAIController.h"
 
 #include "JMMonsterFrameworkRuntime.h"
+#include "AITypes.h"
 #include "Components/StateTreeAIComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Perception/AIPerceptionComponent.h"
@@ -48,7 +49,7 @@ void ASimpleEnemyAIController::OnPossess(APawn* InPawn)
     UStateTree* LoadedStateTree = StateTreeAsset.LoadSynchronous();
     if (!IsValid(LoadedStateTree))
     {
-        UE_LOG(LogJMMonsterFramework, Error, TEXT("Phase 2 StateTree asset could not be loaded."));
+        UE_LOG(LogJMMonsterFramework, Error, TEXT("SimpleEnemy StateTree asset could not be loaded."));
         return;
     }
 
@@ -64,10 +65,13 @@ void ASimpleEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIS
         return;
     }
 
-    ApplySightState(Actor, Stimulus.WasSuccessfullySensed());
+    ApplySightState(Actor, Stimulus.WasSuccessfullySensed(), Stimulus.StimulusLocation);
 }
 
-void ASimpleEnemyAIController::ApplySightState(AActor* Actor, const bool bIsVisible)
+void ASimpleEnemyAIController::ApplySightState(
+    AActor* Actor,
+    const bool bIsVisible,
+    const FVector& ObservedLocation)
 {
     if (bIsVisible)
     {
@@ -79,6 +83,10 @@ void ASimpleEnemyAIController::ApplySightState(AActor* Actor, const bool bIsVisi
         const bool bStateChanged = TargetActor != Actor || !bCanSeeTarget;
         TargetActor = Actor;
         bCanSeeTarget = true;
+        if (FAISystem::IsValidLocation(ObservedLocation))
+        {
+            LastSeenLocation = ObservedLocation;
+        }
 
         if (bStateChanged)
         {
@@ -93,6 +101,12 @@ void ASimpleEnemyAIController::ApplySightState(AActor* Actor, const bool bIsVisi
     }
 
     const bool bWasVisible = bCanSeeTarget;
+    if (FAISystem::IsValidLocation(ObservedLocation))
+    {
+        // Sight reports its stored successful stimulus location on loss. Do not
+        // sample Actor here: it may already be moving unseen behind an obstacle.
+        LastSeenLocation = ObservedLocation;
+    }
     TargetActor = nullptr;
     bCanSeeTarget = false;
 

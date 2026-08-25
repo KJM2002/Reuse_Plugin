@@ -25,7 +25,8 @@ EStateTreeRunStatus FJMSimpleEnemyMoveToTargetTask::EnterState(
     ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
     if (!IsValid(Controller) || !Controller->bCanSeeTarget || !IsValid(Controller->TargetActor))
     {
-        return EStateTreeRunStatus::Failed;
+        // The Chase OnTick transition owns loss handling and moves to Investigate.
+        return EStateTreeRunStatus::Running;
     }
 
     const EPathFollowingRequestResult::Type MoveResult = Controller->MoveToActor(
@@ -75,6 +76,72 @@ EStateTreeRunStatus FJMSimpleEnemyMoveToTargetTask::Tick(
 }
 
 void FJMSimpleEnemyMoveToTargetTask::ExitState(
+    FStateTreeExecutionContext& Context,
+    const FStateTreeTransitionResult& Transition) const
+{
+    if (ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner()))
+    {
+        Controller->StopMovement();
+    }
+}
+
+FJMSimpleEnemyMoveToLastSeenLocationTask::FJMSimpleEnemyMoveToLastSeenLocationTask()
+{
+    bShouldCallTick = true;
+}
+
+EStateTreeRunStatus FJMSimpleEnemyMoveToLastSeenLocationTask::EnterState(
+    FStateTreeExecutionContext& Context,
+    const FStateTreeTransitionResult& Transition) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    if (!IsValid(Controller))
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    const EPathFollowingRequestResult::Type MoveResult = Controller->MoveToLocation(
+        Controller->LastSeenLocation,
+        AcceptanceRadius,
+        true,
+        true,
+        true,
+        true,
+        nullptr,
+        true);
+
+    if (MoveResult == EPathFollowingRequestResult::Failed)
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    return MoveResult == EPathFollowingRequestResult::AlreadyAtGoal
+        ? EStateTreeRunStatus::Succeeded
+        : EStateTreeRunStatus::Running;
+}
+
+EStateTreeRunStatus FJMSimpleEnemyMoveToLastSeenLocationTask::Tick(
+    FStateTreeExecutionContext& Context,
+    const float DeltaTime) const
+{
+    const ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    if (!IsValid(Controller))
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    // Give the StateTree's OnTick transition a chance to resume Chase immediately.
+    if (Controller->bCanSeeTarget && IsValid(Controller->TargetActor))
+    {
+        return EStateTreeRunStatus::Running;
+    }
+
+    return Controller->GetMoveStatus() == EPathFollowingStatus::Idle
+        ? EStateTreeRunStatus::Succeeded
+        : EStateTreeRunStatus::Running;
+}
+
+void FJMSimpleEnemyMoveToLastSeenLocationTask::ExitState(
     FStateTreeExecutionContext& Context,
     const FStateTreeTransitionResult& Transition) const
 {

@@ -19,7 +19,7 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FJMSimpleEnemyStateTreeAssetTest,
-    "JM.MonsterFramework.Phase2.BuildAndValidateStateTree",
+    "JM.MonsterFramework.Phase3.BuildAndValidateStateTree",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
@@ -49,7 +49,7 @@ bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
     const ASimpleEnemyAIController* ControllerDefaults = GetDefault<ASimpleEnemyAIController>();
     TestNotNull(TEXT("Controller owns a StateTree AI component"), ControllerDefaults->StateTreeComponent.Get());
     TestEqual(
-        TEXT("Controller points at the plugin Phase 2 StateTree"),
+        TEXT("Controller points at the plugin StateTree"),
         ControllerDefaults->StateTreeAsset.ToSoftObjectPath().ToString(),
         FString(TEXT("/JMMonsterFramework/AI/ST_SimpleEnemy.ST_SimpleEnemy")));
 
@@ -60,14 +60,20 @@ bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
     UStateTreeState& Root = EditorData->AddRootState();
     UStateTreeState& Chase = Root.AddChildState(TEXT("Chase"));
     UStateTreeState& Idle = Root.AddChildState(TEXT("Idle"));
+    UStateTreeState& Investigate = Root.AddChildState(TEXT("InvestigateLastLocation"));
 
     Chase.AddEnterCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
     Chase.AddTask<FJMSimpleEnemyMoveToTargetTask>();
-    Chase.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Idle)
+    Chase.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Investigate)
         .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = false;
 
     Idle.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
         .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+
+    Investigate.AddTask<FJMSimpleEnemyMoveToLastSeenLocationTask>();
+    Investigate.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
+        .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    Investigate.AddTransition(EStateTreeTransitionTrigger::OnStateCompleted, EStateTreeTransitionType::GotoState, &Idle);
 
     FStateTreeCompilerLog CompilerLog;
     FStateTreeCompiler Compiler(CompilerLog);
@@ -78,9 +84,11 @@ bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
     }
     TestTrue(TEXT("StateTree compiles"), bCompiled);
     TestTrue(TEXT("StateTree is ready to run"), StateTree->IsReadyToRun());
-    TestEqual(TEXT("Root contains Chase and Idle"), Root.Children.Num(), 2);
+    TestEqual(TEXT("Root contains Chase, Idle, and InvestigateLastLocation"), Root.Children.Num(), 3);
     TestEqual(TEXT("Chase has one condition"), Chase.EnterConditions.Num(), 1);
     TestEqual(TEXT("Chase has one movement task"), Chase.Tasks.Num(), 1);
+    TestEqual(TEXT("Investigate has one location movement task"), Investigate.Tasks.Num(), 1);
+    TestEqual(TEXT("Investigate can reacquire or finish at Idle"), Investigate.Transitions.Num(), 2);
 
     if (HasAnyErrors())
     {

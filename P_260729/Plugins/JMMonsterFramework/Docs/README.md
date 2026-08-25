@@ -1,9 +1,9 @@
 ---
-title: "JMMonsterFramework Phase 1"
+title: "JMMonsterFramework Phase 3"
 status: Current
 authority: Guide
-scope: "JMMonsterFramework Phase 0-1 setup and usage"
-last_verified: 2026-08-25
+scope: "JMMonsterFramework Phase 0-3 setup and usage"
+last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
   - "JMMonsterFramework"
@@ -12,27 +12,28 @@ related:
   - "CHANGELOG.md"
   - "Testing/PHASE0_SMOKE_TEST_KO.md"
   - "Testing/PHASE1_SIGHT_TEST_KO.md"
+  - "Testing/PHASE2_CHASE_TEST_KO.md"
+  - "Testing/PHASE3_LAST_SEEN_TEST_KO.md"
 ---
 
-# JMMonsterFramework Phase 1
+# JMMonsterFramework Phase 3
 
-이 플러그인의 현재 범위는 Enemy 자동 Possession과 플레이어 Sight 감지다. Enemy는 아직 움직이지 않는다.
+현재 범위는 Enemy 자동 Possession, 플레이어 Sight, StateTree Chase, 마지막 관측 위치 조사다.
 
 ## 포함 기능
 
-- `ASimpleEnemyCharacter`: `ACharacter`의 Capsule, Mesh, CharacterMovement를 그대로 사용하는 최소 Enemy
-- `ASimpleEnemyAIController`: 행동 로직이 없는 최소 AIController
-- 배치 및 런타임 Spawn 모두에 대한 자동 AI Possession 기본값
-- 플레이어가 보일 때 `TargetActor`와 `bCanSeeTarget` 갱신
-- 시야를 잃을 때 두 상태를 즉시 초기화
+- `ASimpleEnemyCharacter`: Capsule, Mesh, CharacterMovement를 사용하는 최소 Enemy
+- `ASimpleEnemyAIController`: Sight 상태와 `LastSeenLocation`, StateTree 실행 소유
+- `ST_SimpleEnemy`: `Idle`, `Chase`, `InvestigateLastLocation`
+- `Chase`: 보이는 `TargetActor`를 NavMesh로 추적
+- `InvestigateLastLocation`: 시야를 잃은 순간의 실제 마지막 관측 위치까지만 이동 후 정지
 
-## 포함 Blueprint
+## 사용
 
-`/JMMonsterFramework/Blueprints/BP_SimpleEnemy`가 포함되어 있다. 부모 클래스는 `ASimpleEnemyCharacter`다.
-
-1. 필요하면 `BP_SimpleEnemy`에 Skeletal Mesh와 Animation Blueprint만 지정한다.
+1. `/JMMonsterFramework/Blueprints/BP_SimpleEnemy`에 필요한 Mesh와 Animation Blueprint를 지정한다.
 2. `AI Controller Class`가 `ASimpleEnemyAIController`인지 확인한다.
 3. `Auto Possess AI`가 `Placed in World or Spawned`인지 확인한다.
-4. 사용자가 만든 `Level_TestAI`의 NavMesh 위에 배치한다.
+4. 사용자가 만든 `Level_TestAI`의 녹색 NavMesh 위에 배치한다.
+5. 플레이어와 Enemy 사이의 벽이 Visibility 채널을 차단하는지 확인한다.
 
-StateTree, Patrol, Attack, 장기 Memory, Hearing은 Phase 1에 포함되지 않는다.
+Patrol, Attack, Hearing, 장기 Memory는 포함되지 않는다.

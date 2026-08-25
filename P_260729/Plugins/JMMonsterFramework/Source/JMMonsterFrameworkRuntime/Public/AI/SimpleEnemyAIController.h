@@ -9,7 +9,7 @@ class UStateTree;
 class UStateTreeAIComponent;
 
 /**
- * Minimal controller that tracks a visible player and runs the Phase 2 chase StateTree.
+ * Minimal controller that chases a visible player and investigates the last sight location.
  */
 UCLASS(BlueprintType, Blueprintable)
 class JMMONSTERFRAMEWORKRUNTIME_API ASimpleEnemyAIController : public AAIController
@@ -29,6 +29,10 @@ public:
     UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Perception")
     bool bCanSeeTarget = false;
 
+    /** Most recent location reported by AI Sight for the current/previous player target. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Perception")
+    FVector LastSeenLocation = FVector::ZeroVector;
+
 private:
     UPROPERTY(VisibleAnywhere, Category = "JM Monster Framework|StateTree")
     TObjectPtr<UStateTreeAIComponent> StateTreeComponent;
@@ -39,7 +43,7 @@ private:
     UFUNCTION()
     void HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
-    void ApplySightState(AActor* Actor, bool bIsVisible);
+    void ApplySightState(AActor* Actor, bool bIsVisible, const FVector& ObservedLocation);
 
 #if WITH_DEV_AUTOMATION_TESTS
     friend class FJMSimpleEnemySightStateTransitionsTest;

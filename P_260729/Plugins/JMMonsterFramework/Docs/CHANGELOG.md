@@ -3,13 +3,32 @@ title: "JMMonsterFramework Changelog"
 status: Current
 authority: Historical
 scope: "JMMonsterFramework release history"
-last_verified: 2026-08-25
+last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
   - "JMMonsterFramework"
 ---
 
 # Changelog
+
+## 1.3.0 - 2026-08-26
+
+### Added
+
+- Blueprint 읽기 전용 `LastSeenLocation`
+- StateTree `InvestigateLastLocation` 상태
+- 마지막 관측 위치 전용 NavMesh 이동 Task
+- 재감지 시 Chase 복귀, 도착 또는 경로 실패 시 Idle 복귀
+- 20회 반복 Last Seen Location 회귀 검사와 Phase 3 수동 테스트 절차
+
+## 1.2.0 - 2026-08-25
+
+### Added
+
+- Controller 소유 `UStateTreeAIComponent`
+- `Idle`, `Chase` StateTree와 `Can See Target` 조건
+- 움직이는 `TargetActor`를 추적하는 NavMesh 이동 Task
+- StateTree 에셋 생성·컴파일 자동화 테스트
 
 ## 1.1.0 - 2026-08-25
 

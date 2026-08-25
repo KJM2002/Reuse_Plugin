@@ -1,43 +1,54 @@
 ---
-title: "JMMonsterFramework Phase 1 Architecture"
+title: "JMMonsterFramework Phase 3 Architecture"
 status: Current
 authority: Canonical
-scope: "JMMonsterFramework Phase 0-1 runtime architecture"
-last_verified: 2026-08-25
+scope: "JMMonsterFramework Phase 0-3 runtime architecture"
+last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
   - "JMMonsterFramework"
 related:
   - "README.md"
-  - "Testing/PHASE0_SMOKE_TEST_KO.md"
-  - "Testing/PHASE1_SIGHT_TEST_KO.md"
+  - "Testing/PHASE3_LAST_SEEN_TEST_KO.md"
 ---
 
 # JMMonsterFramework Architecture
 
 ## 책임
 
-Phase 0는 재사용 가능한 최소 Enemy `ACharacter`와 이를 Possess하는 `AAIController`를 제공한다. Phase 1은 Controller에 플레이어 전용 AI Sight를 추가한다. Controller가 현재 가시 상태인 `TargetActor`와 `bCanSeeTarget`을 소유한다.
+- Phase 0: 최소 Enemy Character와 자동 AI Possession
+- Phase 1: 플레이어 전용 AI Sight와 `TargetActor`, `bCanSeeTarget`
+- Phase 2: StateTree 기반 Chase와 NavMesh 이동
+- Phase 3: `LastSeenLocation` 기억과 마지막 관측 위치 조사
 
 ## 비책임
 
-StateTree, Patrol, Attack, 장기 Memory, Hearing, Gameplay Tag, 저장, 네트워크 동기화, 특정 레벨 또는 호스트 프로젝트 연동은 제공하지 않는다.
+Patrol, Attack, Hearing, 장기·복수 대상 Memory, 예측 추적, Gameplay Tag, 저장, 네트워크 동기화, 특정 레벨 연동은 제공하지 않는다.
 
-## 모듈
+## 모듈과 의존성
 
-- `JMMonsterFrameworkRuntime`: Shipping에서 사용할 수 있는 독립 Runtime 모듈
-- `JMMonsterFrameworkTests`: CDO 구성만 검사하는 Editor 자동화 테스트 모듈
+- `JMMonsterFrameworkRuntime`: Shipping에서 사용할 독립 Runtime 모듈
+- `JMMonsterFrameworkTests`: StateTree 에셋 생성·컴파일과 상태 회귀 검사용 Editor 모듈
 
-Runtime 의존성은 `Core`, `CoreUObject`, `Engine`, `AIModule`뿐이며 다른 JM 플러그인에는 의존하지 않는다.
+Runtime은 `Core`, `CoreUObject`, `Engine`, `AIModule`, `StateTreeModule`, `GameplayStateTreeModule`에만 의존한다. 다른 JM 플러그인이나 호스트 `/Game` 콘텐츠를 참조하지 않는다. StateTree 기본 에셋은 플러그인 Mount Point의 `/JMMonsterFramework/AI/ST_SimpleEnemy`다.
 
-## 데이터 흐름과 수명
+## 데이터 흐름과 상태 전이
 
-`ASimpleEnemyCharacter`가 월드에 배치되거나 Spawn되면 Unreal의 Pawn 초기화 흐름이 `ASimpleEnemyAIController`를 생성하고 Possess한다. Controller의 `UAIPerceptionComponent`는 Sight 자극 중 플레이어가 조종하는 Pawn만 받아들인다. 감지 성공은 `TargetActor`와 `bCanSeeTarget`을 설정하고, 동일 대상의 감지 실패는 두 값을 초기화한다. 별도 Subsystem, Tick, 이동 명령, Soft Reference는 없다.
+AI Sight가 플레이어 Pawn을 감지하면 Controller가 `TargetActor`, `bCanSeeTarget`, `LastSeenLocation`을 갱신한다. Lost 자극에는 Sight가 보관한 마지막 성공 자극 위치가 들어오므로, 숨은 Actor의 현재 위치를 다시 읽지 않고 그 위치만 보존한 뒤 `TargetActor`를 즉시 비운다.
 
-## 공개 API와 실패 동작
+```text
+Idle -- 보임 --> Chase
+Chase -- 시야 상실 --> InvestigateLastLocation
+InvestigateLastLocation -- 다시 보임 --> Chase
+InvestigateLastLocation -- 위치 도착/경로 실패 --> Idle
+```
 
-두 클래스와 Controller의 읽기 전용 Sight 상태는 Blueprint에 공개된다. 외부 시스템 Cast, `/Game` 경로, 레벨 이름을 참조하지 않는다. 중복 Detected/Lost 자극과 다른 Actor의 Lost 자극은 상태를 흔들지 않으며 Warning을 발생시키지 않는다.
+Chase는 `MoveToActor`로 가시 Actor를 동적으로 추적한다. Investigate는 `MoveToLocation`에 `LastSeenLocation` 값만 전달하므로 벽 뒤의 Actor를 추적하지 않는다. 두 이동 모두 NavMesh pathfinding을 사용하며 상태 이탈 시 현재 이동을 중단한다.
+
+## 수명과 실패 동작
+
+`UStateTreeAIComponent`는 AIController가 소유하며 Possess 시 플러그인 StateTree를 동기 로드해 시작한다. 작은 필수 동작 에셋이므로 Possess 시 로드하며, 누락 시 Error를 남기고 AI 행동만 시작하지 않는다. 별도 Subsystem과 Controller Tick은 없다.
 
 ## 네트워크와 저장
 
-Phase 0는 별도의 Replication, RPC, Save 계약을 정의하지 않는다.
+현재 상태는 로컬 런타임 전용이며 Replication, RPC, Save 계약을 정의하지 않는다. `LastSeenLocation`은 영속 기억이 아닌 현재 AI 세션의 단일 임시 위치다.
