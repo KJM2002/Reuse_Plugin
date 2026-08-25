@@ -1,13 +1,23 @@
 {
   "FileVersion": 3,
-  "Version": 2,
-  "VersionName": "1.1.0",
+  "Version": 3,
+  "VersionName": "1.2.0",
   "FriendlyName": "JM Monster Framework",
-  "Description": "Reusable enemy character foundation with stable player sight detection.",
+  "Description": "Reusable enemy foundation with Sight-driven StateTree chase movement.",
   "Category": "JM Plugins",
   "CreatedBy": "JM",
   "CanContainContent": true,
   "EnabledByDefault": true,
+  "Plugins": [
+    {
+      "Name": "StateTree",
+      "Enabled": true
+    },
+    {
+      "Name": "GameplayStateTree",
+      "Enabled": true
+    }
+  ],
   "Modules": [
     {
       "Name": "JMMonsterFrameworkRuntime",

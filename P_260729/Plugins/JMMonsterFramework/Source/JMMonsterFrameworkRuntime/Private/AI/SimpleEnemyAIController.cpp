@@ -1,13 +1,20 @@
 #include "AI/SimpleEnemyAIController.h"
 
 #include "JMMonsterFrameworkRuntime.h"
+#include "Components/StateTreeAIComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "StateTree.h"
 
 ASimpleEnemyAIController::ASimpleEnemyAIController()
 {
     PrimaryActorTick.bCanEverTick = false;
+
+    StateTreeComponent = CreateDefaultSubobject<UStateTreeAIComponent>(TEXT("StateTreeComponent"));
+    StateTreeComponent->SetStartLogicAutomatically(false);
+    StateTreeAsset = TSoftObjectPtr<UStateTree>(FSoftObjectPath(
+        TEXT("/JMMonsterFramework/AI/ST_SimpleEnemy.ST_SimpleEnemy")));
 
     UAIPerceptionComponent* SightPerception = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("SightPerception"));
     SetPerceptionComponent(*SightPerception);
@@ -27,6 +34,26 @@ ASimpleEnemyAIController::ASimpleEnemyAIController()
     SightPerception->OnTargetPerceptionUpdated.AddDynamic(
         this,
         &ASimpleEnemyAIController::HandleTargetPerceptionUpdated);
+}
+
+void ASimpleEnemyAIController::OnPossess(APawn* InPawn)
+{
+    Super::OnPossess(InPawn);
+
+    if (!IsValid(StateTreeComponent))
+    {
+        return;
+    }
+
+    UStateTree* LoadedStateTree = StateTreeAsset.LoadSynchronous();
+    if (!IsValid(LoadedStateTree))
+    {
+        UE_LOG(LogJMMonsterFramework, Error, TEXT("Phase 2 StateTree asset could not be loaded."));
+        return;
+    }
+
+    StateTreeComponent->SetStateTree(LoadedStateTree);
+    StateTreeComponent->StartLogic();
 }
 
 void ASimpleEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)

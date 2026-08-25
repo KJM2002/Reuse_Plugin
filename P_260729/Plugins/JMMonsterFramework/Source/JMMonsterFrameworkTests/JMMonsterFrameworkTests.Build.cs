@@ -12,7 +12,13 @@ public class JMMonsterFrameworkTests : ModuleRules
             "CoreUObject",
             "Engine",
             "AIModule",
-            "JMMonsterFrameworkRuntime"
+            "JMMonsterFrameworkRuntime",
+            "StateTreeModule",
+            "GameplayStateTreeModule",
+            "StateTreeEditorModule",
+            "PropertyBindingUtils",
+            "AssetRegistry",
+            "UnrealEd"
         });
 
         if (Target.bBuildDeveloperTools)
