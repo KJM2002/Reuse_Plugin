@@ -1,9 +1,9 @@
 {
   "FileVersion": 3,
-  "Version": 8,
-  "VersionName": "1.5.0",
+  "Version": 9,
+  "VersionName": "1.6.0",
   "FriendlyName": "JM Monster Framework",
-  "Description": "Reusable enemy foundation with NavMesh patrol, selectable lost-sight tracking, investigation, and finite search.",
+  "Description": "Reusable enemy foundation with patrol, chase, basic attack, selectable lost-sight tracking, investigation, and search.",
   "Category": "JM Plugins",
   "CreatedBy": "JM",
   "CanContainContent": true,

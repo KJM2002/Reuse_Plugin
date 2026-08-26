@@ -87,6 +87,14 @@ void FJMSimpleEnemyMoveToTargetTask::ExitState(
     }
 }
 
+bool FJMSimpleEnemyTargetInAttackRangeCondition::TestCondition(
+    FStateTreeExecutionContext& Context) const
+{
+    const ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    const bool bIsInRange = IsValid(Controller) && Controller->IsTargetInAttackRange();
+    return bIsInRange == bExpectedValue;
+}
+
 bool FJMSimpleEnemyHasRecentTrackingMemoryCondition::TestCondition(
     FStateTreeExecutionContext& Context) const
 {
@@ -377,6 +385,49 @@ bool FJMSimpleEnemyPatrolTask::RequestPatrolMove(ASimpleEnemyAIController& Contr
         nullptr,
         true);
     return MoveResult != EPathFollowingRequestResult::Failed;
+}
+
+FJMSimpleEnemyBasicAttackTask::FJMSimpleEnemyBasicAttackTask()
+{
+    bShouldCallTick = true;
+}
+
+EStateTreeRunStatus FJMSimpleEnemyBasicAttackTask::EnterState(
+    FStateTreeExecutionContext& Context,
+    const FStateTreeTransitionResult& Transition) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    if (!IsValid(Controller))
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    Controller->StopMovement();
+    Controller->PerformBasicAttack();
+    return EStateTreeRunStatus::Running;
+}
+
+EStateTreeRunStatus FJMSimpleEnemyBasicAttackTask::Tick(
+    FStateTreeExecutionContext& Context,
+    const float DeltaTime) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    if (!IsValid(Controller))
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    // Transitions own range exit and sight loss; never start a movement request here.
+    if (!Controller->IsTargetInAttackRange())
+    {
+        return EStateTreeRunStatus::Running;
+    }
+
+    // The controller timestamp keeps cooldown valid even if range changes cause
+    // rapid Attack -> Chase -> Attack state re-entry.
+    Controller->PerformBasicAttack();
+
+    return EStateTreeRunStatus::Running;
 }
 
 FJMSimpleEnemyMoveToLastSeenLocationTask::FJMSimpleEnemyMoveToLastSeenLocationTask()

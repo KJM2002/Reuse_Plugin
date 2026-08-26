@@ -3,6 +3,7 @@
 #include "JMMonsterFrameworkRuntime.h"
 #include "AITypes.h"
 #include "Components/StateTreeAIComponent.h"
+#include "Engine/DamageEvents.h"
 #include "GameFramework/Pawn.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -159,6 +160,44 @@ void ASimpleEnemyAIController::EndLiveGraceTracking()
 {
     bHasLiveGraceTracking = false;
     LiveGraceTargetActor.Reset();
+}
+
+bool ASimpleEnemyAIController::IsTargetInAttackRange() const
+{
+    const APawn* ControlledPawn = GetPawn();
+    return bCanSeeTarget
+        && IsValid(TargetActor)
+        && IsValid(ControlledPawn)
+        && FVector::DistSquared(ControlledPawn->GetActorLocation(), TargetActor->GetActorLocation())
+            <= FMath::Square(AttackRange);
+}
+
+bool ASimpleEnemyAIController::PerformBasicAttack()
+{
+    if (!IsTargetInAttackRange())
+    {
+        return false;
+    }
+
+    const UWorld* World = GetWorld();
+    const float CurrentTime = IsValid(World) ? World->GetTimeSeconds() : 0.0f;
+    const float EffectiveCooldown = FMath::Max(AttackCooldown, UE_KINDA_SMALL_NUMBER);
+    if (LastBasicAttackTime >= 0.0f && CurrentTime - LastBasicAttackTime < EffectiveCooldown)
+    {
+        return false;
+    }
+
+    FDamageEvent DamageEvent;
+    TargetActor->TakeDamage(Damage, DamageEvent, this, GetPawn());
+    LastBasicAttackTime = CurrentTime;
+    UE_LOG(
+        LogJMMonsterFramework,
+        Log,
+        TEXT("BasicAttack: %s damaged %s for %.1f"),
+        *GetNameSafe(GetPawn()),
+        *GetNameSafe(TargetActor),
+        Damage);
+    return true;
 }
 
 void ASimpleEnemyAIController::UpdateVisibleObservation(

@@ -11,6 +11,16 @@ owners:
 
 # Changelog
 
+## 1.6.0 - 2026-08-26
+
+### Added
+
+- 가시 Player가 150uu 안에 들어오면 선택되는 StateTree `Attack` 상태
+- Attack 진입 시 이동 중지와 10 Damage의 기본 공격
+- 상태 재진입으로 우회되지 않는 1초 공격 Cooldown
+- 공격 범위 이탈 시 Chase, Sight Lost 시 기존 Predictive/Live Grace Tracking 전이
+- 공격 성공을 확인할 수 있는 `BasicAttack` 런타임 로그
+
 ## 1.5.0 - 2026-08-26
 
 ### Added

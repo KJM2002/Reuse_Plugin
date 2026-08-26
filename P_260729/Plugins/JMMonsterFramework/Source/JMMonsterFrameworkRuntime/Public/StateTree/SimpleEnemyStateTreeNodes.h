@@ -69,6 +69,13 @@ struct FJMSimpleEnemyPatrolInstanceData
     bool bWaiting = false;
 };
 
+/** Per-execution cooldown for repeated basic attacks. */
+USTRUCT()
+struct FJMSimpleEnemyBasicAttackInstanceData
+{
+    GENERATED_BODY()
+};
+
 /** Per-execution storage required by StateTree for the investigation task. */
 USTRUCT()
 struct FJMSimpleEnemyMoveToLastSeenLocationInstanceData
@@ -134,6 +141,26 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyMoveToTargetTask : public FSt
 
     UPROPERTY(EditAnywhere, Category = "Movement", meta = (ClampMin = "0.0"))
     float AcceptanceRadius = 75.0f;
+};
+
+/** Selects Attack or Chase according to the visible target's current distance. */
+USTRUCT(meta = (DisplayName = "Target In Attack Range", Category = "JM Monster Framework"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyTargetInAttackRangeCondition
+    : public FStateTreeAIConditionBase
+{
+    GENERATED_BODY()
+
+    using FInstanceDataType = FJMSimpleEnemyCanSeeTargetInstanceData;
+
+    virtual const UStruct* GetInstanceDataType() const override
+    {
+        return FInstanceDataType::StaticStruct();
+    }
+
+    virtual bool TestCondition(FStateTreeExecutionContext& Context) const override;
+
+    UPROPERTY(EditAnywhere, Category = "Condition")
+    bool bExpectedValue = true;
 };
 
 /** Selects RecentTracking only after a confirmed sight loss created a prediction snapshot. */
@@ -270,6 +297,30 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyPatrolTask : public FStateTre
 
 private:
     bool RequestPatrolMove(ASimpleEnemyAIController& Controller) const;
+};
+
+/** Stops movement and applies one basic attack per controller cooldown while valid. */
+USTRUCT(meta = (DisplayName = "Basic Attack", Category = "JM Monster Framework"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyBasicAttackTask : public FStateTreeAIActionTaskBase
+{
+    GENERATED_BODY()
+
+    using FInstanceDataType = FJMSimpleEnemyBasicAttackInstanceData;
+
+    FJMSimpleEnemyBasicAttackTask();
+
+    virtual const UStruct* GetInstanceDataType() const override
+    {
+        return FInstanceDataType::StaticStruct();
+    }
+
+    virtual EStateTreeRunStatus EnterState(
+        FStateTreeExecutionContext& Context,
+        const FStateTreeTransitionResult& Transition) const override;
+
+    virtual EStateTreeRunStatus Tick(
+        FStateTreeExecutionContext& Context,
+        float DeltaTime) const override;
 };
 
 /** Moves to a snapshot of LastSeenLocation without following the hidden Actor. */

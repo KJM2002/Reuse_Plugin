@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 5 Architecture"
+title: "JMMonsterFramework Phase 6 Architecture"
 status: Current
 authority: Canonical
-scope: "JMMonsterFramework Phase 0-5 runtime architecture"
+scope: "JMMonsterFramework Phase 0-6 runtime architecture"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -25,10 +25,11 @@ related:
 - Phase 4.5: 마지막 가시 위치와 속도만 사용하는 단기 예상 추적
 - Phase 4.6: 별도 StateTree에서 제한 시간 동안만 숨은 Player Actor를 사용하는 Live Grace 추적
 - Phase 5: 비상호작용 상태에서 도달 가능한 NavMesh 지점을 반복 방문하는 Patrol
+- Phase 6: 가시 Player가 공격 범위 안에 있을 때 이동을 멈추고 Cooldown 기반 Damage 적용
 
 ## 비책임
 
-Attack, Hearing, 장기·복수 대상 Memory, 복잡한 궤적 예측, Gameplay Tag, 저장, 네트워크 동기화, 특정 레벨 연동은 제공하지 않는다.
+Combo, Heavy/Special Attack, Ability/Animation Framework, Hearing, 장기·복수 대상 Memory, Gameplay Tag, 저장, 네트워크 동기화는 제공하지 않는다.
 
 ## 모듈과 의존성
 
@@ -45,6 +46,9 @@ AI Sight가 플레이어 Pawn을 감지하면 Controller가 `TargetActor`, `bCan
 
 ```text
 Patrol -- 보임 --> Chase
+Chase -- 150uu 안 --> Attack
+Attack -- 범위 이탈 --> Chase
+Attack -- 시야 상실 --> 선택된 Lost Sight Tracking
 Chase -- 시야 상실 --> RecentTracking
 RecentTracking -- 다시 보임 --> Chase
 RecentTracking -- 1.5초 만료 --> InvestigateLastLocation
@@ -59,6 +63,8 @@ Chase는 `MoveToActor`로 가시 Actor를 동적으로 추적한다. RecentTrack
 Live Grace StateTree만 `LiveGraceTargetActor` 약한 참조를 사용한다. Sight Lost마다 새 참조와 새 Task 경과 시간이 시작되고, 1.5초 동안 `MoveToActor`와 실제 위치 표본으로 `LastSeenLocation`을 갱신한다. 만료 시 참조와 유효 플래그를 먼저 제거하고 Investigate로 전환하므로 이후 Player 이동은 기억 위치에 반영되지 않는다.
 
 두 StateTree의 평상시 상태는 Patrol이다. Patrol Task는 Pawn 현재 위치를 중심으로 반경 800uu 안의 `GetRandomReachablePointInRadius` 결과만 `MoveToLocation`에 전달한다. 목적지 도착 또는 이동 실패 후 1.5초를 기다리고 새 지점을 요청하며, Player가 보이면 OnTick 전이가 Patrol 이동보다 우선해 Chase로 이동한다. Search 완료 전이는 각 트리의 Patrol로 돌아간다.
+
+Attack은 두 StateTree에서 동일한 Task와 조건을 사용한다. 150uu 안의 가시 Target만 선택하고 진입 시 `StopMovement` 후 `TakeDamage(10)`을 호출한다. 마지막 성공 공격 시간은 Controller에 남아 Attack/Chase 경계를 반복해도 1초 Cooldown을 우회할 수 없다. Attack Task는 Move 요청을 생성하지 않으며, 범위 이탈은 Chase로, Sight Lost는 각 트리 고유의 RecentTracking 또는 LiveGraceTracking으로 직접 전환한다.
 
 ## 수명과 실패 동작
 

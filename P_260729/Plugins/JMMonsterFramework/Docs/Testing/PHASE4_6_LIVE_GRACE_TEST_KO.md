@@ -18,7 +18,7 @@ related:
 
 Automation 창에서 다음을 실행한다.
 
-- `JM.MonsterFramework.Phase5.BuildAndValidateLiveGraceAssets`
+- `JM.MonsterFramework.Phase6.BuildAndValidateLiveGraceAssets`
 - `JM.MonsterFramework.Phase4_6.LiveGraceState`
 - 기존 `JM.MonsterFramework` 회귀 테스트
 

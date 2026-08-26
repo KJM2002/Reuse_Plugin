@@ -70,7 +70,7 @@ namespace
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FJMSimpleEnemyLiveGraceAssetsTest,
-    "JM.MonsterFramework.Phase5.BuildAndValidateLiveGraceAssets",
+    "JM.MonsterFramework.Phase6.BuildAndValidateLiveGraceAssets",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
@@ -115,40 +115,80 @@ bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
     StateTree->EditorData = EditorData;
 
     UStateTreeState& Root = EditorData->AddRootState();
+    UStateTreeState& Attack = Root.AddChildState(TEXT("Attack"));
     UStateTreeState& Chase = Root.AddChildState(TEXT("Chase"));
     UStateTreeState& LiveGrace = Root.AddChildState(TEXT("LiveGraceTracking"));
     UStateTreeState& Patrol = Root.AddChildState(TEXT("Patrol"));
     UStateTreeState& Investigate = Root.AddChildState(TEXT("InvestigateLastLocation"));
     UStateTreeState& Search = Root.AddChildState(TEXT("Search"));
 
+    Attack.AddEnterCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    Attack.AddEnterCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = true;
+    Attack.AddTask<FJMSimpleEnemyBasicAttackTask>();
+    auto& AttackToChase = Attack.AddTransition(
+        EStateTreeTransitionTrigger::OnTick,
+        EStateTreeTransitionType::GotoState,
+        &Chase);
+    AttackToChase.AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    AttackToChase.AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = false;
+    Attack.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &LiveGrace)
+        .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = false;
+
     Chase.AddEnterCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    Chase.AddEnterCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = false;
     Chase.AddTask<FJMSimpleEnemyMoveToTargetTask>();
+    Chase.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Attack)
+        .AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = true;
     Chase.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &LiveGrace)
         .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = false;
 
     LiveGrace.AddEnterCondition<FJMSimpleEnemyHasLiveGraceTrackingCondition>();
     LiveGrace.AddTask<FJMSimpleEnemyLiveGraceTrackingTask>();
-    LiveGrace.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
-        .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    LiveGrace.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Attack)
+        .AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = true;
+    auto& LiveGraceToChase = LiveGrace.AddTransition(
+        EStateTreeTransitionTrigger::OnTick,
+        EStateTreeTransitionType::GotoState,
+        &Chase);
+    LiveGraceToChase.AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    LiveGraceToChase.AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = false;
     LiveGrace.AddTransition(
         EStateTreeTransitionTrigger::OnStateCompleted,
         EStateTreeTransitionType::GotoState,
         &Investigate);
 
     FJMSimpleEnemyPatrolTask& PatrolTask = Patrol.AddTask<FJMSimpleEnemyPatrolTask>().GetNode();
-    Patrol.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
-        .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    Patrol.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Attack)
+        .AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = true;
+    auto& PatrolToChase = Patrol.AddTransition(
+        EStateTreeTransitionTrigger::OnTick,
+        EStateTreeTransitionType::GotoState,
+        &Chase);
+    PatrolToChase.AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    PatrolToChase.AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = false;
 
     Investigate.AddTask<FJMSimpleEnemyMoveToLastSeenLocationTask>();
-    Investigate.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
-        .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    Investigate.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Attack)
+        .AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = true;
+    auto& InvestigateToChase = Investigate.AddTransition(
+        EStateTreeTransitionTrigger::OnTick,
+        EStateTreeTransitionType::GotoState,
+        &Chase);
+    InvestigateToChase.AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    InvestigateToChase.AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = false;
     Investigate.AddTransition(EStateTreeTransitionTrigger::OnStateCompleted, EStateTreeTransitionType::GotoState, &Search);
 
     FJMSimpleEnemySearchTask& SearchTask = Search.AddTask<FJMSimpleEnemySearchTask>().GetNode();
     SearchTask.SearchDuration = 4.0f;
     SearchTask.RotationSpeedDegrees = 90.0f;
-    Search.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
-        .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    Search.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Attack)
+        .AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = true;
+    auto& SearchToChase = Search.AddTransition(
+        EStateTreeTransitionTrigger::OnTick,
+        EStateTreeTransitionType::GotoState,
+        &Chase);
+    SearchToChase.AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    SearchToChase.AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = false;
     Search.AddTransition(EStateTreeTransitionTrigger::OnStateCompleted, EStateTreeTransitionType::GotoState, &Patrol);
 
     FStateTreeCompilerLog CompilerLog;
@@ -160,12 +200,15 @@ bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
     }
     TestTrue(TEXT("Live Grace StateTree compiles"), bCompiled);
     TestTrue(TEXT("Live Grace StateTree is ready to run"), StateTree->IsReadyToRun());
-    TestEqual(TEXT("Live Grace tree contains five independent states"), Root.Children.Num(), 5);
+    TestEqual(TEXT("Live Grace tree contains six Phase 6 states"), Root.Children.Num(), 6);
+    TestEqual(TEXT("Live Grace tree Attack requires sight and range"), Attack.EnterConditions.Num(), 2);
+    TestEqual(TEXT("Live Grace tree Attack has one task"), Attack.Tasks.Num(), 1);
+    TestEqual(TEXT("Attack can chase or use Live Grace loss tracking"), Attack.Transitions.Num(), 2);
     TestEqual(TEXT("Live Grace state has one validity condition"), LiveGrace.EnterConditions.Num(), 1);
     TestEqual(TEXT("Live Grace state has one live tracking task"), LiveGrace.Tasks.Num(), 1);
-    TestEqual(TEXT("Live Grace can reacquire or investigate"), LiveGrace.Transitions.Num(), 2);
+    TestEqual(TEXT("Live Grace can attack, chase, or investigate"), LiveGrace.Transitions.Num(), 3);
     TestEqual(TEXT("Live Grace tree Patrol has one NavMesh task"), Patrol.Tasks.Num(), 1);
-    TestEqual(TEXT("Live Grace tree Patrol can enter Chase"), Patrol.Transitions.Num(), 1);
+    TestEqual(TEXT("Live Grace tree Patrol can enter Attack or Chase"), Patrol.Transitions.Num(), 2);
     TestTrue(TEXT("Live Grace tree Patrol radius is positive"), PatrolTask.PatrolRadius > 0.0f);
     TestTrue(TEXT("Live Grace tree Patrol wait is finite"), PatrolTask.WaitDuration > 0.0f);
     TestTrue(TEXT("Search remains finite"), SearchTask.SearchDuration > 0.0f);

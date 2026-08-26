@@ -76,6 +76,28 @@ public:
     /** Irreversibly stops live target access for the current sight-loss event. */
     void EndLiveGraceTracking();
 
+    /** Maximum distance at which the visible player can be attacked. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "JM Monster Framework|Attack", meta = (ClampMin = "0.0"))
+    float AttackRange = 150.0f;
+
+    /** Minimum time between consecutive basic attacks. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "JM Monster Framework|Attack", meta = (ClampMin = "0.01"))
+    float AttackCooldown = 1.0f;
+
+    /** Damage passed to the visible player for each successful basic attack. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "JM Monster Framework|Attack", meta = (ClampMin = "0.0"))
+    float Damage = 10.0f;
+
+    /** World time of the last successful hit; persists across Attack/Chase transitions. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Attack")
+    float LastBasicAttackTime = -1.0f;
+
+    /** True only when the currently visible player is within AttackRange. */
+    bool IsTargetInAttackRange() const;
+
+    /** Applies one basic attack to the currently visible in-range player. */
+    bool PerformBasicAttack();
+
 private:
     UPROPERTY(VisibleAnywhere, Category = "JM Monster Framework|StateTree")
     TObjectPtr<UStateTreeAIComponent> StateTreeComponent;

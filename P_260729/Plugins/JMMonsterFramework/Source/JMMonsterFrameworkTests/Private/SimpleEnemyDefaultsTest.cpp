@@ -36,6 +36,9 @@ bool FJMSimpleEnemyDefaultsTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Recent tracking lasts 1.5 seconds"), Controller->TrackingMemoryDuration, 1.5f);
     TestEqual(TEXT("Recent tracking prediction is capped at 700uu"), Controller->MaximumPredictionDistance, 700.0f);
     TestEqual(TEXT("Live Grace tracking lasts 1.5 seconds"), Controller->LiveGraceDuration, 1.5f);
+    TestEqual(TEXT("Basic attack range is 150uu"), Controller->AttackRange, 150.0f);
+    TestEqual(TEXT("Basic attack cooldown is one second"), Controller->AttackCooldown, 1.0f);
+    TestEqual(TEXT("Basic attack damage is ten"), Controller->Damage, 10.0f);
 
     return true;
 }
