@@ -10,8 +10,8 @@ bool FJMSimpleEnemyCanSeeTargetCondition::TestCondition(FStateTreeExecutionConte
 {
     const ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
     const bool bHasVisibleTarget = IsValid(Controller)
-        && Controller->bCanSeeTarget
-        && IsValid(Controller->TargetActor);
+        && Controller->EnemyMemory.bCanSeeTarget
+        && IsValid(Controller->EnemyMemory.TargetActor);
     return bHasVisibleTarget == bExpectedValue;
 }
 
@@ -25,14 +25,14 @@ EStateTreeRunStatus FJMSimpleEnemyMoveToTargetTask::EnterState(
     const FStateTreeTransitionResult& Transition) const
 {
     ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
-    if (!IsValid(Controller) || !Controller->bCanSeeTarget || !IsValid(Controller->TargetActor))
+    if (!IsValid(Controller) || !Controller->EnemyMemory.bCanSeeTarget || !IsValid(Controller->EnemyMemory.TargetActor))
     {
         // The Chase OnTick transition owns loss handling and moves to RecentTracking.
         return EStateTreeRunStatus::Running;
     }
 
     const EPathFollowingRequestResult::Type MoveResult = Controller->MoveToActor(
-        Controller->TargetActor,
+        Controller->EnemyMemory.TargetActor,
         AcceptanceRadius,
         true,
         true,
@@ -50,7 +50,7 @@ EStateTreeRunStatus FJMSimpleEnemyMoveToTargetTask::Tick(
     const float DeltaTime) const
 {
     ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
-    if (!IsValid(Controller) || !Controller->bCanSeeTarget || !IsValid(Controller->TargetActor))
+    if (!IsValid(Controller) || !Controller->EnemyMemory.bCanSeeTarget || !IsValid(Controller->EnemyMemory.TargetActor))
     {
         return EStateTreeRunStatus::Failed;
     }
@@ -60,7 +60,7 @@ EStateTreeRunStatus FJMSimpleEnemyMoveToTargetTask::Tick(
     if (Controller->GetMoveStatus() == EPathFollowingStatus::Idle)
     {
         const EPathFollowingRequestResult::Type MoveResult = Controller->MoveToActor(
-            Controller->TargetActor,
+            Controller->EnemyMemory.TargetActor,
             AcceptanceRadius,
             true,
             true,
@@ -100,8 +100,8 @@ bool FJMSimpleEnemyHasRecentTrackingMemoryCondition::TestCondition(
 {
     const ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
     return IsValid(Controller)
-        && !Controller->bCanSeeTarget
-        && Controller->bHasRecentTrackingMemory;
+        && !Controller->EnemyMemory.bCanSeeTarget
+        && Controller->EnemyMemory.bHasRecentTrackingMemory;
 }
 
 bool FJMSimpleEnemyHasLiveGraceTrackingCondition::TestCondition(
@@ -109,9 +109,9 @@ bool FJMSimpleEnemyHasLiveGraceTrackingCondition::TestCondition(
 {
     const ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
     return IsValid(Controller)
-        && !Controller->bCanSeeTarget
-        && Controller->bHasLiveGraceTracking
-        && Controller->LiveGraceTargetActor.IsValid();
+        && !Controller->EnemyMemory.bCanSeeTarget
+        && Controller->EnemyMemory.bHasLiveGraceTracking
+        && Controller->EnemyMemory.LiveGraceTargetActor.IsValid();
 }
 
 bool FJMSimpleEnemyHasHeardSoundCondition::TestCondition(
@@ -119,8 +119,8 @@ bool FJMSimpleEnemyHasHeardSoundCondition::TestCondition(
 {
     const ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
     return IsValid(Controller)
-        && !Controller->bCanSeeTarget
-        && Controller->bHasHeardSound;
+        && !Controller->EnemyMemory.bCanSeeTarget
+        && Controller->EnemyMemory.bHasHeardSound;
 }
 
 FJMSimpleEnemyRecentTrackingTask::FJMSimpleEnemyRecentTrackingTask()
@@ -133,14 +133,14 @@ EStateTreeRunStatus FJMSimpleEnemyRecentTrackingTask::EnterState(
     const FStateTreeTransitionResult& Transition) const
 {
     ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
-    if (!IsValid(Controller) || !Controller->bHasRecentTrackingMemory)
+    if (!IsValid(Controller) || !Controller->EnemyMemory.bHasRecentTrackingMemory)
     {
         return EStateTreeRunStatus::Failed;
     }
 
     Context.GetInstanceData(*this).ElapsedTime = 0.0f;
     const EPathFollowingRequestResult::Type MoveResult = Controller->MoveToLocation(
-        Controller->EstimatedTrackingLocation,
+        Controller->EnemyMemory.EstimatedTrackingLocation,
         AcceptanceRadius,
         true,
         true,
@@ -165,7 +165,7 @@ EStateTreeRunStatus FJMSimpleEnemyRecentTrackingTask::Tick(
     }
 
     // Keep running for this tick so the StateTree's reacquisition transition wins.
-    if (Controller->bCanSeeTarget && IsValid(Controller->TargetActor))
+    if (Controller->EnemyMemory.bCanSeeTarget && IsValid(Controller->EnemyMemory.TargetActor))
     {
         return EStateTreeRunStatus::Running;
     }
@@ -174,7 +174,7 @@ EStateTreeRunStatus FJMSimpleEnemyRecentTrackingTask::Tick(
     InstanceData.ElapsedTime += FMath::Max(DeltaTime, 0.0f);
     if (InstanceData.ElapsedTime >= Controller->TrackingMemoryDuration)
     {
-        Controller->bHasRecentTrackingMemory = false;
+        Controller->EnemyMemory.bHasRecentTrackingMemory = false;
         return EStateTreeRunStatus::Succeeded;
     }
 
@@ -188,7 +188,7 @@ void FJMSimpleEnemyRecentTrackingTask::ExitState(
     if (ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner()))
     {
         Controller->StopMovement();
-        Controller->bHasRecentTrackingMemory = false;
+        Controller->EnemyMemory.bHasRecentTrackingMemory = false;
     }
 }
 
@@ -202,10 +202,10 @@ EStateTreeRunStatus FJMSimpleEnemyLiveGraceTrackingTask::EnterState(
     const FStateTreeTransitionResult& Transition) const
 {
     ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
-    AActor* GraceTarget = IsValid(Controller) ? Controller->LiveGraceTargetActor.Get() : nullptr;
+    AActor* GraceTarget = IsValid(Controller) ? Controller->EnemyMemory.LiveGraceTargetActor.Get() : nullptr;
     if (!IsValid(Controller)
-        || Controller->bCanSeeTarget
-        || !Controller->bHasLiveGraceTracking
+        || Controller->EnemyMemory.bCanSeeTarget
+        || !Controller->EnemyMemory.bHasLiveGraceTracking
         || !IsValid(GraceTarget))
     {
         return EStateTreeRunStatus::Failed;
@@ -241,7 +241,7 @@ EStateTreeRunStatus FJMSimpleEnemyLiveGraceTrackingTask::Tick(
     }
 
     // Reacquisition must win before any further hidden-target sampling.
-    if (Controller->bCanSeeTarget && IsValid(Controller->TargetActor))
+    if (Controller->EnemyMemory.bCanSeeTarget && IsValid(Controller->EnemyMemory.TargetActor))
     {
         return EStateTreeRunStatus::Running;
     }
@@ -264,7 +264,7 @@ EStateTreeRunStatus FJMSimpleEnemyLiveGraceTrackingTask::Tick(
     // player moves away again while the same Grace window is still valid.
     if (Controller->GetMoveStatus() == EPathFollowingStatus::Idle)
     {
-        AActor* GraceTarget = Controller->LiveGraceTargetActor.Get();
+        AActor* GraceTarget = Controller->EnemyMemory.LiveGraceTargetActor.Get();
         const EPathFollowingRequestResult::Type MoveResult = IsValid(GraceTarget)
             ? Controller->MoveToActor(
                 GraceTarget,
@@ -328,7 +328,7 @@ EStateTreeRunStatus FJMSimpleEnemyPatrolTask::Tick(
     }
 
     // Keep Patrol alive for this tick so its sight transition can preempt immediately.
-    if (Controller->bCanSeeTarget && IsValid(Controller->TargetActor))
+    if (Controller->EnemyMemory.bCanSeeTarget && IsValid(Controller->EnemyMemory.TargetActor))
     {
         return EStateTreeRunStatus::Running;
     }
@@ -449,13 +449,13 @@ EStateTreeRunStatus FJMSimpleEnemyInvestigateSoundTask::EnterState(
     const FStateTreeTransitionResult& Transition) const
 {
     ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
-    if (!IsValid(Controller) || !Controller->bHasHeardSound || Controller->bCanSeeTarget)
+    if (!IsValid(Controller) || !Controller->EnemyMemory.bHasHeardSound || Controller->EnemyMemory.bCanSeeTarget)
     {
         return EStateTreeRunStatus::Failed;
     }
 
     const EPathFollowingRequestResult::Type MoveResult = Controller->MoveToLocation(
-        Controller->LastHeardLocation,
+        Controller->EnemyMemory.LastHeardLocation,
         AcceptanceRadius,
         true,
         true,
@@ -487,7 +487,7 @@ EStateTreeRunStatus FJMSimpleEnemyInvestigateSoundTask::Tick(
     }
 
     // Sight transitions must preempt before the pending sound is consumed.
-    if (Controller->bCanSeeTarget && IsValid(Controller->TargetActor))
+    if (Controller->EnemyMemory.bCanSeeTarget && IsValid(Controller->EnemyMemory.TargetActor))
     {
         return EStateTreeRunStatus::Running;
     }
@@ -527,7 +527,7 @@ EStateTreeRunStatus FJMSimpleEnemyMoveToLastSeenLocationTask::EnterState(
     }
 
     const EPathFollowingRequestResult::Type MoveResult = Controller->MoveToLocation(
-        Controller->LastSeenLocation,
+        Controller->EnemyMemory.LastSeenLocation,
         AcceptanceRadius,
         true,
         true,
@@ -557,7 +557,7 @@ EStateTreeRunStatus FJMSimpleEnemyMoveToLastSeenLocationTask::Tick(
     }
 
     // Give the StateTree's OnTick transition a chance to resume Chase immediately.
-    if (Controller->bCanSeeTarget && IsValid(Controller->TargetActor))
+    if (Controller->EnemyMemory.bCanSeeTarget && IsValid(Controller->EnemyMemory.TargetActor))
     {
         return EStateTreeRunStatus::Running;
     }
@@ -612,7 +612,7 @@ EStateTreeRunStatus FJMSimpleEnemySearchTask::Tick(
     }
 
     // Keep Search running for this tick so its sight transition can win immediately.
-    if (Controller->bCanSeeTarget && IsValid(Controller->TargetActor))
+    if (Controller->EnemyMemory.bCanSeeTarget && IsValid(Controller->EnemyMemory.TargetActor))
     {
         return EStateTreeRunStatus::Running;
     }

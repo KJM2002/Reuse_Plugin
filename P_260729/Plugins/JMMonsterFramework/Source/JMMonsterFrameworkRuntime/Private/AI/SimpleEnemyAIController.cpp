@@ -58,9 +58,9 @@ void ASimpleEnemyAIController::Tick(const float DeltaSeconds)
 
     // Sampling the actor is deliberately restricted to the confirmed-visible state.
     // After sight loss, RecentTracking uses only the snapshot created in ApplySightState.
-    if (bCanSeeTarget && IsValid(TargetActor))
+    if (EnemyMemory.bCanSeeTarget && IsValid(EnemyMemory.TargetActor))
     {
-        UpdateVisibleObservation(*TargetActor, TargetActor->GetActorLocation());
+        UpdateVisibleObservation(*EnemyMemory.TargetActor, EnemyMemory.TargetActor->GetActorLocation());
     }
 }
 
@@ -171,18 +171,18 @@ void ASimpleEnemyAIController::ApplySightState(
             return;
         }
 
-        const bool bStateChanged = TargetActor != Actor || !bCanSeeTarget;
-        TargetActor = Actor;
-        bCanSeeTarget = true;
-        bHasRecentTrackingMemory = false;
+        const bool bStateChanged = EnemyMemory.TargetActor != Actor || !EnemyMemory.bCanSeeTarget;
+        EnemyMemory.TargetActor = Actor;
+        EnemyMemory.bCanSeeTarget = true;
+        EnemyMemory.bHasRecentTrackingMemory = false;
         EndLiveGraceTracking();
         ClearHeardSound();
         if (FAISystem::IsValidLocation(ObservedLocation))
         {
-            LastSeenLocation = ObservedLocation;
+            EnemyMemory.LastSeenLocation = ObservedLocation;
         }
-        LastSeenVelocity = ObservedVelocity;
-        LastSeenTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+        EnemyMemory.LastSeenVelocity = ObservedVelocity;
+        EnemyMemory.LastSeenTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 
         if (bStateChanged)
         {
@@ -191,27 +191,27 @@ void ASimpleEnemyAIController::ApplySightState(
         return;
     }
 
-    if (TargetActor != Actor)
+    if (EnemyMemory.TargetActor != Actor)
     {
         return;
     }
 
-    const bool bWasVisible = bCanSeeTarget;
+    const bool bWasVisible = EnemyMemory.bCanSeeTarget;
     if (FAISystem::IsValidLocation(ObservedLocation))
     {
         // Sight reports its stored successful stimulus location on loss. Do not
         // sample Actor here: it may already be moving unseen behind an obstacle.
-        LastSeenLocation = ObservedLocation;
+        EnemyMemory.LastSeenLocation = ObservedLocation;
     }
 
-    const FVector PredictionOffset = (LastSeenVelocity * TrackingMemoryDuration)
+    const FVector PredictionOffset = (EnemyMemory.LastSeenVelocity * TrackingMemoryDuration)
         .GetClampedToMaxSize(MaximumPredictionDistance);
-    EstimatedTrackingLocation = LastSeenLocation + PredictionOffset;
-    bHasRecentTrackingMemory = TrackingMemoryDuration > 0.0f;
-    LiveGraceTargetActor = Actor;
-    bHasLiveGraceTracking = LiveGraceDuration > 0.0f && IsValid(Actor);
-    TargetActor = nullptr;
-    bCanSeeTarget = false;
+    EnemyMemory.EstimatedTrackingLocation = EnemyMemory.LastSeenLocation + PredictionOffset;
+    EnemyMemory.bHasRecentTrackingMemory = TrackingMemoryDuration > 0.0f;
+    EnemyMemory.LiveGraceTargetActor = Actor;
+    EnemyMemory.bHasLiveGraceTracking = LiveGraceDuration > 0.0f && IsValid(Actor);
+    EnemyMemory.TargetActor = nullptr;
+    EnemyMemory.bCanSeeTarget = false;
 
     if (bWasVisible)
     {
@@ -233,7 +233,7 @@ void ASimpleEnemyAIController::ApplyHearingState(
     {
         RejectionReason = TEXT("StimulusFailed");
     }
-    else if (bCanSeeTarget)
+    else if (EnemyMemory.bCanSeeTarget)
     {
         RejectionReason = TEXT("SightActive");
     }
@@ -261,8 +261,8 @@ void ASimpleEnemyAIController::ApplyHearingState(
         return;
     }
 
-    LastHeardLocation = HeardLocation;
-    bHasHeardSound = true;
+    EnemyMemory.LastHeardLocation = HeardLocation;
+    EnemyMemory.bHasHeardSound = true;
     UE_LOG(
         LogJMMonsterFramework,
         Log,
@@ -276,35 +276,35 @@ void ASimpleEnemyAIController::ApplyHearingState(
 
 void ASimpleEnemyAIController::ClearHeardSound()
 {
-    bHasHeardSound = false;
+    EnemyMemory.bHasHeardSound = false;
 }
 
 bool ASimpleEnemyAIController::UpdateLiveGraceLastKnownLocation()
 {
-    AActor* GraceTarget = LiveGraceTargetActor.Get();
-    if (bCanSeeTarget || !bHasLiveGraceTracking || !IsValid(GraceTarget))
+    AActor* GraceTarget = EnemyMemory.LiveGraceTargetActor.Get();
+    if (EnemyMemory.bCanSeeTarget || !EnemyMemory.bHasLiveGraceTracking || !IsValid(GraceTarget))
     {
         return false;
     }
 
-    LastSeenLocation = GraceTarget->GetActorLocation();
-    LastSeenTime = GetWorld() ? GetWorld()->GetTimeSeconds() : LastSeenTime;
+    EnemyMemory.LastSeenLocation = GraceTarget->GetActorLocation();
+    EnemyMemory.LastSeenTime = GetWorld() ? GetWorld()->GetTimeSeconds() : EnemyMemory.LastSeenTime;
     return true;
 }
 
 void ASimpleEnemyAIController::EndLiveGraceTracking()
 {
-    bHasLiveGraceTracking = false;
-    LiveGraceTargetActor.Reset();
+    EnemyMemory.bHasLiveGraceTracking = false;
+    EnemyMemory.LiveGraceTargetActor.Reset();
 }
 
 bool ASimpleEnemyAIController::IsTargetInAttackRange() const
 {
     const APawn* ControlledPawn = GetPawn();
-    return bCanSeeTarget
-        && IsValid(TargetActor)
+    return EnemyMemory.bCanSeeTarget
+        && IsValid(EnemyMemory.TargetActor)
         && IsValid(ControlledPawn)
-        && FVector::DistSquared(ControlledPawn->GetActorLocation(), TargetActor->GetActorLocation())
+        && FVector::DistSquared(ControlledPawn->GetActorLocation(), EnemyMemory.TargetActor->GetActorLocation())
             <= FMath::Square(AttackRange);
 }
 
@@ -324,14 +324,14 @@ bool ASimpleEnemyAIController::PerformBasicAttack()
     }
 
     FDamageEvent DamageEvent;
-    TargetActor->TakeDamage(Damage, DamageEvent, this, GetPawn());
+    EnemyMemory.TargetActor->TakeDamage(Damage, DamageEvent, this, GetPawn());
     LastBasicAttackTime = CurrentTime;
     UE_LOG(
         LogJMMonsterFramework,
         Log,
         TEXT("BasicAttack: %s damaged %s for %.1f"),
         *GetNameSafe(GetPawn()),
-        *GetNameSafe(TargetActor),
+        *GetNameSafe(EnemyMemory.TargetActor),
         Damage);
     return true;
 }
@@ -340,15 +340,15 @@ void ASimpleEnemyAIController::UpdateVisibleObservation(
     AActor& VisibleActor,
     const FVector& ObservedLocation)
 {
-    if (!bCanSeeTarget || TargetActor != &VisibleActor)
+    if (!EnemyMemory.bCanSeeTarget || EnemyMemory.TargetActor != &VisibleActor)
     {
         return;
     }
 
     if (FAISystem::IsValidLocation(ObservedLocation))
     {
-        LastSeenLocation = ObservedLocation;
+        EnemyMemory.LastSeenLocation = ObservedLocation;
     }
-    LastSeenVelocity = VisibleActor.GetVelocity();
-    LastSeenTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+    EnemyMemory.LastSeenVelocity = VisibleActor.GetVelocity();
+    EnemyMemory.LastSeenTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 }

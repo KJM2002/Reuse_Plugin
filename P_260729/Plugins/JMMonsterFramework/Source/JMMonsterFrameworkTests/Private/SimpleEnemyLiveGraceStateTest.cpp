@@ -27,27 +27,27 @@ bool FJMSimpleEnemyLiveGraceStateTest::RunTest(const FString& Parameters)
     Controller->ApplySightState(PlayerTarget.Get(), true, VisibleLocation, FVector(300.0, 0.0, 0.0));
     Controller->ApplySightState(PlayerTarget.Get(), false, SightLossLocation, FVector::ZeroVector);
 
-    TestNull(TEXT("Predictive TargetActor still clears on sight loss"), Controller->TargetActor.Get());
-    TestFalse(TEXT("Sight flag clears on loss"), Controller->bCanSeeTarget);
-    TestTrue(TEXT("Live Grace starts on loss"), Controller->bHasLiveGraceTracking);
-    TestEqual(TEXT("Live Grace retains only its weak target"), Controller->LiveGraceTargetActor.Get(), PlayerTarget.Get());
+    TestNull(TEXT("Predictive TargetActor still clears on sight loss"), Controller->EnemyMemory.TargetActor.Get());
+    TestFalse(TEXT("Sight flag clears on loss"), Controller->EnemyMemory.bCanSeeTarget);
+    TestTrue(TEXT("Live Grace starts on loss"), Controller->EnemyMemory.bHasLiveGraceTracking);
+    TestEqual(TEXT("Live Grace retains only its weak target"), Controller->EnemyMemory.LiveGraceTargetActor.Get(), PlayerTarget.Get());
 
     PlayerRoot->SetWorldLocation(GraceLocation);
     TestTrue(TEXT("Live Grace may sample the hidden target while valid"), Controller->UpdateLiveGraceLastKnownLocation());
-    TestEqual(TEXT("Grace sampling refreshes the investigate location"), Controller->LastSeenLocation, GraceLocation);
+    TestEqual(TEXT("Grace sampling refreshes the investigate location"), Controller->EnemyMemory.LastSeenLocation, GraceLocation);
 
     Controller->EndLiveGraceTracking();
     PlayerRoot->SetWorldLocation(PostExpiryLocation);
     TestFalse(TEXT("Expired Live Grace cannot sample the target"), Controller->UpdateLiveGraceLastKnownLocation());
-    TestEqual(TEXT("Post-expiry movement cannot change memory"), Controller->LastSeenLocation, GraceLocation);
-    TestFalse(TEXT("Expiry consumes the Grace flag"), Controller->bHasLiveGraceTracking);
-    TestFalse(TEXT("Expiry releases the weak target"), Controller->LiveGraceTargetActor.IsValid());
+    TestEqual(TEXT("Post-expiry movement cannot change memory"), Controller->EnemyMemory.LastSeenLocation, GraceLocation);
+    TestFalse(TEXT("Expiry consumes the Grace flag"), Controller->EnemyMemory.bHasLiveGraceTracking);
+    TestFalse(TEXT("Expiry releases the weak target"), Controller->EnemyMemory.LiveGraceTargetActor.IsValid());
 
     Controller->ApplySightState(PlayerTarget.Get(), true, PostExpiryLocation, FVector(0.0, 300.0, 0.0));
-    TestFalse(TEXT("Reacquisition leaves old Grace inactive"), Controller->bHasLiveGraceTracking);
+    TestFalse(TEXT("Reacquisition leaves old Grace inactive"), Controller->EnemyMemory.bHasLiveGraceTracking);
     Controller->ApplySightState(PlayerTarget.Get(), false, PostExpiryLocation, FVector::ZeroVector);
-    TestTrue(TEXT("A second loss starts a fresh Grace event"), Controller->bHasLiveGraceTracking);
-    TestEqual(TEXT("A second loss retains the target again"), Controller->LiveGraceTargetActor.Get(), PlayerTarget.Get());
+    TestTrue(TEXT("A second loss starts a fresh Grace event"), Controller->EnemyMemory.bHasLiveGraceTracking);
+    TestEqual(TEXT("A second loss retains the target again"), Controller->EnemyMemory.LiveGraceTargetActor.Get(), PlayerTarget.Get());
 
     return true;
 }

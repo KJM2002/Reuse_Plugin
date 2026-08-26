@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 7 Architecture"
+title: "JMMonsterFramework Phase 8 Architecture"
 status: Current
 authority: Canonical
-scope: "JMMonsterFramework Phase 0-7 runtime architecture"
+scope: "JMMonsterFramework Phase 0-8 runtime architecture"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -27,10 +27,11 @@ related:
 - Phase 5: 비상호작용 상태에서 도달 가능한 NavMesh 지점을 반복 방문하는 Patrol
 - Phase 6: 가시 Player가 공격 범위 안에 있을 때 이동을 멈추고 Cooldown 기반 Damage 적용
 - Phase 7: AI Hearing으로 단일 소리 위치를 기억하고 조사한 뒤 Patrol 복귀
+- Phase 8: 실제 사용 중인 Sight, Hearing, Predictive, Live Grace 사실을 단일 `EnemyMemory` 소유 구조로 정리
 
 ## 비책임
 
-Listener, 소음 단계/누적/Threat Score, Suspicion, Combo, Ability/Animation Framework, 장기·복수 대상 Memory는 제공하지 않는다.
+Listener, 소음 단계/누적/Threat Score, Suspicion, Combo, Ability/Animation Framework, Memory Manager/Subsystem/Interface, 장기·복수 대상 Memory는 제공하지 않는다.
 
 ## 모듈과 의존성
 
@@ -43,7 +44,9 @@ Predictive 정책은 기존 `/JMMonsterFramework/AI/ST_SimpleEnemy`, Live Grace 
 
 ## 데이터 흐름과 상태 전이
 
-AI Sight가 플레이어 Pawn을 감지하면 Controller가 `TargetActor`, `bCanSeeTarget`, `LastSeenLocation`, `LastSeenVelocity`, `LastSeenTime`을 갱신한다. 이 갱신은 `bCanSeeTarget`이 참인 동안에만 수행된다. Lost 자극에는 Sight가 보관한 마지막 성공 자극 위치가 들어오므로, 숨은 Actor의 현재 위치나 속도를 다시 읽지 않는다. 마지막 가시 속도에 1.5초를 곱하고 700uu로 제한한 오프셋을 마지막 관측 위치에 더해 `EstimatedTrackingLocation`을 한 번 만든 뒤 `TargetActor`를 즉시 비운다.
+AI Perception 콜백은 Controller의 단일 `EnemyMemory`를 갱신하고, StateTree 조건과 Task는 그 값을 읽어 행동을 결정한다. `EnemyMemory` 자체에는 Chase, Investigate 같은 행동 분기가 없다.
+
+AI Sight가 플레이어 Pawn을 감지하면 `EnemyMemory`의 `TargetActor`, `bCanSeeTarget`, `LastSeenLocation`, `LastSeenVelocity`, `LastSeenTime`을 갱신한다. 이 갱신은 `bCanSeeTarget`이 참인 동안에만 수행된다. Lost 자극에는 Sight가 보관한 마지막 성공 자극 위치가 들어오므로, 숨은 Actor의 현재 위치나 속도를 다시 읽지 않는다. 마지막 가시 속도에 1.5초를 곱하고 700uu로 제한한 오프셋을 마지막 관측 위치에 더해 `EstimatedTrackingLocation`을 한 번 만든 뒤 `TargetActor`를 즉시 비운다.
 
 ```text
 Patrol -- 보임 --> Chase
@@ -70,7 +73,9 @@ Live Grace StateTree만 `LiveGraceTargetActor` 약한 참조를 사용한다. Si
 
 Attack은 두 StateTree에서 동일한 Task와 조건을 사용한다. 150uu 안의 가시 Target만 선택하고 진입 시 `StopMovement` 후 `TakeDamage(10)`을 호출한다. 마지막 성공 공격 시간은 Controller에 남아 Attack/Chase 경계를 반복해도 1초 Cooldown을 우회할 수 없다. Attack Task는 Move 요청을 생성하지 않으며, 범위 이탈은 Chase로, Sight Lost는 각 트리 고유의 RecentTracking 또는 LiveGraceTracking으로 직접 전환한다.
 
-Perception 콜백은 Sense ID로 Sight와 Hearing을 먼저 분리한다. 성공한 Hearing 자극의 유효 위치 하나만 `LastHeardLocation`에 저장하며 Sight가 활성화된 동안에는 저장하지 않는다. `InvestigateSound`는 이 위치의 스냅샷으로만 `MoveToLocation`을 수행하고 도착·경로 실패 후 메모리를 소비해 Patrol로 돌아간다. 조사 중 Player를 실제로 보면 Hearing 메모리를 폐기하고 Attack 또는 Chase가 즉시 우선한다.
+Perception 콜백은 Sense ID로 Sight와 Hearing을 먼저 분리한다. 성공한 Hearing 자극의 유효 위치 하나만 `EnemyMemory.LastHeardLocation`에 저장하며 Sight가 활성화된 동안에는 저장하지 않는다. `InvestigateSound`는 이 위치의 스냅샷으로만 `MoveToLocation`을 수행하고 도착·경로 실패 후 메모리를 소비해 Patrol로 돌아간다. 조사 중 Player를 실제로 보면 Hearing 메모리를 폐기하고 Attack 또는 Chase가 즉시 우선한다.
+
+Phase 8은 새 행동을 추가하지 않는다. Controller의 이전 개별 런타임 변수는 제거됐고 Predictive와 Live Grace StateTree는 통합되지 않은 채 각각 같은 `EnemyMemory`에서 필요한 사실만 읽는다.
 
 ## 수명과 실패 동작
 

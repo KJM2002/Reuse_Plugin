@@ -31,8 +31,8 @@ bool FJMSimpleEnemyBasicAttackTest::RunTest(const FString& Parameters)
     if (Enemy && Target && Controller)
     {
         Controller->Possess(Enemy);
-        Controller->TargetActor = Target;
-        Controller->bCanSeeTarget = true;
+        Controller->EnemyMemory.TargetActor = Target;
+        Controller->EnemyMemory.bCanSeeTarget = true;
 
         TestFalse(TEXT("Target outside 150uu is not in attack range"), Controller->IsTargetInAttackRange());
         TestFalse(TEXT("Target outside range cannot be damaged"), Controller->PerformBasicAttack());

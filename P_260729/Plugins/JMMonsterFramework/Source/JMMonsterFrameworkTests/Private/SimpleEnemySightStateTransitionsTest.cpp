@@ -17,13 +17,13 @@ bool FJMSimpleEnemySightStateTransitionsTest::RunTest(const FString& Parameters)
     TStrongObjectPtr<AActor> PlayerTarget(NewObject<AActor>());
     TStrongObjectPtr<AActor> UnrelatedTarget(NewObject<AActor>());
 
-    TestNull(TEXT("Target starts empty"), Controller->TargetActor.Get());
-    TestFalse(TEXT("Sight starts false"), Controller->bCanSeeTarget);
-    TestEqual(TEXT("Last seen location starts at zero"), Controller->LastSeenLocation, FVector::ZeroVector);
+    TestNull(TEXT("Target starts empty"), Controller->EnemyMemory.TargetActor.Get());
+    TestFalse(TEXT("Sight starts false"), Controller->EnemyMemory.bCanSeeTarget);
+    TestEqual(TEXT("Last seen location starts at zero"), Controller->EnemyMemory.LastSeenLocation, FVector::ZeroVector);
 
     Controller->ApplySightState(nullptr, true, FVector(1.0, 2.0, 3.0), FVector(4.0, 5.0, 6.0));
-    TestNull(TEXT("Null detection is ignored"), Controller->TargetActor.Get());
-    TestFalse(TEXT("Null detection does not enable sight"), Controller->bCanSeeTarget);
+    TestNull(TEXT("Null detection is ignored"), Controller->EnemyMemory.TargetActor.Get());
+    TestFalse(TEXT("Null detection does not enable sight"), Controller->EnemyMemory.bCanSeeTarget);
 
     for (int32 Iteration = 0; Iteration < 20; ++Iteration)
     {
@@ -35,32 +35,32 @@ bool FJMSimpleEnemySightStateTransitionsTest::RunTest(const FString& Parameters)
         Controller->ApplySightState(PlayerTarget.Get(), true, DetectedLocation, DetectedVelocity);
         TestEqual(
             FString::Printf(TEXT("Detected target is stable on iteration %d"), Iteration + 1),
-            Controller->TargetActor.Get(),
+            Controller->EnemyMemory.TargetActor.Get(),
             PlayerTarget.Get());
         TestTrue(
             FString::Printf(TEXT("Detected flag is true on iteration %d"), Iteration + 1),
-            Controller->bCanSeeTarget);
+            Controller->EnemyMemory.bCanSeeTarget);
         TestEqual(
             FString::Printf(TEXT("Detection stores observed location on iteration %d"), Iteration + 1),
-            Controller->LastSeenLocation,
+            Controller->EnemyMemory.LastSeenLocation,
             DetectedLocation);
         TestEqual(
             FString::Printf(TEXT("Detection stores visible velocity on iteration %d"), Iteration + 1),
-            Controller->LastSeenVelocity,
+            Controller->EnemyMemory.LastSeenVelocity,
             DetectedVelocity);
 
         Controller->ApplySightState(PlayerTarget.Get(), true, LastObservedLocation, LastObservedVelocity);
         TestEqual(
             FString::Printf(TEXT("Duplicate detection does not change target on iteration %d"), Iteration + 1),
-            Controller->TargetActor.Get(),
+            Controller->EnemyMemory.TargetActor.Get(),
             PlayerTarget.Get());
         TestEqual(
             FString::Printf(TEXT("Visible update refreshes last seen location on iteration %d"), Iteration + 1),
-            Controller->LastSeenLocation,
+            Controller->EnemyMemory.LastSeenLocation,
             LastObservedLocation);
         TestEqual(
             FString::Printf(TEXT("Visible update refreshes last seen velocity on iteration %d"), Iteration + 1),
-            Controller->LastSeenVelocity,
+            Controller->EnemyMemory.LastSeenVelocity,
             LastObservedVelocity);
 
         Controller->ApplySightState(
@@ -70,14 +70,14 @@ bool FJMSimpleEnemySightStateTransitionsTest::RunTest(const FString& Parameters)
             FVector(-9999.0, -9999.0, -9999.0));
         TestEqual(
             FString::Printf(TEXT("Unrelated loss does not clear target on iteration %d"), Iteration + 1),
-            Controller->TargetActor.Get(),
+            Controller->EnemyMemory.TargetActor.Get(),
             PlayerTarget.Get());
         TestTrue(
             FString::Printf(TEXT("Unrelated loss preserves sight on iteration %d"), Iteration + 1),
-            Controller->bCanSeeTarget);
+            Controller->EnemyMemory.bCanSeeTarget);
         TestEqual(
             FString::Printf(TEXT("Unrelated loss preserves memory on iteration %d"), Iteration + 1),
-            Controller->LastSeenLocation,
+            Controller->EnemyMemory.LastSeenLocation,
             LastObservedLocation);
 
         Controller->ApplySightState(
@@ -87,23 +87,23 @@ bool FJMSimpleEnemySightStateTransitionsTest::RunTest(const FString& Parameters)
             FVector(-9999.0, -9999.0, -9999.0));
         TestNull(
             FString::Printf(TEXT("Lost clears target on iteration %d"), Iteration + 1),
-            Controller->TargetActor.Get());
+            Controller->EnemyMemory.TargetActor.Get());
         TestFalse(
             FString::Printf(TEXT("Lost clears flag on iteration %d"), Iteration + 1),
-            Controller->bCanSeeTarget);
+            Controller->EnemyMemory.bCanSeeTarget);
         TestEqual(
             FString::Printf(TEXT("Lost preserves the actual observed location on iteration %d"), Iteration + 1),
-            Controller->LastSeenLocation,
+            Controller->EnemyMemory.LastSeenLocation,
             LastObservedLocation);
         TestEqual(
             FString::Printf(TEXT("Lost preserves the last visible velocity on iteration %d"), Iteration + 1),
-            Controller->LastSeenVelocity,
+            Controller->EnemyMemory.LastSeenVelocity,
             LastObservedVelocity);
         TestTrue(
             FString::Printf(TEXT("Lost enables recent tracking on iteration %d"), Iteration + 1),
-            Controller->bHasRecentTrackingMemory);
+            Controller->EnemyMemory.bHasRecentTrackingMemory);
 
-        const FVector PredictionOffset = Controller->EstimatedTrackingLocation - LastObservedLocation;
+        const FVector PredictionOffset = Controller->EnemyMemory.EstimatedTrackingLocation - LastObservedLocation;
         TestTrue(
             FString::Printf(TEXT("Prediction follows the last visible direction on iteration %d"), Iteration + 1),
             FVector::DotProduct(PredictionOffset, LastObservedVelocity) > 0.0);
@@ -111,7 +111,7 @@ bool FJMSimpleEnemySightStateTransitionsTest::RunTest(const FString& Parameters)
             FString::Printf(TEXT("Prediction distance is capped on iteration %d"), Iteration + 1),
             PredictionOffset.Size() <= Controller->MaximumPredictionDistance + UE_KINDA_SMALL_NUMBER);
 
-        const FVector EstimatedBeforeDuplicateLoss = Controller->EstimatedTrackingLocation;
+        const FVector EstimatedBeforeDuplicateLoss = Controller->EnemyMemory.EstimatedTrackingLocation;
         Controller->ApplySightState(
             PlayerTarget.Get(),
             false,
@@ -119,14 +119,14 @@ bool FJMSimpleEnemySightStateTransitionsTest::RunTest(const FString& Parameters)
             FVector(-8888.0, -8888.0, -8888.0));
         TestNull(
             FString::Printf(TEXT("Duplicate loss remains stable on iteration %d"), Iteration + 1),
-            Controller->TargetActor.Get());
+            Controller->EnemyMemory.TargetActor.Get());
         TestEqual(
             FString::Printf(TEXT("Duplicate loss cannot move remembered location on iteration %d"), Iteration + 1),
-            Controller->LastSeenLocation,
+            Controller->EnemyMemory.LastSeenLocation,
             LastObservedLocation);
         TestEqual(
             FString::Printf(TEXT("Duplicate loss cannot change the cached prediction on iteration %d"), Iteration + 1),
-            Controller->EstimatedTrackingLocation,
+            Controller->EnemyMemory.EstimatedTrackingLocation,
             EstimatedBeforeDuplicateLoss);
     }
 

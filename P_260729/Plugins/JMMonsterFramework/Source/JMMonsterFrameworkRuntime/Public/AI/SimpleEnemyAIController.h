@@ -9,6 +9,46 @@ class UStateTree;
 class UStateTreeAIComponent;
 class UAISenseConfig_Hearing;
 
+/** Runtime perception and tracking facts owned by one enemy. Contains no behavior decisions. */
+USTRUCT(BlueprintType)
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyMemory
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sight")
+    TObjectPtr<AActor> TargetActor = nullptr;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sight")
+    bool bCanSeeTarget = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sight")
+    FVector LastSeenLocation = FVector::ZeroVector;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sight")
+    FVector LastSeenVelocity = FVector::ZeroVector;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sight")
+    float LastSeenTime = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Predictive Tracking")
+    FVector EstimatedTrackingLocation = FVector::ZeroVector;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Predictive Tracking")
+    bool bHasRecentTrackingMemory = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Live Grace Tracking")
+    TWeakObjectPtr<AActor> LiveGraceTargetActor;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Live Grace Tracking")
+    bool bHasLiveGraceTracking = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Hearing")
+    FVector LastHeardLocation = FVector::ZeroVector;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Hearing")
+    bool bHasHeardSound = false;
+};
+
 /**
  * Minimal controller that chases a visible player and investigates the last sight location.
  */
@@ -23,29 +63,9 @@ public:
     virtual void OnPossess(APawn* InPawn) override;
     virtual void Tick(float DeltaSeconds) override;
 
-    /** Player-controlled pawn currently confirmed by AI Sight. */
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Perception")
-    TObjectPtr<AActor> TargetActor = nullptr;
-
-    /** True only while AI Sight currently confirms TargetActor. */
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Perception")
-    bool bCanSeeTarget = false;
-
-    /** Most recent location reported by AI Sight for the current/previous player target. */
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Perception")
-    FVector LastSeenLocation = FVector::ZeroVector;
-
-    /** Velocity sampled only while AI Sight confirms the player is visible. */
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Perception")
-    FVector LastSeenVelocity = FVector::ZeroVector;
-
-    /** World time of the most recent visible observation. */
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Perception")
-    float LastSeenTime = 0.0f;
-
-    /** One-shot destination predicted from the final visible location and velocity. */
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Tracking")
-    FVector EstimatedTrackingLocation = FVector::ZeroVector;
+    /** Single owner of the perception and tracking facts currently used by the enemy. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Memory")
+    FJMSimpleEnemyMemory EnemyMemory;
 
     /** Short window in which RecentTracking follows its cached prediction. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "JM Monster Framework|Tracking", meta = (ClampMin = "0.0"))
@@ -55,21 +75,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "JM Monster Framework|Tracking", meta = (ClampMin = "0.0"))
     float MaximumPredictionDistance = 700.0f;
 
-    /** True between a confirmed sight loss and RecentTracking expiry/reacquisition. */
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Tracking")
-    bool bHasRecentTrackingMemory = false;
-
-    /** Player retained only for the independently selected Live Grace StateTree. */
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Live Grace")
-    TWeakObjectPtr<AActor> LiveGraceTargetActor;
-
     /** Maximum time the Live Grace StateTree may follow the hidden player's live position. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "JM Monster Framework|Live Grace", meta = (ClampMin = "0.0"))
     float LiveGraceDuration = 1.5f;
-
-    /** True after sight loss until reacquisition or explicit Live Grace expiry. */
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Live Grace")
-    bool bHasLiveGraceTracking = false;
 
     /** Updates LastSeenLocation from the live target only while Live Grace is valid. */
     bool UpdateLiveGraceLastKnownLocation();
@@ -98,14 +106,6 @@ public:
 
     /** Applies one basic attack to the currently visible in-range player. */
     bool PerformBasicAttack();
-
-    /** Most recent valid AI Hearing stimulus location. */
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Hearing")
-    FVector LastHeardLocation = FVector::ZeroVector;
-
-    /** True while a heard location is waiting to be investigated. */
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Hearing")
-    bool bHasHeardSound = false;
 
     /** Clears the single pending sound after investigation or Sight preemption. */
     void ClearHeardSound();
@@ -144,5 +144,6 @@ private:
     friend class FJMSimpleEnemyLiveGraceAssetsTest;
     friend class FJMSimpleEnemyLiveGraceStateTest;
     friend class FJMSimpleEnemyHearingStateTest;
+    friend class FJMSimpleEnemyMemoryRuntimeTest;
 #endif
 };

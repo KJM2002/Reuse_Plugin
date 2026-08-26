@@ -62,28 +62,28 @@ bool FJMSimpleEnemyHearingStateTest::RunTest(const FString& Parameters)
         TEXT("Runtime Perception listener contains Hearing configuration"),
         Perception ? Perception->GetSenseConfig(UAISense::GetSenseID<UAISense_Hearing>()) : nullptr);
 
-    TestFalse(TEXT("Hearing memory starts empty"), Controller->bHasHeardSound);
+    TestFalse(TEXT("Hearing memory starts empty"), Controller->EnemyMemory.bHasHeardSound);
     Controller->ApplyHearingState(SoundSource.Get(), false, HeardLocation);
-    TestFalse(TEXT("Unsuccessful Hearing stimulus is ignored"), Controller->bHasHeardSound);
+    TestFalse(TEXT("Unsuccessful Hearing stimulus is ignored"), Controller->EnemyMemory.bHasHeardSound);
 
     Controller->ApplyHearingState(SoundSource.Get(), true, FAISystem::InvalidLocation);
-    TestFalse(TEXT("Invalid Hearing location is ignored"), Controller->bHasHeardSound);
+    TestFalse(TEXT("Invalid Hearing location is ignored"), Controller->EnemyMemory.bHasHeardSound);
 
     Controller->ApplyHearingState(SoundSource.Get(), true, HeardLocation);
-    TestTrue(TEXT("Valid Hearing stimulus creates one pending sound"), Controller->bHasHeardSound);
-    TestEqual(TEXT("Valid Hearing stimulus stores its location"), Controller->LastHeardLocation, HeardLocation);
-    TestFalse(TEXT("Hearing alone never enables Sight"), Controller->bCanSeeTarget);
-    TestNull(TEXT("Hearing alone never assigns the Sight target"), Controller->TargetActor.Get());
+    TestTrue(TEXT("Valid Hearing stimulus creates one pending sound"), Controller->EnemyMemory.bHasHeardSound);
+    TestEqual(TEXT("Valid Hearing stimulus stores its location"), Controller->EnemyMemory.LastHeardLocation, HeardLocation);
+    TestFalse(TEXT("Hearing alone never enables Sight"), Controller->EnemyMemory.bCanSeeTarget);
+    TestNull(TEXT("Hearing alone never assigns the Sight target"), Controller->EnemyMemory.TargetActor.Get());
 
-    Controller->bCanSeeTarget = true;
+    Controller->EnemyMemory.bCanSeeTarget = true;
     Controller->ApplyHearingState(SoundSource.Get(), true, IgnoredLocation);
-    TestEqual(TEXT("Sight priority prevents Hearing memory replacement"), Controller->LastHeardLocation, HeardLocation);
+    TestEqual(TEXT("Sight priority prevents Hearing memory replacement"), Controller->EnemyMemory.LastHeardLocation, HeardLocation);
 
-    Controller->bCanSeeTarget = false;
+    Controller->EnemyMemory.bCanSeeTarget = false;
     Controller->ApplySightState(VisibleTarget.Get(), true, FVector::ZeroVector, FVector::ZeroVector);
-    TestFalse(TEXT("Sight acquisition consumes pending Hearing memory"), Controller->bHasHeardSound);
-    TestTrue(TEXT("Sight acquisition remains active"), Controller->bCanSeeTarget);
-    TestEqual(TEXT("Sight acquisition owns TargetActor"), Controller->TargetActor.Get(), VisibleTarget.Get());
+    TestFalse(TEXT("Sight acquisition consumes pending Hearing memory"), Controller->EnemyMemory.bHasHeardSound);
+    TestTrue(TEXT("Sight acquisition remains active"), Controller->EnemyMemory.bCanSeeTarget);
+    TestEqual(TEXT("Sight acquisition owns TargetActor"), Controller->EnemyMemory.TargetActor.Get(), VisibleTarget.Get());
 
     return true;
 }

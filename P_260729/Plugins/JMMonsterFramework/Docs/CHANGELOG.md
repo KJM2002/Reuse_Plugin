@@ -11,6 +11,16 @@ owners:
 
 # Changelog
 
+## 1.8.0 - 2026-08-26
+
+### Changed
+
+- 실제 사용 중인 Sight, Hearing, Predictive, Live Grace 데이터를 `FJMSimpleEnemyMemory` 하나로 이동
+- AI Perception은 Memory 사실만 갱신하고 기존 StateTree가 행동을 결정하도록 책임 분리
+- Predictive와 Live Grace StateTree의 Lost Sight 정책 및 독립 에셋 구조 유지
+- 실제 BP Enemy/Controller/Player와 AI System을 사용하는 Sight/Hearing 런타임 통합 검사 추가
+- Enemy/Controller Blueprint 네 개를 재컴파일해 제거된 Controller 변수 참조와 Native 기본값 직렬화 회귀 검사
+
 ## 1.7.0 - 2026-08-26
 
 ### Added

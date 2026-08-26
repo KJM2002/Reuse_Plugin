@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 7"
+title: "JMMonsterFramework Phase 8"
 status: Current
 authority: Guide
-scope: "JMMonsterFramework Phase 0-7 setup and usage"
+scope: "JMMonsterFramework Phase 0-8 setup and usage"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -20,16 +20,18 @@ related:
   - "Testing/PHASE5_PATROL_TEST_KO.md"
   - "Testing/PHASE6_BASIC_ATTACK_TEST_KO.md"
   - "Testing/PHASE7_BASIC_HEARING_TEST_KO.md"
+  - "Testing/PHASE8_MEMORY_REFACTOR_TEST_KO.md"
 ---
 
-# JMMonsterFramework Phase 7
+# JMMonsterFramework Phase 8
 
 현재 범위는 Enemy 자동 Possession, NavMesh Patrol, Sight/Hearing, Chase, Basic Attack, 선택 가능한 Lost Sight Tracking, 위치 조사와 유한 Search다.
 
 ## 포함 기능
 
 - `ASimpleEnemyCharacter`: Capsule, Mesh, CharacterMovement를 사용하는 최소 Enemy
-- `ASimpleEnemyAIController`: Sight 상태, 마지막 가시 위치·속도, 제한된 예상 위치와 StateTree 실행 소유
+- `ASimpleEnemyAIController`: Perception, 단일 `EnemyMemory`, StateTree 실행 소유
+- `FJMSimpleEnemyMemory`: 현재 실제 사용하는 Sight, Hearing, Predictive, Live Grace 사실만 보관하며 행동을 결정하지 않음
 - `ST_SimpleEnemy`: `Patrol`, `Chase`, `Attack`, `RecentTracking`, `InvestigateLastLocation`, `Search`, `InvestigateSound`
 - `ST_SimpleEnemy_LiveGrace`: `Patrol`, `Chase`, `Attack`, `LiveGraceTracking`, `InvestigateLastLocation`, `Search`, `InvestigateSound`
 - `Patrol`: 반경 800uu 안의 도달 가능한 NavMesh 목적지를 반복 방문하고 1.5초 대기
@@ -51,4 +53,4 @@ related:
 
 Predictive 방식은 기존 `BP_SimpleEnemy`, Live Grace 방식은 `BP_SimpleEnemy_LiveGrace`를 배치해 독립적으로 비교한다.
 
-Listener, 복잡한 소음 단계/점수, Suspicion, Combo, Ability/Animation Framework와 장기 Memory는 포함되지 않는다.
+Listener, 복잡한 소음 단계/점수, Suspicion, Combo, Ability/Animation Framework와 장기·복수 대상 Memory Framework는 포함되지 않는다.

@@ -77,6 +77,10 @@
 		{
 			"Name": "CableComponent",
 			"Enabled": true
+		},
+		{
+			"Name": "FunctionalTestingEditor",
+			"Enabled": true
 		}
 	]
 }
