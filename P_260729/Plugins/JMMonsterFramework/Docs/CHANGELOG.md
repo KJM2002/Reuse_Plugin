@@ -11,6 +11,17 @@ owners:
 
 # Changelog
 
+## 1.7.0 - 2026-08-26
+
+### Added
+
+- 1500uu 범위의 AI Perception Hearing 설정
+- 단일 유효 소리 위치를 기억하는 `LastHeardLocation`, `bHasHeardSound`
+- 소리 위치까지 NavMesh로 이동한 뒤 Patrol로 복귀하는 `InvestigateSound`
+- Sound 조사 중 Sight 획득 시 거리별 Attack/Chase 우선 전환
+- 실패·잘못된 위치의 Hearing 자극 무시 및 Sight/Hearing 분리 회귀 검사
+- 기존 Blueprint Controller의 Sight-only 직렬화가 Hearing을 제거하지 않도록 Possess 시 Listener 설정 복구
+
 ## 1.6.0 - 2026-08-26
 
 ### Added

@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 6 Architecture"
+title: "JMMonsterFramework Phase 7 Architecture"
 status: Current
 authority: Canonical
-scope: "JMMonsterFramework Phase 0-6 runtime architecture"
+scope: "JMMonsterFramework Phase 0-7 runtime architecture"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -26,10 +26,11 @@ related:
 - Phase 4.6: 별도 StateTree에서 제한 시간 동안만 숨은 Player Actor를 사용하는 Live Grace 추적
 - Phase 5: 비상호작용 상태에서 도달 가능한 NavMesh 지점을 반복 방문하는 Patrol
 - Phase 6: 가시 Player가 공격 범위 안에 있을 때 이동을 멈추고 Cooldown 기반 Damage 적용
+- Phase 7: AI Hearing으로 단일 소리 위치를 기억하고 조사한 뒤 Patrol 복귀
 
 ## 비책임
 
-Combo, Heavy/Special Attack, Ability/Animation Framework, Hearing, 장기·복수 대상 Memory, Gameplay Tag, 저장, 네트워크 동기화는 제공하지 않는다.
+Listener, 소음 단계/누적/Threat Score, Suspicion, Combo, Ability/Animation Framework, 장기·복수 대상 Memory는 제공하지 않는다.
 
 ## 모듈과 의존성
 
@@ -56,6 +57,9 @@ InvestigateLastLocation -- 다시 보임 --> Chase
 InvestigateLastLocation -- 위치 도착/경로 실패 --> Search
 Search -- 다시 보임 --> Chase
 Search -- 제한 시간 종료 --> Patrol
+Patrol -- 유효한 Hearing --> InvestigateSound
+InvestigateSound -- 위치 도착/경로 실패 --> Patrol
+InvestigateSound -- Sight 획득 --> Attack 또는 Chase
 ```
 
 Chase는 `MoveToActor`로 가시 Actor를 동적으로 추적한다. RecentTracking은 시야 상실 때 고정된 `EstimatedTrackingLocation`으로만 이동하며 숨은 Actor를 참조하지 않는다. 1.5초 안에 재감지하면 Chase가 우선하고, 만료되면 Investigate로 이어진다. Investigate는 `MoveToLocation`에 `LastSeenLocation` 값만 전달한다. Search는 4초 동안 초당 90도로 Pawn과 Controller 시선을 함께 회전시켜 한 바퀴만 확인한다. RecentTracking과 Search의 경과 시간은 StateTree 인스턴스 데이터에만 존재하며 완료 시 폐기된다.
@@ -65,6 +69,8 @@ Live Grace StateTree만 `LiveGraceTargetActor` 약한 참조를 사용한다. Si
 두 StateTree의 평상시 상태는 Patrol이다. Patrol Task는 Pawn 현재 위치를 중심으로 반경 800uu 안의 `GetRandomReachablePointInRadius` 결과만 `MoveToLocation`에 전달한다. 목적지 도착 또는 이동 실패 후 1.5초를 기다리고 새 지점을 요청하며, Player가 보이면 OnTick 전이가 Patrol 이동보다 우선해 Chase로 이동한다. Search 완료 전이는 각 트리의 Patrol로 돌아간다.
 
 Attack은 두 StateTree에서 동일한 Task와 조건을 사용한다. 150uu 안의 가시 Target만 선택하고 진입 시 `StopMovement` 후 `TakeDamage(10)`을 호출한다. 마지막 성공 공격 시간은 Controller에 남아 Attack/Chase 경계를 반복해도 1초 Cooldown을 우회할 수 없다. Attack Task는 Move 요청을 생성하지 않으며, 범위 이탈은 Chase로, Sight Lost는 각 트리 고유의 RecentTracking 또는 LiveGraceTracking으로 직접 전환한다.
+
+Perception 콜백은 Sense ID로 Sight와 Hearing을 먼저 분리한다. 성공한 Hearing 자극의 유효 위치 하나만 `LastHeardLocation`에 저장하며 Sight가 활성화된 동안에는 저장하지 않는다. `InvestigateSound`는 이 위치의 스냅샷으로만 `MoveToLocation`을 수행하고 도착·경로 실패 후 메모리를 소비해 Patrol로 돌아간다. 조사 중 Player를 실제로 보면 Hearing 메모리를 폐기하고 Attack 또는 Chase가 즉시 우선한다.
 
 ## 수명과 실패 동작
 

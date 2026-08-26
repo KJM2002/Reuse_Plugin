@@ -16,7 +16,7 @@ related:
 
 ## 자동 검사
 
-Automation 창에서 `JM.MonsterFramework.Phase6.BuildAndValidatePredictiveStateTree`, `JM.MonsterFramework.Phase1.SightStateTransitions`, `JM.MonsterFramework.Phase0.SimpleEnemyDefaults`를 실행한다.
+Automation 창에서 `JM.MonsterFramework.Phase7.BuildAndValidatePredictiveStateTree`, `JM.MonsterFramework.Phase1.SightStateTransitions`, `JM.MonsterFramework.Phase0.SimpleEnemyDefaults`를 실행한다.
 
 ## Level_TestAI 수동 검사
 

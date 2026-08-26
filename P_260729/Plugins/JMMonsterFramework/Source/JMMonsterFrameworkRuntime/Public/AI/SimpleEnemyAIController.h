@@ -7,6 +7,7 @@
 
 class UStateTree;
 class UStateTreeAIComponent;
+class UAISenseConfig_Hearing;
 
 /**
  * Minimal controller that chases a visible player and investigates the last sight location.
@@ -98,7 +99,22 @@ public:
     /** Applies one basic attack to the currently visible in-range player. */
     bool PerformBasicAttack();
 
+    /** Most recent valid AI Hearing stimulus location. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Hearing")
+    FVector LastHeardLocation = FVector::ZeroVector;
+
+    /** True while a heard location is waiting to be investigated. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Hearing")
+    bool bHasHeardSound = false;
+
+    /** Clears the single pending sound after investigation or Sight preemption. */
+    void ClearHeardSound();
+
 private:
+    /** Native Hearing config reapplied on possess so stale Blueprint SensesConfig overrides cannot remove it. */
+    UPROPERTY(VisibleAnywhere, Category = "JM Monster Framework|Hearing")
+    TObjectPtr<UAISenseConfig_Hearing> HearingConfig;
+
     UPROPERTY(VisibleAnywhere, Category = "JM Monster Framework|StateTree")
     TObjectPtr<UStateTreeAIComponent> StateTreeComponent;
 
@@ -114,6 +130,12 @@ private:
         const FVector& ObservedLocation,
         const FVector& ObservedVelocity);
 
+    void ApplyHearingState(
+        AActor* Actor,
+        bool bWasSuccessfullySensed,
+        const FVector& HeardLocation,
+        float Strength = 1.0f);
+
     void UpdateVisibleObservation(AActor& VisibleActor, const FVector& ObservedLocation);
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -121,5 +143,6 @@ private:
     friend class FJMSimpleEnemyStateTreeAssetTest;
     friend class FJMSimpleEnemyLiveGraceAssetsTest;
     friend class FJMSimpleEnemyLiveGraceStateTest;
+    friend class FJMSimpleEnemyHearingStateTest;
 #endif
 };

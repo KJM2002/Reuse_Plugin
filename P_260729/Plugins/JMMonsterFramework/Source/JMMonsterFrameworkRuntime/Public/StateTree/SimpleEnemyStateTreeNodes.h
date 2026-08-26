@@ -29,6 +29,13 @@ struct FJMSimpleEnemyHasLiveGraceTrackingInstanceData
     GENERATED_BODY()
 };
 
+/** Per-execution storage required by the pending sound condition. */
+USTRUCT()
+struct FJMSimpleEnemyHasHeardSoundInstanceData
+{
+    GENERATED_BODY()
+};
+
 /** Per-execution storage required by StateTree for the chase task. */
 USTRUCT()
 struct FJMSimpleEnemyMoveToTargetInstanceData
@@ -72,6 +79,13 @@ struct FJMSimpleEnemyPatrolInstanceData
 /** Per-execution cooldown for repeated basic attacks. */
 USTRUCT()
 struct FJMSimpleEnemyBasicAttackInstanceData
+{
+    GENERATED_BODY()
+};
+
+/** Per-execution storage required by the one-shot sound investigation. */
+USTRUCT()
+struct FJMSimpleEnemyInvestigateSoundInstanceData
 {
     GENERATED_BODY()
 };
@@ -188,6 +202,23 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyHasLiveGraceTrackingCondition
     GENERATED_BODY()
 
     using FInstanceDataType = FJMSimpleEnemyHasLiveGraceTrackingInstanceData;
+
+    virtual const UStruct* GetInstanceDataType() const override
+    {
+        return FInstanceDataType::StaticStruct();
+    }
+
+    virtual bool TestCondition(FStateTreeExecutionContext& Context) const override;
+};
+
+/** Selects sound investigation only when Sight is not currently active. */
+USTRUCT(meta = (DisplayName = "Has Heard Sound", Category = "JM Monster Framework"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyHasHeardSoundCondition
+    : public FStateTreeAIConditionBase
+{
+    GENERATED_BODY()
+
+    using FInstanceDataType = FJMSimpleEnemyHasHeardSoundInstanceData;
 
     virtual const UStruct* GetInstanceDataType() const override
     {
@@ -321,6 +352,37 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyBasicAttackTask : public FSta
     virtual EStateTreeRunStatus Tick(
         FStateTreeExecutionContext& Context,
         float DeltaTime) const override;
+};
+
+/** Moves once to the remembered hearing location, then consumes it. */
+USTRUCT(meta = (DisplayName = "Investigate Heard Sound", Category = "JM Monster Framework"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyInvestigateSoundTask : public FStateTreeAIActionTaskBase
+{
+    GENERATED_BODY()
+
+    using FInstanceDataType = FJMSimpleEnemyInvestigateSoundInstanceData;
+
+    FJMSimpleEnemyInvestigateSoundTask();
+
+    virtual const UStruct* GetInstanceDataType() const override
+    {
+        return FInstanceDataType::StaticStruct();
+    }
+
+    virtual EStateTreeRunStatus EnterState(
+        FStateTreeExecutionContext& Context,
+        const FStateTreeTransitionResult& Transition) const override;
+
+    virtual EStateTreeRunStatus Tick(
+        FStateTreeExecutionContext& Context,
+        float DeltaTime) const override;
+
+    virtual void ExitState(
+        FStateTreeExecutionContext& Context,
+        const FStateTreeTransitionResult& Transition) const override;
+
+    UPROPERTY(EditAnywhere, Category = "Movement", meta = (ClampMin = "0.0"))
+    float AcceptanceRadius = 75.0f;
 };
 
 /** Moves to a snapshot of LastSeenLocation without following the hidden Actor. */

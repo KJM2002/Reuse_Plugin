@@ -18,8 +18,8 @@ related:
 
 Automation 창에서 다음을 실행한다.
 
-- `JM.MonsterFramework.Phase6.BuildAndValidatePredictiveStateTree`
-- `JM.MonsterFramework.Phase6.BuildAndValidateLiveGraceAssets`
+- `JM.MonsterFramework.Phase7.BuildAndValidatePredictiveStateTree`
+- `JM.MonsterFramework.Phase7.BuildAndValidateLiveGraceAssets`
 - 전체 `JM.MonsterFramework` 회귀 테스트
 
 ## PIE 절차

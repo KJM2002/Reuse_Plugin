@@ -114,6 +114,15 @@ bool FJMSimpleEnemyHasLiveGraceTrackingCondition::TestCondition(
         && Controller->LiveGraceTargetActor.IsValid();
 }
 
+bool FJMSimpleEnemyHasHeardSoundCondition::TestCondition(
+    FStateTreeExecutionContext& Context) const
+{
+    const ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    return IsValid(Controller)
+        && !Controller->bCanSeeTarget
+        && Controller->bHasHeardSound;
+}
+
 FJMSimpleEnemyRecentTrackingTask::FJMSimpleEnemyRecentTrackingTask()
 {
     bShouldCallTick = true;
@@ -428,6 +437,78 @@ EStateTreeRunStatus FJMSimpleEnemyBasicAttackTask::Tick(
     Controller->PerformBasicAttack();
 
     return EStateTreeRunStatus::Running;
+}
+
+FJMSimpleEnemyInvestigateSoundTask::FJMSimpleEnemyInvestigateSoundTask()
+{
+    bShouldCallTick = true;
+}
+
+EStateTreeRunStatus FJMSimpleEnemyInvestigateSoundTask::EnterState(
+    FStateTreeExecutionContext& Context,
+    const FStateTreeTransitionResult& Transition) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    if (!IsValid(Controller) || !Controller->bHasHeardSound || Controller->bCanSeeTarget)
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    const EPathFollowingRequestResult::Type MoveResult = Controller->MoveToLocation(
+        Controller->LastHeardLocation,
+        AcceptanceRadius,
+        true,
+        true,
+        true,
+        true,
+        nullptr,
+        true);
+    if (MoveResult == EPathFollowingRequestResult::Failed)
+    {
+        Controller->ClearHeardSound();
+        return EStateTreeRunStatus::Failed;
+    }
+    if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
+    {
+        Controller->ClearHeardSound();
+        return EStateTreeRunStatus::Succeeded;
+    }
+    return EStateTreeRunStatus::Running;
+}
+
+EStateTreeRunStatus FJMSimpleEnemyInvestigateSoundTask::Tick(
+    FStateTreeExecutionContext& Context,
+    const float DeltaTime) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    if (!IsValid(Controller))
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    // Sight transitions must preempt before the pending sound is consumed.
+    if (Controller->bCanSeeTarget && IsValid(Controller->TargetActor))
+    {
+        return EStateTreeRunStatus::Running;
+    }
+
+    if (Controller->GetMoveStatus() == EPathFollowingStatus::Idle)
+    {
+        Controller->ClearHeardSound();
+        return EStateTreeRunStatus::Succeeded;
+    }
+    return EStateTreeRunStatus::Running;
+}
+
+void FJMSimpleEnemyInvestigateSoundTask::ExitState(
+    FStateTreeExecutionContext& Context,
+    const FStateTreeTransitionResult& Transition) const
+{
+    if (ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner()))
+    {
+        Controller->StopMovement();
+        Controller->ClearHeardSound();
+    }
 }
 
 FJMSimpleEnemyMoveToLastSeenLocationTask::FJMSimpleEnemyMoveToLastSeenLocationTask()

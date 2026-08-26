@@ -19,8 +19,8 @@ related:
 
 Automation 창에서 다음을 실행한다.
 
-- `JM.MonsterFramework.Phase6.BuildAndValidatePredictiveStateTree`
-- `JM.MonsterFramework.Phase6.BuildAndValidateLiveGraceAssets`
+- `JM.MonsterFramework.Phase7.BuildAndValidatePredictiveStateTree`
+- `JM.MonsterFramework.Phase7.BuildAndValidateLiveGraceAssets`
 - 기존 `JM.MonsterFramework.Phase0`, `Phase1`, `Phase4_6.LiveGraceState` 회귀 검사
 
 ## PIE 절차

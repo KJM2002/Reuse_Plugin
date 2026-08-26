@@ -19,7 +19,7 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FJMSimpleEnemyStateTreeAssetTest,
-    "JM.MonsterFramework.Phase6.BuildAndValidatePredictiveStateTree",
+    "JM.MonsterFramework.Phase7.BuildAndValidatePredictiveStateTree",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
@@ -61,6 +61,7 @@ bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
     UStateTreeState& Attack = Root.AddChildState(TEXT("Attack"));
     UStateTreeState& Chase = Root.AddChildState(TEXT("Chase"));
     UStateTreeState& RecentTracking = Root.AddChildState(TEXT("RecentTracking"));
+    UStateTreeState& InvestigateSound = Root.AddChildState(TEXT("InvestigateSound"));
     UStateTreeState& Patrol = Root.AddChildState(TEXT("Patrol"));
     UStateTreeState& Investigate = Root.AddChildState(TEXT("InvestigateLastLocation"));
     UStateTreeState& Search = Root.AddChildState(TEXT("Search"));
@@ -109,6 +110,23 @@ bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
         &Chase);
     PatrolToChase.AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
     PatrolToChase.AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = false;
+    Patrol.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &InvestigateSound)
+        .AddCondition<FJMSimpleEnemyHasHeardSoundCondition>();
+
+    InvestigateSound.AddEnterCondition<FJMSimpleEnemyHasHeardSoundCondition>();
+    InvestigateSound.AddTask<FJMSimpleEnemyInvestigateSoundTask>();
+    InvestigateSound.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Attack)
+        .AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = true;
+    auto& SoundToChase = InvestigateSound.AddTransition(
+        EStateTreeTransitionTrigger::OnTick,
+        EStateTreeTransitionType::GotoState,
+        &Chase);
+    SoundToChase.AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    SoundToChase.AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = false;
+    InvestigateSound.AddTransition(
+        EStateTreeTransitionTrigger::OnStateCompleted,
+        EStateTreeTransitionType::GotoState,
+        &Patrol);
 
     Investigate.AddTask<FJMSimpleEnemyMoveToLastSeenLocationTask>();
     Investigate.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Attack)
@@ -143,7 +161,7 @@ bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
     }
     TestTrue(TEXT("StateTree compiles"), bCompiled);
     TestTrue(TEXT("StateTree is ready to run"), StateTree->IsReadyToRun());
-    TestEqual(TEXT("Predictive tree contains the six Phase 6 states"), Root.Children.Num(), 6);
+    TestEqual(TEXT("Predictive tree contains the seven Phase 7 states"), Root.Children.Num(), 7);
     TestEqual(TEXT("Attack requires sight and range"), Attack.EnterConditions.Num(), 2);
     TestEqual(TEXT("Attack has one basic attack task"), Attack.Tasks.Num(), 1);
     TestEqual(TEXT("Attack can chase or use Predictive loss tracking"), Attack.Transitions.Num(), 2);
@@ -153,9 +171,12 @@ bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("RecentTracking has one cached prediction task"), RecentTracking.Tasks.Num(), 1);
     TestEqual(TEXT("RecentTracking can attack, chase, or enter Investigate"), RecentTracking.Transitions.Num(), 3);
     TestEqual(TEXT("Patrol has one NavMesh movement task"), Patrol.Tasks.Num(), 1);
-    TestEqual(TEXT("Patrol can immediately enter Attack or Chase"), Patrol.Transitions.Num(), 2);
+    TestEqual(TEXT("Patrol can enter Attack, Chase, or sound investigation"), Patrol.Transitions.Num(), 3);
     TestTrue(TEXT("Patrol radius is positive"), PatrolTask.PatrolRadius > 0.0f);
     TestTrue(TEXT("Patrol wait is finite and positive"), PatrolTask.WaitDuration > 0.0f);
+    TestEqual(TEXT("Sound investigation requires one pending sound"), InvestigateSound.EnterConditions.Num(), 1);
+    TestEqual(TEXT("Sound investigation has one movement task"), InvestigateSound.Tasks.Num(), 1);
+    TestEqual(TEXT("Sound investigation can attack, chase, or return to Patrol"), InvestigateSound.Transitions.Num(), 3);
     TestEqual(TEXT("Investigate has one location movement task"), Investigate.Tasks.Num(), 1);
     TestEqual(TEXT("Investigate can attack, chase, or enter Search"), Investigate.Transitions.Num(), 3);
     TestEqual(TEXT("Search has one finite rotation task"), Search.Tasks.Num(), 1);

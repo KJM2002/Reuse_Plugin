@@ -70,7 +70,7 @@ namespace
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FJMSimpleEnemyLiveGraceAssetsTest,
-    "JM.MonsterFramework.Phase6.BuildAndValidateLiveGraceAssets",
+    "JM.MonsterFramework.Phase7.BuildAndValidateLiveGraceAssets",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
@@ -118,6 +118,7 @@ bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
     UStateTreeState& Attack = Root.AddChildState(TEXT("Attack"));
     UStateTreeState& Chase = Root.AddChildState(TEXT("Chase"));
     UStateTreeState& LiveGrace = Root.AddChildState(TEXT("LiveGraceTracking"));
+    UStateTreeState& InvestigateSound = Root.AddChildState(TEXT("InvestigateSound"));
     UStateTreeState& Patrol = Root.AddChildState(TEXT("Patrol"));
     UStateTreeState& Investigate = Root.AddChildState(TEXT("InvestigateLastLocation"));
     UStateTreeState& Search = Root.AddChildState(TEXT("Search"));
@@ -166,6 +167,23 @@ bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
         &Chase);
     PatrolToChase.AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
     PatrolToChase.AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = false;
+    Patrol.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &InvestigateSound)
+        .AddCondition<FJMSimpleEnemyHasHeardSoundCondition>();
+
+    InvestigateSound.AddEnterCondition<FJMSimpleEnemyHasHeardSoundCondition>();
+    InvestigateSound.AddTask<FJMSimpleEnemyInvestigateSoundTask>();
+    InvestigateSound.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Attack)
+        .AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = true;
+    auto& SoundToChase = InvestigateSound.AddTransition(
+        EStateTreeTransitionTrigger::OnTick,
+        EStateTreeTransitionType::GotoState,
+        &Chase);
+    SoundToChase.AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    SoundToChase.AddCondition<FJMSimpleEnemyTargetInAttackRangeCondition>().GetNode().bExpectedValue = false;
+    InvestigateSound.AddTransition(
+        EStateTreeTransitionTrigger::OnStateCompleted,
+        EStateTreeTransitionType::GotoState,
+        &Patrol);
 
     Investigate.AddTask<FJMSimpleEnemyMoveToLastSeenLocationTask>();
     Investigate.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Attack)
@@ -200,7 +218,7 @@ bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
     }
     TestTrue(TEXT("Live Grace StateTree compiles"), bCompiled);
     TestTrue(TEXT("Live Grace StateTree is ready to run"), StateTree->IsReadyToRun());
-    TestEqual(TEXT("Live Grace tree contains six Phase 6 states"), Root.Children.Num(), 6);
+    TestEqual(TEXT("Live Grace tree contains seven Phase 7 states"), Root.Children.Num(), 7);
     TestEqual(TEXT("Live Grace tree Attack requires sight and range"), Attack.EnterConditions.Num(), 2);
     TestEqual(TEXT("Live Grace tree Attack has one task"), Attack.Tasks.Num(), 1);
     TestEqual(TEXT("Attack can chase or use Live Grace loss tracking"), Attack.Transitions.Num(), 2);
@@ -208,9 +226,12 @@ bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Live Grace state has one live tracking task"), LiveGrace.Tasks.Num(), 1);
     TestEqual(TEXT("Live Grace can attack, chase, or investigate"), LiveGrace.Transitions.Num(), 3);
     TestEqual(TEXT("Live Grace tree Patrol has one NavMesh task"), Patrol.Tasks.Num(), 1);
-    TestEqual(TEXT("Live Grace tree Patrol can enter Attack or Chase"), Patrol.Transitions.Num(), 2);
+    TestEqual(TEXT("Live Grace tree Patrol can enter Attack, Chase, or sound investigation"), Patrol.Transitions.Num(), 3);
     TestTrue(TEXT("Live Grace tree Patrol radius is positive"), PatrolTask.PatrolRadius > 0.0f);
     TestTrue(TEXT("Live Grace tree Patrol wait is finite"), PatrolTask.WaitDuration > 0.0f);
+    TestEqual(TEXT("Live Grace sound investigation requires pending sound"), InvestigateSound.EnterConditions.Num(), 1);
+    TestEqual(TEXT("Live Grace sound investigation has one task"), InvestigateSound.Tasks.Num(), 1);
+    TestEqual(TEXT("Live Grace sound investigation can attack, chase, or Patrol"), InvestigateSound.Transitions.Num(), 3);
     TestTrue(TEXT("Search remains finite"), SearchTask.SearchDuration > 0.0f);
 
     if (bCreatedStateTree)
