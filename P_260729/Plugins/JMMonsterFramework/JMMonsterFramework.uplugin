@@ -1,9 +1,9 @@
 {
   "FileVersion": 3,
-  "Version": 5,
-  "VersionName": "1.4.0",
+  "Version": 6,
+  "VersionName": "1.4.5",
   "FriendlyName": "JM Monster Framework",
-  "Description": "Reusable enemy foundation with Sight-driven chase, last-location investigation, and finite search.",
+  "Description": "Reusable enemy foundation with Sight-driven chase, short recent tracking, last-location investigation, and finite search.",
   "Category": "JM Plugins",
   "CreatedBy": "JM",
   "CanContainContent": true,

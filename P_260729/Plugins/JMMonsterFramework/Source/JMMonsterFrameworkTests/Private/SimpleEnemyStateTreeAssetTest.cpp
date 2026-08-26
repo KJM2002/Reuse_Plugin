@@ -19,7 +19,7 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FJMSimpleEnemyStateTreeAssetTest,
-    "JM.MonsterFramework.Phase4.BuildAndValidateStateTree",
+    "JM.MonsterFramework.Phase4_5.BuildAndValidateStateTree",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
@@ -59,14 +59,24 @@ bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
 
     UStateTreeState& Root = EditorData->AddRootState();
     UStateTreeState& Chase = Root.AddChildState(TEXT("Chase"));
+    UStateTreeState& RecentTracking = Root.AddChildState(TEXT("RecentTracking"));
     UStateTreeState& Idle = Root.AddChildState(TEXT("Idle"));
     UStateTreeState& Investigate = Root.AddChildState(TEXT("InvestigateLastLocation"));
     UStateTreeState& Search = Root.AddChildState(TEXT("Search"));
 
     Chase.AddEnterCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
     Chase.AddTask<FJMSimpleEnemyMoveToTargetTask>();
-    Chase.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Investigate)
+    Chase.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &RecentTracking)
         .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = false;
+
+    RecentTracking.AddEnterCondition<FJMSimpleEnemyHasRecentTrackingMemoryCondition>();
+    RecentTracking.AddTask<FJMSimpleEnemyRecentTrackingTask>();
+    RecentTracking.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
+        .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
+    RecentTracking.AddTransition(
+        EStateTreeTransitionTrigger::OnStateCompleted,
+        EStateTreeTransitionType::GotoState,
+        &Investigate);
 
     Idle.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
         .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
@@ -92,9 +102,12 @@ bool FJMSimpleEnemyStateTreeAssetTest::RunTest(const FString& Parameters)
     }
     TestTrue(TEXT("StateTree compiles"), bCompiled);
     TestTrue(TEXT("StateTree is ready to run"), StateTree->IsReadyToRun());
-    TestEqual(TEXT("Root contains the four Phase 4 states"), Root.Children.Num(), 4);
+    TestEqual(TEXT("Root contains the five Phase 4.5 states"), Root.Children.Num(), 5);
     TestEqual(TEXT("Chase has one condition"), Chase.EnterConditions.Num(), 1);
     TestEqual(TEXT("Chase has one movement task"), Chase.Tasks.Num(), 1);
+    TestEqual(TEXT("RecentTracking requires valid cached memory"), RecentTracking.EnterConditions.Num(), 1);
+    TestEqual(TEXT("RecentTracking has one cached prediction task"), RecentTracking.Tasks.Num(), 1);
+    TestEqual(TEXT("RecentTracking can reacquire or enter Investigate"), RecentTracking.Transitions.Num(), 2);
     TestEqual(TEXT("Investigate has one location movement task"), Investigate.Tasks.Num(), 1);
     TestEqual(TEXT("Investigate can reacquire or enter Search"), Investigate.Transitions.Num(), 2);
     TestEqual(TEXT("Search has one finite rotation task"), Search.Tasks.Num(), 1);

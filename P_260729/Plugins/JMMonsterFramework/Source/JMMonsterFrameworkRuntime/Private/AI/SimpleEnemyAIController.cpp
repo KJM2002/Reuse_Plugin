@@ -10,7 +10,7 @@
 
 ASimpleEnemyAIController::ASimpleEnemyAIController()
 {
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
 
     StateTreeComponent = CreateDefaultSubobject<UStateTreeAIComponent>(TEXT("StateTreeComponent"));
     StateTreeComponent->SetStartLogicAutomatically(false);
@@ -35,6 +35,18 @@ ASimpleEnemyAIController::ASimpleEnemyAIController()
     SightPerception->OnTargetPerceptionUpdated.AddDynamic(
         this,
         &ASimpleEnemyAIController::HandleTargetPerceptionUpdated);
+}
+
+void ASimpleEnemyAIController::Tick(const float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+
+    // Sampling the actor is deliberately restricted to the confirmed-visible state.
+    // After sight loss, RecentTracking uses only the snapshot created in ApplySightState.
+    if (bCanSeeTarget && IsValid(TargetActor))
+    {
+        UpdateVisibleObservation(*TargetActor, TargetActor->GetActorLocation());
+    }
 }
 
 void ASimpleEnemyAIController::OnPossess(APawn* InPawn)
@@ -65,13 +77,16 @@ void ASimpleEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIS
         return;
     }
 
-    ApplySightState(Actor, Stimulus.WasSuccessfullySensed(), Stimulus.StimulusLocation);
+    const bool bIsVisible = Stimulus.WasSuccessfullySensed();
+    const FVector ObservedVelocity = bIsVisible ? Actor->GetVelocity() : FVector::ZeroVector;
+    ApplySightState(Actor, bIsVisible, Stimulus.StimulusLocation, ObservedVelocity);
 }
 
 void ASimpleEnemyAIController::ApplySightState(
     AActor* Actor,
     const bool bIsVisible,
-    const FVector& ObservedLocation)
+    const FVector& ObservedLocation,
+    const FVector& ObservedVelocity)
 {
     if (bIsVisible)
     {
@@ -83,10 +98,13 @@ void ASimpleEnemyAIController::ApplySightState(
         const bool bStateChanged = TargetActor != Actor || !bCanSeeTarget;
         TargetActor = Actor;
         bCanSeeTarget = true;
+        bHasRecentTrackingMemory = false;
         if (FAISystem::IsValidLocation(ObservedLocation))
         {
             LastSeenLocation = ObservedLocation;
         }
+        LastSeenVelocity = ObservedVelocity;
+        LastSeenTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 
         if (bStateChanged)
         {
@@ -107,6 +125,11 @@ void ASimpleEnemyAIController::ApplySightState(
         // sample Actor here: it may already be moving unseen behind an obstacle.
         LastSeenLocation = ObservedLocation;
     }
+
+    const FVector PredictionOffset = (LastSeenVelocity * TrackingMemoryDuration)
+        .GetClampedToMaxSize(MaximumPredictionDistance);
+    EstimatedTrackingLocation = LastSeenLocation + PredictionOffset;
+    bHasRecentTrackingMemory = TrackingMemoryDuration > 0.0f;
     TargetActor = nullptr;
     bCanSeeTarget = false;
 
@@ -114,4 +137,21 @@ void ASimpleEnemyAIController::ApplySightState(
     {
         UE_LOG(LogJMMonsterFramework, Log, TEXT("Lost: %s"), *GetNameSafe(Actor));
     }
+}
+
+void ASimpleEnemyAIController::UpdateVisibleObservation(
+    AActor& VisibleActor,
+    const FVector& ObservedLocation)
+{
+    if (!bCanSeeTarget || TargetActor != &VisibleActor)
+    {
+        return;
+    }
+
+    if (FAISystem::IsValidLocation(ObservedLocation))
+    {
+        LastSeenLocation = ObservedLocation;
+    }
+    LastSeenVelocity = VisibleActor.GetVelocity();
+    LastSeenTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 }

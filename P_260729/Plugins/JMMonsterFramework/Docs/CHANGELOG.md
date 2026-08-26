@@ -11,6 +11,16 @@ owners:
 
 # Changelog
 
+## 1.4.5 - 2026-08-26
+
+### Added
+
+- 시야 중에만 갱신되는 `LastSeenVelocity`, `LastSeenTime`
+- 시야 상실 시 한 번 계산되는 최대 700uu의 `EstimatedTrackingLocation`
+- 1.5초 제한의 StateTree `RecentTracking` 상태
+- Tracking 중 재감지 시 즉시 Chase, 만료 시 기존 Investigate/Search 전이
+- 숨은 Player Transform/Velocity를 읽지 않는 반복 회귀 검사
+
 ## 1.4.0 - 2026-08-26
 
 ### Added

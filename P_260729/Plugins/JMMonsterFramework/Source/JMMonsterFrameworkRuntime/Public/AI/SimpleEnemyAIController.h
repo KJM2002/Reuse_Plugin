@@ -20,6 +20,7 @@ public:
     ASimpleEnemyAIController();
 
     virtual void OnPossess(APawn* InPawn) override;
+    virtual void Tick(float DeltaSeconds) override;
 
     /** Player-controlled pawn currently confirmed by AI Sight. */
     UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Perception")
@@ -33,6 +34,30 @@ public:
     UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Perception")
     FVector LastSeenLocation = FVector::ZeroVector;
 
+    /** Velocity sampled only while AI Sight confirms the player is visible. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Perception")
+    FVector LastSeenVelocity = FVector::ZeroVector;
+
+    /** World time of the most recent visible observation. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Perception")
+    float LastSeenTime = 0.0f;
+
+    /** One-shot destination predicted from the final visible location and velocity. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Tracking")
+    FVector EstimatedTrackingLocation = FVector::ZeroVector;
+
+    /** Short window in which RecentTracking follows its cached prediction. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "JM Monster Framework|Tracking", meta = (ClampMin = "0.0"))
+    float TrackingMemoryDuration = 1.5f;
+
+    /** Prevents a fast final observation from producing an excessive prediction. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "JM Monster Framework|Tracking", meta = (ClampMin = "0.0"))
+    float MaximumPredictionDistance = 700.0f;
+
+    /** True between a confirmed sight loss and RecentTracking expiry/reacquisition. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Tracking")
+    bool bHasRecentTrackingMemory = false;
+
 private:
     UPROPERTY(VisibleAnywhere, Category = "JM Monster Framework|StateTree")
     TObjectPtr<UStateTreeAIComponent> StateTreeComponent;
@@ -43,7 +68,13 @@ private:
     UFUNCTION()
     void HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
-    void ApplySightState(AActor* Actor, bool bIsVisible, const FVector& ObservedLocation);
+    void ApplySightState(
+        AActor* Actor,
+        bool bIsVisible,
+        const FVector& ObservedLocation,
+        const FVector& ObservedVelocity);
+
+    void UpdateVisibleObservation(AActor& VisibleActor, const FVector& ObservedLocation);
 
 #if WITH_DEV_AUTOMATION_TESTS
     friend class FJMSimpleEnemySightStateTransitionsTest;

@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 4 Architecture"
+title: "JMMonsterFramework Phase 4.5 Architecture"
 status: Current
 authority: Canonical
-scope: "JMMonsterFramework Phase 0-4 runtime architecture"
+scope: "JMMonsterFramework Phase 0-4.5 runtime architecture"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -22,10 +22,11 @@ related:
 - Phase 2: StateTree 기반 Chase와 NavMesh 이동
 - Phase 3: `LastSeenLocation` 기억과 마지막 관측 위치 조사
 - Phase 4: 마지막 위치 도착 후 제한 시간 동안 제자리 회전 Search
+- Phase 4.5: 마지막 가시 위치와 속도만 사용하는 단기 예상 추적
 
 ## 비책임
 
-Patrol, Attack, Hearing, 장기·복수 대상 Memory, 예측 추적, Gameplay Tag, 저장, 네트워크 동기화, 특정 레벨 연동은 제공하지 않는다.
+Patrol, Attack, Hearing, 장기·복수 대상 Memory, 복잡한 궤적 예측, Gameplay Tag, 저장, 네트워크 동기화, 특정 레벨 연동은 제공하지 않는다.
 
 ## 모듈과 의존성
 
@@ -36,18 +37,20 @@ Runtime은 `Core`, `CoreUObject`, `Engine`, `AIModule`, `StateTreeModule`, `Game
 
 ## 데이터 흐름과 상태 전이
 
-AI Sight가 플레이어 Pawn을 감지하면 Controller가 `TargetActor`, `bCanSeeTarget`, `LastSeenLocation`을 갱신한다. Lost 자극에는 Sight가 보관한 마지막 성공 자극 위치가 들어오므로, 숨은 Actor의 현재 위치를 다시 읽지 않고 그 위치만 보존한 뒤 `TargetActor`를 즉시 비운다.
+AI Sight가 플레이어 Pawn을 감지하면 Controller가 `TargetActor`, `bCanSeeTarget`, `LastSeenLocation`, `LastSeenVelocity`, `LastSeenTime`을 갱신한다. 이 갱신은 `bCanSeeTarget`이 참인 동안에만 수행된다. Lost 자극에는 Sight가 보관한 마지막 성공 자극 위치가 들어오므로, 숨은 Actor의 현재 위치나 속도를 다시 읽지 않는다. 마지막 가시 속도에 1.5초를 곱하고 700uu로 제한한 오프셋을 마지막 관측 위치에 더해 `EstimatedTrackingLocation`을 한 번 만든 뒤 `TargetActor`를 즉시 비운다.
 
 ```text
 Idle -- 보임 --> Chase
-Chase -- 시야 상실 --> InvestigateLastLocation
+Chase -- 시야 상실 --> RecentTracking
+RecentTracking -- 다시 보임 --> Chase
+RecentTracking -- 1.5초 만료 --> InvestigateLastLocation
 InvestigateLastLocation -- 다시 보임 --> Chase
 InvestigateLastLocation -- 위치 도착/경로 실패 --> Search
 Search -- 다시 보임 --> Chase
 Search -- 제한 시간 종료 --> Idle
 ```
 
-Chase는 `MoveToActor`로 가시 Actor를 동적으로 추적한다. Investigate는 `MoveToLocation`에 `LastSeenLocation` 값만 전달하므로 벽 뒤의 Actor를 추적하지 않는다. Search는 4초 동안 초당 90도로 Pawn과 Controller 시선을 함께 회전시켜 한 바퀴만 확인한다. Search Task의 경과 시간은 StateTree 인스턴스 데이터에만 존재하며 완료 시 폐기된다.
+Chase는 `MoveToActor`로 가시 Actor를 동적으로 추적한다. RecentTracking은 시야 상실 때 고정된 `EstimatedTrackingLocation`으로만 이동하며 숨은 Actor를 참조하지 않는다. 1.5초 안에 재감지하면 Chase가 우선하고, 만료되면 Investigate로 이어진다. Investigate는 `MoveToLocation`에 `LastSeenLocation` 값만 전달한다. Search는 4초 동안 초당 90도로 Pawn과 Controller 시선을 함께 회전시켜 한 바퀴만 확인한다. RecentTracking과 Search의 경과 시간은 StateTree 인스턴스 데이터에만 존재하며 완료 시 폐기된다.
 
 ## 수명과 실패 동작
 

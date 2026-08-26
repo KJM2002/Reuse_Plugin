@@ -26,7 +26,7 @@ EStateTreeRunStatus FJMSimpleEnemyMoveToTargetTask::EnterState(
     ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
     if (!IsValid(Controller) || !Controller->bCanSeeTarget || !IsValid(Controller->TargetActor))
     {
-        // The Chase OnTick transition owns loss handling and moves to Investigate.
+        // The Chase OnTick transition owns loss handling and moves to RecentTracking.
         return EStateTreeRunStatus::Running;
     }
 
@@ -83,6 +83,84 @@ void FJMSimpleEnemyMoveToTargetTask::ExitState(
     if (ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner()))
     {
         Controller->StopMovement();
+    }
+}
+
+bool FJMSimpleEnemyHasRecentTrackingMemoryCondition::TestCondition(
+    FStateTreeExecutionContext& Context) const
+{
+    const ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    return IsValid(Controller)
+        && !Controller->bCanSeeTarget
+        && Controller->bHasRecentTrackingMemory;
+}
+
+FJMSimpleEnemyRecentTrackingTask::FJMSimpleEnemyRecentTrackingTask()
+{
+    bShouldCallTick = true;
+}
+
+EStateTreeRunStatus FJMSimpleEnemyRecentTrackingTask::EnterState(
+    FStateTreeExecutionContext& Context,
+    const FStateTreeTransitionResult& Transition) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    if (!IsValid(Controller) || !Controller->bHasRecentTrackingMemory)
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    Context.GetInstanceData(*this).ElapsedTime = 0.0f;
+    const EPathFollowingRequestResult::Type MoveResult = Controller->MoveToLocation(
+        Controller->EstimatedTrackingLocation,
+        AcceptanceRadius,
+        true,
+        true,
+        true,
+        true,
+        nullptr,
+        true);
+
+    return MoveResult == EPathFollowingRequestResult::Failed
+        ? EStateTreeRunStatus::Failed
+        : EStateTreeRunStatus::Running;
+}
+
+EStateTreeRunStatus FJMSimpleEnemyRecentTrackingTask::Tick(
+    FStateTreeExecutionContext& Context,
+    const float DeltaTime) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    if (!IsValid(Controller))
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    // Keep running for this tick so the StateTree's reacquisition transition wins.
+    if (Controller->bCanSeeTarget && IsValid(Controller->TargetActor))
+    {
+        return EStateTreeRunStatus::Running;
+    }
+
+    FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
+    InstanceData.ElapsedTime += FMath::Max(DeltaTime, 0.0f);
+    if (InstanceData.ElapsedTime >= Controller->TrackingMemoryDuration)
+    {
+        Controller->bHasRecentTrackingMemory = false;
+        return EStateTreeRunStatus::Succeeded;
+    }
+
+    return EStateTreeRunStatus::Running;
+}
+
+void FJMSimpleEnemyRecentTrackingTask::ExitState(
+    FStateTreeExecutionContext& Context,
+    const FStateTreeTransitionResult& Transition) const
+{
+    if (ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner()))
+    {
+        Controller->StopMovement();
+        Controller->bHasRecentTrackingMemory = false;
     }
 }
 

@@ -77,10 +77,6 @@
 		{
 			"Name": "CableComponent",
 			"Enabled": true
-		},
-		{
-			"Name": "NarshaMCP",
-			"Enabled": true
 		}
 	]
 }
