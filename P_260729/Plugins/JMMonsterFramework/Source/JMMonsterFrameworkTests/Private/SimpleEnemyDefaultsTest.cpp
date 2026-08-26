@@ -35,6 +35,7 @@ bool FJMSimpleEnemyDefaultsTest::RunTest(const FString& Parameters)
     const ASimpleEnemyAIController* Controller = GetDefault<ASimpleEnemyAIController>();
     TestEqual(TEXT("Recent tracking lasts 1.5 seconds"), Controller->TrackingMemoryDuration, 1.5f);
     TestEqual(TEXT("Recent tracking prediction is capped at 700uu"), Controller->MaximumPredictionDistance, 700.0f);
+    TestEqual(TEXT("Live Grace tracking lasts 1.5 seconds"), Controller->LiveGraceDuration, 1.5f);
 
     return true;
 }

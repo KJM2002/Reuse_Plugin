@@ -21,6 +21,13 @@ struct FJMSimpleEnemyHasRecentTrackingMemoryInstanceData
     GENERATED_BODY()
 };
 
+/** Per-execution storage required by the Live Grace condition. */
+USTRUCT()
+struct FJMSimpleEnemyHasLiveGraceTrackingInstanceData
+{
+    GENERATED_BODY()
+};
+
 /** Per-execution storage required by StateTree for the chase task. */
 USTRUCT()
 struct FJMSimpleEnemyMoveToTargetInstanceData
@@ -31,6 +38,16 @@ struct FJMSimpleEnemyMoveToTargetInstanceData
 /** Runtime timer for the short cached-prediction movement. */
 USTRUCT()
 struct FJMSimpleEnemyRecentTrackingInstanceData
+{
+    GENERATED_BODY()
+
+    UPROPERTY(Transient)
+    float ElapsedTime = 0.0f;
+};
+
+/** Runtime timer for live target access after sight loss. */
+USTRUCT()
+struct FJMSimpleEnemyLiveGraceTrackingInstanceData
 {
     GENERATED_BODY()
 
@@ -122,6 +139,23 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyHasRecentTrackingMemoryCondit
     virtual bool TestCondition(FStateTreeExecutionContext& Context) const override;
 };
 
+/** Selects LiveGraceTracking only for a valid, unexpired live target reference. */
+USTRUCT(meta = (DisplayName = "Has Live Grace Tracking", Category = "JM Monster Framework"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyHasLiveGraceTrackingCondition
+    : public FStateTreeAIConditionBase
+{
+    GENERATED_BODY()
+
+    using FInstanceDataType = FJMSimpleEnemyHasLiveGraceTrackingInstanceData;
+
+    virtual const UStruct* GetInstanceDataType() const override
+    {
+        return FInstanceDataType::StaticStruct();
+    }
+
+    virtual bool TestCondition(FStateTreeExecutionContext& Context) const override;
+};
+
 /** Moves toward the prediction snapshot created at sight loss without reading the hidden Actor. */
 USTRUCT(meta = (DisplayName = "Recent Tracking", Category = "JM Monster Framework"))
 struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyRecentTrackingTask : public FStateTreeAIActionTaskBase
@@ -131,6 +165,37 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyRecentTrackingTask : public F
     using FInstanceDataType = FJMSimpleEnemyRecentTrackingInstanceData;
 
     FJMSimpleEnemyRecentTrackingTask();
+
+    virtual const UStruct* GetInstanceDataType() const override
+    {
+        return FInstanceDataType::StaticStruct();
+    }
+
+    virtual EStateTreeRunStatus EnterState(
+        FStateTreeExecutionContext& Context,
+        const FStateTreeTransitionResult& Transition) const override;
+
+    virtual EStateTreeRunStatus Tick(
+        FStateTreeExecutionContext& Context,
+        float DeltaTime) const override;
+
+    virtual void ExitState(
+        FStateTreeExecutionContext& Context,
+        const FStateTreeTransitionResult& Transition) const override;
+
+    UPROPERTY(EditAnywhere, Category = "Movement", meta = (ClampMin = "0.0"))
+    float AcceptanceRadius = 75.0f;
+};
+
+/** Follows the hidden player's live Actor only until the configured grace duration expires. */
+USTRUCT(meta = (DisplayName = "Live Grace Tracking", Category = "JM Monster Framework"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyLiveGraceTrackingTask : public FStateTreeAIActionTaskBase
+{
+    GENERATED_BODY()
+
+    using FInstanceDataType = FJMSimpleEnemyLiveGraceTrackingInstanceData;
+
+    FJMSimpleEnemyLiveGraceTrackingTask();
 
     virtual const UStruct* GetInstanceDataType() const override
     {

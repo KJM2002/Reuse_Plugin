@@ -11,6 +11,16 @@ owners:
 
 # Changelog
 
+## 1.4.6 - 2026-08-26
+
+### Added
+
+- 독립 에셋 `ST_SimpleEnemy_LiveGrace`
+- Sight Lost 후 1.5초 동안 실제 Player Actor를 추적하는 `LiveGraceTracking`
+- Grace 중 `LastSeenLocation` 갱신과 만료 즉시 Live Target 참조 해제
+- 기존 Predictive 에셋과 나란히 배치 가능한 Live Grace Blueprint 프리셋
+- Grace 만료 후 실제 위치 갱신 차단 자동화 검사
+
 ## 1.4.5 - 2026-08-26
 
 ### Added

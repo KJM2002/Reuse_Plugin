@@ -99,6 +99,7 @@ void ASimpleEnemyAIController::ApplySightState(
         TargetActor = Actor;
         bCanSeeTarget = true;
         bHasRecentTrackingMemory = false;
+        EndLiveGraceTracking();
         if (FAISystem::IsValidLocation(ObservedLocation))
         {
             LastSeenLocation = ObservedLocation;
@@ -130,6 +131,8 @@ void ASimpleEnemyAIController::ApplySightState(
         .GetClampedToMaxSize(MaximumPredictionDistance);
     EstimatedTrackingLocation = LastSeenLocation + PredictionOffset;
     bHasRecentTrackingMemory = TrackingMemoryDuration > 0.0f;
+    LiveGraceTargetActor = Actor;
+    bHasLiveGraceTracking = LiveGraceDuration > 0.0f && IsValid(Actor);
     TargetActor = nullptr;
     bCanSeeTarget = false;
 
@@ -137,6 +140,25 @@ void ASimpleEnemyAIController::ApplySightState(
     {
         UE_LOG(LogJMMonsterFramework, Log, TEXT("Lost: %s"), *GetNameSafe(Actor));
     }
+}
+
+bool ASimpleEnemyAIController::UpdateLiveGraceLastKnownLocation()
+{
+    AActor* GraceTarget = LiveGraceTargetActor.Get();
+    if (bCanSeeTarget || !bHasLiveGraceTracking || !IsValid(GraceTarget))
+    {
+        return false;
+    }
+
+    LastSeenLocation = GraceTarget->GetActorLocation();
+    LastSeenTime = GetWorld() ? GetWorld()->GetTimeSeconds() : LastSeenTime;
+    return true;
+}
+
+void ASimpleEnemyAIController::EndLiveGraceTracking()
+{
+    bHasLiveGraceTracking = false;
+    LiveGraceTargetActor.Reset();
 }
 
 void ASimpleEnemyAIController::UpdateVisibleObservation(

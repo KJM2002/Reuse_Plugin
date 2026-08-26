@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 4.5 Architecture"
+title: "JMMonsterFramework Phase 4.6 Architecture"
 status: Current
 authority: Canonical
-scope: "JMMonsterFramework Phase 0-4.5 runtime architecture"
+scope: "JMMonsterFramework Phase 0-4.6 runtime architecture"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -23,6 +23,7 @@ related:
 - Phase 3: `LastSeenLocation` 기억과 마지막 관측 위치 조사
 - Phase 4: 마지막 위치 도착 후 제한 시간 동안 제자리 회전 Search
 - Phase 4.5: 마지막 가시 위치와 속도만 사용하는 단기 예상 추적
+- Phase 4.6: 별도 StateTree에서 제한 시간 동안만 숨은 Player Actor를 사용하는 Live Grace 추적
 
 ## 비책임
 
@@ -34,6 +35,8 @@ Patrol, Attack, Hearing, 장기·복수 대상 Memory, 복잡한 궤적 예측, 
 - `JMMonsterFrameworkTests`: StateTree 에셋 생성·컴파일과 상태 회귀 검사용 Editor 모듈
 
 Runtime은 `Core`, `CoreUObject`, `Engine`, `AIModule`, `StateTreeModule`, `GameplayStateTreeModule`에만 의존한다. 다른 JM 플러그인이나 호스트 `/Game` 콘텐츠를 참조하지 않는다. StateTree 기본 에셋은 플러그인 Mount Point의 `/JMMonsterFramework/AI/ST_SimpleEnemy`다.
+
+Predictive 정책은 기존 `/JMMonsterFramework/AI/ST_SimpleEnemy`, Live Grace 정책은 `/JMMonsterFramework/AI/ST_SimpleEnemy_LiveGrace`에 독립적으로 존재한다. `BP_SimpleEnemy`와 `BP_SimpleEnemy_LiveGrace` 프리셋으로 선택하며 enum, 정책 Component 또는 통합 Mode 분기는 없다.
 
 ## 데이터 흐름과 상태 전이
 
@@ -51,6 +54,8 @@ Search -- 제한 시간 종료 --> Idle
 ```
 
 Chase는 `MoveToActor`로 가시 Actor를 동적으로 추적한다. RecentTracking은 시야 상실 때 고정된 `EstimatedTrackingLocation`으로만 이동하며 숨은 Actor를 참조하지 않는다. 1.5초 안에 재감지하면 Chase가 우선하고, 만료되면 Investigate로 이어진다. Investigate는 `MoveToLocation`에 `LastSeenLocation` 값만 전달한다. Search는 4초 동안 초당 90도로 Pawn과 Controller 시선을 함께 회전시켜 한 바퀴만 확인한다. RecentTracking과 Search의 경과 시간은 StateTree 인스턴스 데이터에만 존재하며 완료 시 폐기된다.
+
+Live Grace StateTree만 `LiveGraceTargetActor` 약한 참조를 사용한다. Sight Lost마다 새 참조와 새 Task 경과 시간이 시작되고, 1.5초 동안 `MoveToActor`와 실제 위치 표본으로 `LastSeenLocation`을 갱신한다. 만료 시 참조와 유효 플래그를 먼저 제거하고 Investigate로 전환하므로 이후 Player 이동은 기억 위치에 반영되지 않는다.
 
 ## 수명과 실패 동작
 

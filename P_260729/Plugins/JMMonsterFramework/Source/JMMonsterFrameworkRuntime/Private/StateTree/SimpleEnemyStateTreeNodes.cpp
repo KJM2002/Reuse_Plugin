@@ -95,6 +95,16 @@ bool FJMSimpleEnemyHasRecentTrackingMemoryCondition::TestCondition(
         && Controller->bHasRecentTrackingMemory;
 }
 
+bool FJMSimpleEnemyHasLiveGraceTrackingCondition::TestCondition(
+    FStateTreeExecutionContext& Context) const
+{
+    const ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    return IsValid(Controller)
+        && !Controller->bCanSeeTarget
+        && Controller->bHasLiveGraceTracking
+        && Controller->LiveGraceTargetActor.IsValid();
+}
+
 FJMSimpleEnemyRecentTrackingTask::FJMSimpleEnemyRecentTrackingTask()
 {
     bShouldCallTick = true;
@@ -161,6 +171,110 @@ void FJMSimpleEnemyRecentTrackingTask::ExitState(
     {
         Controller->StopMovement();
         Controller->bHasRecentTrackingMemory = false;
+    }
+}
+
+FJMSimpleEnemyLiveGraceTrackingTask::FJMSimpleEnemyLiveGraceTrackingTask()
+{
+    bShouldCallTick = true;
+}
+
+EStateTreeRunStatus FJMSimpleEnemyLiveGraceTrackingTask::EnterState(
+    FStateTreeExecutionContext& Context,
+    const FStateTreeTransitionResult& Transition) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    AActor* GraceTarget = IsValid(Controller) ? Controller->LiveGraceTargetActor.Get() : nullptr;
+    if (!IsValid(Controller)
+        || Controller->bCanSeeTarget
+        || !Controller->bHasLiveGraceTracking
+        || !IsValid(GraceTarget))
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    Context.GetInstanceData(*this).ElapsedTime = 0.0f;
+    const EPathFollowingRequestResult::Type MoveResult = Controller->MoveToActor(
+        GraceTarget,
+        AcceptanceRadius,
+        true,
+        true,
+        true,
+        nullptr,
+        true);
+
+    if (MoveResult == EPathFollowingRequestResult::Failed)
+    {
+        Controller->EndLiveGraceTracking();
+        return EStateTreeRunStatus::Failed;
+    }
+
+    return EStateTreeRunStatus::Running;
+}
+
+EStateTreeRunStatus FJMSimpleEnemyLiveGraceTrackingTask::Tick(
+    FStateTreeExecutionContext& Context,
+    const float DeltaTime) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    if (!IsValid(Controller))
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    // Reacquisition must win before any further hidden-target sampling.
+    if (Controller->bCanSeeTarget && IsValid(Controller->TargetActor))
+    {
+        return EStateTreeRunStatus::Running;
+    }
+
+    if (!Controller->UpdateLiveGraceLastKnownLocation())
+    {
+        Controller->EndLiveGraceTracking();
+        return EStateTreeRunStatus::Failed;
+    }
+
+    FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
+    InstanceData.ElapsedTime += FMath::Max(DeltaTime, 0.0f);
+    if (InstanceData.ElapsedTime >= Controller->LiveGraceDuration)
+    {
+        Controller->EndLiveGraceTracking();
+        return EStateTreeRunStatus::Succeeded;
+    }
+
+    // MoveToActor stops after reaching the live goal. Restart it if the hidden
+    // player moves away again while the same Grace window is still valid.
+    if (Controller->GetMoveStatus() == EPathFollowingStatus::Idle)
+    {
+        AActor* GraceTarget = Controller->LiveGraceTargetActor.Get();
+        const EPathFollowingRequestResult::Type MoveResult = IsValid(GraceTarget)
+            ? Controller->MoveToActor(
+                GraceTarget,
+                AcceptanceRadius,
+                true,
+                true,
+                true,
+                nullptr,
+                true)
+            : EPathFollowingRequestResult::Failed;
+        if (MoveResult == EPathFollowingRequestResult::Failed)
+        {
+            Controller->EndLiveGraceTracking();
+            return EStateTreeRunStatus::Failed;
+        }
+    }
+
+    return EStateTreeRunStatus::Running;
+}
+
+void FJMSimpleEnemyLiveGraceTrackingTask::ExitState(
+    FStateTreeExecutionContext& Context,
+    const FStateTreeTransitionResult& Transition) const
+{
+    if (ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner()))
+    {
+        Controller->StopMovement();
+        Controller->EndLiveGraceTracking();
     }
 }
 

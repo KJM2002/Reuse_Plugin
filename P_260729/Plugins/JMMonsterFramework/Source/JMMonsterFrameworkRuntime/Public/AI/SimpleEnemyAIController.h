@@ -58,6 +58,24 @@ public:
     UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Tracking")
     bool bHasRecentTrackingMemory = false;
 
+    /** Player retained only for the independently selected Live Grace StateTree. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Live Grace")
+    TWeakObjectPtr<AActor> LiveGraceTargetActor;
+
+    /** Maximum time the Live Grace StateTree may follow the hidden player's live position. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "JM Monster Framework|Live Grace", meta = (ClampMin = "0.0"))
+    float LiveGraceDuration = 1.5f;
+
+    /** True after sight loss until reacquisition or explicit Live Grace expiry. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "JM Monster Framework|Live Grace")
+    bool bHasLiveGraceTracking = false;
+
+    /** Updates LastSeenLocation from the live target only while Live Grace is valid. */
+    bool UpdateLiveGraceLastKnownLocation();
+
+    /** Irreversibly stops live target access for the current sight-loss event. */
+    void EndLiveGraceTracking();
+
 private:
     UPROPERTY(VisibleAnywhere, Category = "JM Monster Framework|StateTree")
     TObjectPtr<UStateTreeAIComponent> StateTreeComponent;
@@ -79,5 +97,7 @@ private:
 #if WITH_DEV_AUTOMATION_TESTS
     friend class FJMSimpleEnemySightStateTransitionsTest;
     friend class FJMSimpleEnemyStateTreeAssetTest;
+    friend class FJMSimpleEnemyLiveGraceAssetsTest;
+    friend class FJMSimpleEnemyLiveGraceStateTest;
 #endif
 };
