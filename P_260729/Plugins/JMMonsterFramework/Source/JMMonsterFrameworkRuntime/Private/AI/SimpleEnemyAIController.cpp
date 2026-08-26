@@ -228,6 +228,15 @@ void ASimpleEnemyAIController::ApplyHearingState(
     const UAIPerceptionComponent* Perception = GetPerceptionComponent();
     const bool bHearingEnabled = IsValid(Perception)
         && Perception->IsSenseEnabled(UAISense_Hearing::StaticClass());
+    FString CurrentState = TEXT("None");
+    if (IsValid(StateTreeComponent))
+    {
+        const TArray<FName> ActiveStateNames = StateTreeComponent->GetActiveStateNames();
+        if (!ActiveStateNames.IsEmpty())
+        {
+            CurrentState = ActiveStateNames.Last().ToString();
+        }
+    }
     const TCHAR* RejectionReason = nullptr;
     if (!bWasSuccessfullySensed)
     {
@@ -251,12 +260,14 @@ void ASimpleEnemyAIController::ApplyHearingState(
         UE_LOG(
             LogJMMonsterFramework,
             Log,
-            TEXT("[JM HEARING REJECTED] Enemy=%s Actor=%s Success=%d Strength=%.2f MinimumStrength=0.00 Enabled=%d Reason=%s"),
+            TEXT("[JM HEARING REJECTED] Enemy=%s Actor=%s Success=%d Strength=%.2f MinimumStrength=0.00 Enabled=%d Location=%s State=%s Reason=%s"),
             *GetNameSafe(GetPawn()),
             *GetNameSafe(Actor),
             bWasSuccessfullySensed,
             Strength,
             bHearingEnabled,
+            *HeardLocation.ToCompactString(),
+            *CurrentState,
             RejectionReason);
         return;
     }
@@ -266,12 +277,13 @@ void ASimpleEnemyAIController::ApplyHearingState(
     UE_LOG(
         LogJMMonsterFramework,
         Log,
-        TEXT("[JM HEARING ACCEPTED] Enemy=%s Actor=%s Success=1 Strength=%.2f MinimumStrength=0.00 Enabled=%d Location=%s"),
+        TEXT("[JM HEARING ACCEPTED] Enemy=%s Actor=%s Success=1 Strength=%.2f MinimumStrength=0.00 Enabled=%d Location=%s State=%s"),
         *GetNameSafe(GetPawn()),
         *GetNameSafe(Actor),
         Strength,
         bHearingEnabled,
-        *HeardLocation.ToCompactString());
+        *HeardLocation.ToCompactString(),
+        *CurrentState);
 }
 
 void ASimpleEnemyAIController::ClearHeardSound()

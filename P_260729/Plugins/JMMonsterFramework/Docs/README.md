@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 8"
+title: "JMMonsterFramework Phase 9"
 status: Current
 authority: Guide
-scope: "JMMonsterFramework Phase 0-8 setup and usage"
+scope: "JMMonsterFramework Phase 0-9 setup and usage"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -21,9 +21,10 @@ related:
   - "Testing/PHASE6_BASIC_ATTACK_TEST_KO.md"
   - "Testing/PHASE7_BASIC_HEARING_TEST_KO.md"
   - "Testing/PHASE8_MEMORY_REFACTOR_TEST_KO.md"
+  - "Testing/PHASE9_LISTENER_ENEMY_TEST_KO.md"
 ---
 
-# JMMonsterFramework Phase 8
+# JMMonsterFramework Phase 9
 
 현재 범위는 Enemy 자동 Possession, NavMesh Patrol, Sight/Hearing, Chase, Basic Attack, 선택 가능한 Lost Sight Tracking, 위치 조사와 유한 Search다.
 
@@ -32,6 +33,9 @@ related:
 - `ASimpleEnemyCharacter`: Capsule, Mesh, CharacterMovement를 사용하는 최소 Enemy
 - `ASimpleEnemyAIController`: Perception, 단일 `EnemyMemory`, StateTree 실행 소유
 - `FJMSimpleEnemyMemory`: 현재 실제 사용하는 Sight, Hearing, Predictive, Live Grace 사실만 보관하며 행동을 결정하지 않음
+- `AListenerEnemyAIController`: Patrol 중 Sight를 끄고 Hearing 조사 중에만 확인용 Sight를 켜는 2500uu 청각 중심 파생형
+- `BP_ListenerEnemy`: 기존 Enemy 몸체·이동·공격을 재사용하는 실제 Listener 배치 프리셋
+- `ST_ListenerEnemy`: `Patrol`, `InvestigateSound`, `Chase`, `Attack`, `Search`만 사용하는 Listener 전용 StateTree
 - `ST_SimpleEnemy`: `Patrol`, `Chase`, `Attack`, `RecentTracking`, `InvestigateLastLocation`, `Search`, `InvestigateSound`
 - `ST_SimpleEnemy_LiveGrace`: `Patrol`, `Chase`, `Attack`, `LiveGraceTracking`, `InvestigateLastLocation`, `Search`, `InvestigateSound`
 - `Patrol`: 반경 800uu 안의 도달 가능한 NavMesh 목적지를 반복 방문하고 1.5초 대기
@@ -53,4 +57,6 @@ related:
 
 Predictive 방식은 기존 `BP_SimpleEnemy`, Live Grace 방식은 `BP_SimpleEnemy_LiveGrace`를 배치해 독립적으로 비교한다.
 
-Listener, 복잡한 소음 단계/점수, Suspicion, Combo, Ability/Animation Framework와 장기·복수 대상 Memory Framework는 포함되지 않는다.
+Listener는 `BP_ListenerEnemy`를 NavMesh 위에 배치한다. Patrol 중에는 Sight 자체가 비활성화되어 눈앞의 Player도 먼저 발견하지 않는다. Accepted Noise가 들어와 `InvestigateSound`가 시작된 동안에만 Sight를 켜 Player를 확인하며, 미발견 조사는 Sight를 다시 끄고 Patrol로 복귀한다.
+
+복잡한 소음 단계/점수, Suspicion, Combo, Ability/Animation Framework와 장기·복수 대상 Memory Framework는 포함되지 않는다.

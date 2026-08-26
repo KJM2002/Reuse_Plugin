@@ -110,7 +110,7 @@ public:
     /** Clears the single pending sound after investigation or Sight preemption. */
     void ClearHeardSound();
 
-private:
+protected:
     /** Native Hearing config reapplied on possess so stale Blueprint SensesConfig overrides cannot remove it. */
     UPROPERTY(VisibleAnywhere, Category = "JM Monster Framework|Hearing")
     TObjectPtr<UAISenseConfig_Hearing> HearingConfig;
@@ -120,6 +120,8 @@ private:
 
     UPROPERTY(EditDefaultsOnly, Category = "JM Monster Framework|StateTree")
     TSoftObjectPtr<UStateTree> StateTreeAsset;
+
+private:
 
     UFUNCTION()
     void HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
@@ -145,5 +147,6 @@ private:
     friend class FJMSimpleEnemyLiveGraceStateTest;
     friend class FJMSimpleEnemyHearingStateTest;
     friend class FJMSimpleEnemyMemoryRuntimeTest;
+    friend class FJMListenerEnemyAssetsTest;
 #endif
 };

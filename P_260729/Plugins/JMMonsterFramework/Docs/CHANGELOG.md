@@ -11,6 +11,22 @@ owners:
 
 # Changelog
 
+## 1.9.0 - 2026-08-26
+
+### Added
+
+- 기존 AIController 기능을 상속하되 Patrol 중 Sight를 비활성화하는 `AListenerEnemyAIController`
+- 실제 배치용 `BP_ListenerEnemy`, `BP_ListenerEnemyAIController`, `ST_ListenerEnemy`
+- 2500uu Hearing을 주요 Trigger로 사용하는 Patrol → Sound Investigate → Patrol 흐름
+- 실제 Hearing 조사 진입 시에만 Sight를 활성화하고 조사 실패·Search 종료 후 Patrol에서 다시 비활성화
+- Sound 조사 중 Sight 획득 시 기존 Chase/Attack 우선 전환
+- 실제 BP Possession, Perception Component, Hearing Config, StateTree, Report Noise Event를 사용하는 Listener 통합 검사
+
+### Changed
+
+- 반복 Noise는 가장 최근 Accepted Sound Location으로 조사 목적지를 갱신
+- Hearing Accepted/Rejected 로그에 Strength, Location, 현재 StateTree State 출력
+
 ## 1.8.0 - 2026-08-26
 
 ### Changed

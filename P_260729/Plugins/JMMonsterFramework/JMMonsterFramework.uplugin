@@ -1,9 +1,9 @@
 {
   "FileVersion": 3,
-  "Version": 11,
-  "VersionName": "1.8.0",
+  "Version": 12,
+  "VersionName": "1.9.0",
   "FriendlyName": "JM Monster Framework",
-  "Description": "Reusable enemy foundation with unified runtime memory, patrol, sight and hearing perception, chase, basic attack, investigation, and search.",
+  "Description": "Reusable enemy foundation with unified memory and a hearing-focused Listener enemy.",
   "Category": "JM Plugins",
   "CreatedBy": "JM",
   "CanContainContent": true,

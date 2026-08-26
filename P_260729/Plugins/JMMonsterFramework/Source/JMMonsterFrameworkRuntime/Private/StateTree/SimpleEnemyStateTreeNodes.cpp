@@ -1,6 +1,8 @@
 #include "StateTree/SimpleEnemyStateTreeNodes.h"
 
+#include "AI/ListenerEnemyAIController.h"
 #include "AI/SimpleEnemyAIController.h"
+#include "JMMonsterFrameworkRuntime.h"
 #include "GameFramework/Pawn.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
@@ -311,6 +313,11 @@ EStateTreeRunStatus FJMSimpleEnemyPatrolTask::EnterState(
         return EStateTreeRunStatus::Failed;
     }
 
+    if (AListenerEnemyAIController* ListenerController = Cast<AListenerEnemyAIController>(Controller))
+    {
+        ListenerController->SetSightConfirmationEnabled(false);
+    }
+
     FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
     InstanceData.ElapsedWaitTime = 0.0f;
     InstanceData.bWaiting = !RequestPatrolMove(*Controller);
@@ -454,8 +461,16 @@ EStateTreeRunStatus FJMSimpleEnemyInvestigateSoundTask::EnterState(
         return EStateTreeRunStatus::Failed;
     }
 
+
+    if (AListenerEnemyAIController* ListenerController = Cast<AListenerEnemyAIController>(Controller))
+    {
+        ListenerController->SetSightConfirmationEnabled(true);
+    }
+
+    FJMSimpleEnemyInvestigateSoundInstanceData& InstanceData = Context.GetInstanceData(*this);
+    InstanceData.ActiveSoundLocation = Controller->EnemyMemory.LastHeardLocation;
     const EPathFollowingRequestResult::Type MoveResult = Controller->MoveToLocation(
-        Controller->EnemyMemory.LastHeardLocation,
+        InstanceData.ActiveSoundLocation,
         AcceptanceRadius,
         true,
         true,
@@ -490,6 +505,38 @@ EStateTreeRunStatus FJMSimpleEnemyInvestigateSoundTask::Tick(
     if (Controller->EnemyMemory.bCanSeeTarget && IsValid(Controller->EnemyMemory.TargetActor))
     {
         return EStateTreeRunStatus::Running;
+    }
+
+    FJMSimpleEnemyInvestigateSoundInstanceData& InstanceData = Context.GetInstanceData(*this);
+    if (Controller->EnemyMemory.bHasHeardSound
+        && !Controller->EnemyMemory.LastHeardLocation.Equals(InstanceData.ActiveSoundLocation, 1.0f))
+    {
+        InstanceData.ActiveSoundLocation = Controller->EnemyMemory.LastHeardLocation;
+        const EPathFollowingRequestResult::Type MoveResult = Controller->MoveToLocation(
+            InstanceData.ActiveSoundLocation,
+            AcceptanceRadius,
+            true,
+            true,
+            true,
+            true,
+            nullptr,
+            true);
+        UE_LOG(
+            LogJMMonsterFramework,
+            Log,
+            TEXT("[JM HEARING REDIRECT] Enemy=%s Location=%s State=InvestigateSound"),
+            *GetNameSafe(Controller->GetPawn()),
+            *InstanceData.ActiveSoundLocation.ToCompactString());
+        if (MoveResult == EPathFollowingRequestResult::Failed)
+        {
+            Controller->ClearHeardSound();
+            return EStateTreeRunStatus::Failed;
+        }
+        if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
+        {
+            Controller->ClearHeardSound();
+            return EStateTreeRunStatus::Succeeded;
+        }
     }
 
     if (Controller->GetMoveStatus() == EPathFollowingStatus::Idle)

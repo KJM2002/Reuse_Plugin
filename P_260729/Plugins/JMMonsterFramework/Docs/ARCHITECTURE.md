@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 8 Architecture"
+title: "JMMonsterFramework Phase 9 Architecture"
 status: Current
 authority: Canonical
-scope: "JMMonsterFramework Phase 0-8 runtime architecture"
+scope: "JMMonsterFramework Phase 0-9 runtime architecture"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -28,6 +28,7 @@ related:
 - Phase 6: 가시 Player가 공격 범위 안에 있을 때 이동을 멈추고 Cooldown 기반 Damage 적용
 - Phase 7: AI Hearing으로 단일 소리 위치를 기억하고 조사한 뒤 Patrol 복귀
 - Phase 8: 실제 사용 중인 Sight, Hearing, Predictive, Live Grace 사실을 단일 `EnemyMemory` 소유 구조로 정리
+- Phase 9: 실제 Hearing 경로를 주요 Trigger로 사용하는 첫 특수 Enemy `Listener` 추가
 
 ## 비책임
 
@@ -76,6 +77,22 @@ Attack은 두 StateTree에서 동일한 Task와 조건을 사용한다. 150uu �
 Perception 콜백은 Sense ID로 Sight와 Hearing을 먼저 분리한다. 성공한 Hearing 자극의 유효 위치 하나만 `EnemyMemory.LastHeardLocation`에 저장하며 Sight가 활성화된 동안에는 저장하지 않는다. `InvestigateSound`는 이 위치의 스냅샷으로만 `MoveToLocation`을 수행하고 도착·경로 실패 후 메모리를 소비해 Patrol로 돌아간다. 조사 중 Player를 실제로 보면 Hearing 메모리를 폐기하고 Attack 또는 Chase가 즉시 우선한다.
 
 Phase 8은 새 행동을 추가하지 않는다. Controller의 이전 개별 런타임 변수는 제거됐고 Predictive와 Live Grace StateTree는 통합되지 않은 채 각각 같은 `EnemyMemory`에서 필요한 사실만 읽는다.
+
+## Listener Enemy
+
+`AListenerEnemyAIController`는 `ASimpleEnemyAIController`의 Perception, Memory, Navigation, Attack 구현을 그대로 상속한다. 새 감각 Component나 전략 Interface를 만들지 않는다. Listener는 2500uu Hearing을 주요 Trigger로 사용하며 Patrol 진입 시 Sight를 비활성화한다. 실제 Hearing으로 `InvestigateSound`에 들어갈 때만 Sight를 켜고, 조사 실패로 Patrol에 복귀하면 다시 끈다. `BP_ListenerEnemy`는 기존 `BP_SimpleEnemy` 몸체를 상속하고 실제 `BP_ListenerEnemyAIController`를 사용한다.
+
+```text
+Patrol -- 실제 Hearing --> InvestigateSound
+Patrol -- Player가 눈앞에 있음 --> Patrol 유지
+InvestigateSound -- 최신 Noise --> 새 SoundLocation으로 MoveTo 갱신
+InvestigateSound -- Sight 획득 --> Chase 또는 Attack
+InvestigateSound -- 도착/경로 실패 --> Sight 비활성화 후 Patrol
+Chase/Attack -- Sight 상실 --> Search
+Search -- 완료 --> Sight 비활성화 후 Patrol
+```
+
+반복 Noise 정책은 가장 최근 Accepted 위치 우선 하나뿐이다. `InvestigateSound` Task의 현재 목적지와 `EnemyMemory.LastHeardLocation`이 달라지면 기존 Move 요청을 새 위치로 갱신한다. Strength는 RAW 및 Accepted/Rejected 로그에 남기지만 점수화·누적·분류하지 않는다. Hearing 로그에는 Sound Location과 현재 활성 StateTree State도 함께 기록한다.
 
 ## 수명과 실패 동작
 

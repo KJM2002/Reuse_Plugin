@@ -88,6 +88,9 @@ USTRUCT()
 struct FJMSimpleEnemyInvestigateSoundInstanceData
 {
     GENERATED_BODY()
+
+    UPROPERTY(Transient)
+    FVector ActiveSoundLocation = FVector::ZeroVector;
 };
 
 /** Per-execution storage required by StateTree for the investigation task. */
