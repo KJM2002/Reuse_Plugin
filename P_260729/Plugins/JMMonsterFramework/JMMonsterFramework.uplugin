@@ -1,9 +1,9 @@
 {
   "FileVersion": 3,
-  "Version": 12,
-  "VersionName": "1.9.0",
+  "Version": 14,
+  "VersionName": "1.10.1",
   "FriendlyName": "JM Monster Framework",
-  "Description": "Reusable enemy foundation with unified memory and a hearing-focused Listener enemy.",
+  "Description": "Reusable enemy foundation with Listener hearing and Watcher camera-gaze enemies.",
   "Category": "JM Plugins",
   "CreatedBy": "JM",
   "CanContainContent": true,

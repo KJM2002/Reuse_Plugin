@@ -11,6 +11,30 @@ owners:
 
 # Changelog
 
+## 1.10.1 - 2026-08-26
+
+### Changed
+
+- 고정 중앙 12도·눈 한 점 Gaze를 실제 Camera FOV와 Viewport 비율의 85% 화면 영역 판정으로 교체
+- Watcher 눈·상체·몸통·하체 네 지점 중 하나라도 실제로 보이면 Watched로 인정
+- 거리 제한 없이 5000uu에서도 같은 카메라 화면 기준을 사용하도록 회귀 검사 추가
+- 한 프레임 Gaze 손실에 움직이지 않도록 0.12초 Watched 해제 완충 추가
+- Gaze 로그의 `Angle`을 실제 의미에 맞는 `Screen`으로 변경
+
+## 1.10.0 - 2026-08-26
+
+### Added
+
+- 실제 Player Camera Location과 View Direction을 사용하는 `AWatcherEnemyAIController`
+- 중앙 12도 View Angle과 `ECC_Visibility` Trace를 모두 통과해야만 Watched가 되는 Gaze 판정
+- 실제 배치용 `BP_WatcherEnemy`, `BP_WatcherEnemyAIController`, `ST_WatcherEnemy`
+- `WatchedStop`과 `UnwatchedMove` 두 상태만 사용하는 Watcher 행동
+- 실제 BP Possession, ViewPoint, 각도, 벽 차단, StateTree 전달과 20회 빠른 시선 반복 통합 검사
+
+### Changed
+
+- Player 부착 Actor는 Gaze Trace에서 제외하고 Watcher 부착 Actor는 Watcher 본체로 인정
+
 ## 1.9.0 - 2026-08-26
 
 ### Added

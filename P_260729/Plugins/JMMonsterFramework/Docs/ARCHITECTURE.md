@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 9 Architecture"
+title: "JMMonsterFramework Phase 10 Architecture"
 status: Current
 authority: Canonical
-scope: "JMMonsterFramework Phase 0-9 runtime architecture"
+scope: "JMMonsterFramework Phase 0-10 runtime architecture"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -29,10 +29,11 @@ related:
 - Phase 7: AI Hearing으로 단일 소리 위치를 기억하고 조사한 뒤 Patrol 복귀
 - Phase 8: 실제 사용 중인 Sight, Hearing, Predictive, Live Grace 사실을 단일 `EnemyMemory` 소유 구조로 정리
 - Phase 9: 실제 Hearing 경로를 주요 Trigger로 사용하는 첫 특수 Enemy `Listener` 추가
+- Phase 10: 실제 Player Camera 방향과 Visibility Trace로 멈춤을 결정하는 특수 Enemy `Watcher` 추가
 
 ## 비책임
 
-Listener, 소음 단계/누적/Threat Score, Suspicion, Combo, Ability/Animation Framework, Memory Manager/Subsystem/Interface, 장기·복수 대상 Memory는 제공하지 않는다.
+Encounter 단계, Flee/Hide/ReApproach, Enrage/Frenzy, Crawler, 소음 단계/누적/Threat Score, Suspicion, Combo, Ability/Animation Framework, Memory Manager/Subsystem/Interface, 장기·복수 대상 Memory는 제공하지 않는다.
 
 ## 모듈과 의존성
 
@@ -94,9 +95,31 @@ Search -- 완료 --> Sight 비활성화 후 Patrol
 
 반복 Noise 정책은 가장 최근 Accepted 위치 우선 하나뿐이다. `InvestigateSound` Task의 현재 목적지와 `EnemyMemory.LastHeardLocation`이 달라지면 기존 Move 요청을 새 위치로 갱신한다. Strength는 RAW 및 Accepted/Rejected 로그에 남기지만 점수화·누적·분류하지 않는다. Hearing 로그에는 Sound Location과 현재 활성 StateTree State도 함께 기록한다.
 
+## Watcher Enemy
+
+`AWatcherEnemyAIController`는 기존 Character, Possession, Navigation, StateTree 실행만 재사용한다. Possess 후 AI Perception Sight와 Hearing을 모두 비활성화하므로 기존 `Enemy → Player` 감지는 Watcher 상태를 바꾸지 않는다. Controller Tick은 실제 첫 PlayerController의 `GetPlayerViewPoint`에서 Camera Location과 View Rotation을 읽고 다음 경로 하나만 계산한다.
+
+```text
+Player Camera Location + View Direction
+→ Watcher 눈 위치 방향과 Dot Product
+→ 실제 Camera FOV와 Viewport 비율의 85% 화면 영역 판정
+→ 눈·상체·몸통·하체 Visibility Trace
+→ bPlayerIsWatchingWatcher
+→ ST_WatcherEnemy
+```
+
+Player와 Player 부착 Actor는 Trace에서 제외하며 Watcher 또는 Watcher 부착 Actor에 도달하면 보이는 것으로 인정한다. 네 표본점 중 하나라도 화면 영역과 Visibility를 통과하면 Watched다. 다른 Blocking Actor가 모든 유효 표본점을 가리면 카메라 방향이 일치해도 Watched가 아니다. 별도 최대 거리는 없으며 Watched 해제에만 0.12초 완충을 사용해 단일 프레임 흔들림을 막는다.
+
+```text
+WatchedStop -- 시선 이탈/벽 차단 --> UnwatchedMove
+UnwatchedMove -- 각도와 Visibility 모두 통과 --> WatchedStop
+```
+
+`WatchedStop`은 매 Tick `StopMovement`만 수행한다. `UnwatchedMove`는 실제 Player Pawn으로 `MoveToActor`를 요청한다. Encounter 횟수, 도망, 숨기, 재접근, 분노 같은 추가 행동은 없다.
+
 ## 수명과 실패 동작
 
-`UStateTreeAIComponent`는 AIController가 소유하며 Possess 시 플러그인 StateTree를 동기 로드해 시작한다. 작은 필수 동작 에셋이므로 Possess 시 로드하며, 누락 시 Error를 남기고 AI 행동만 시작하지 않는다. 별도 Subsystem과 Controller Tick은 없다.
+`UStateTreeAIComponent`는 AIController가 소유하며 Possess 시 플러그인 StateTree를 동기 로드해 시작한다. 작은 필수 동작 에셋이므로 Possess 시 로드하며, 누락 시 Error를 남기고 AI 행동만 시작하지 않는다. 별도 Subsystem은 없으며 Controller Tick은 Watcher의 실제 카메라 Gaze 판정에만 사용한다.
 
 ## 네트워크와 저장
 

@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 9"
+title: "JMMonsterFramework Phase 10"
 status: Current
 authority: Guide
-scope: "JMMonsterFramework Phase 0-9 setup and usage"
+scope: "JMMonsterFramework Phase 0-10 setup and usage"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -22,9 +22,10 @@ related:
   - "Testing/PHASE7_BASIC_HEARING_TEST_KO.md"
   - "Testing/PHASE8_MEMORY_REFACTOR_TEST_KO.md"
   - "Testing/PHASE9_LISTENER_ENEMY_TEST_KO.md"
+  - "Testing/PHASE10_WATCHER_ENEMY_TEST_KO.md"
 ---
 
-# JMMonsterFramework Phase 9
+# JMMonsterFramework Phase 10
 
 현재 범위는 Enemy 자동 Possession, NavMesh Patrol, Sight/Hearing, Chase, Basic Attack, 선택 가능한 Lost Sight Tracking, 위치 조사와 유한 Search다.
 
@@ -36,6 +37,9 @@ related:
 - `AListenerEnemyAIController`: Patrol 중 Sight를 끄고 Hearing 조사 중에만 확인용 Sight를 켜는 2500uu 청각 중심 파생형
 - `BP_ListenerEnemy`: 기존 Enemy 몸체·이동·공격을 재사용하는 실제 Listener 배치 프리셋
 - `ST_ListenerEnemy`: `Patrol`, `InvestigateSound`, `Chase`, `Attack`, `Search`만 사용하는 Listener 전용 StateTree
+- `AWatcherEnemyAIController`: 실제 Player Camera FOV의 85% 화면 영역, 다중 몸체 지점, Visibility Trace로 Gaze를 판정하는 Watcher
+- `BP_WatcherEnemy`: 기존 Enemy 몸체와 Navigation을 재사용하는 실제 Watcher 배치 프리셋
+- `ST_WatcherEnemy`: `WatchedStop`, `UnwatchedMove` 두 상태만 사용하는 Watcher 전용 StateTree
 - `ST_SimpleEnemy`: `Patrol`, `Chase`, `Attack`, `RecentTracking`, `InvestigateLastLocation`, `Search`, `InvestigateSound`
 - `ST_SimpleEnemy_LiveGrace`: `Patrol`, `Chase`, `Attack`, `LiveGraceTracking`, `InvestigateLastLocation`, `Search`, `InvestigateSound`
 - `Patrol`: 반경 800uu 안의 도달 가능한 NavMesh 목적지를 반복 방문하고 1.5초 대기
@@ -59,4 +63,6 @@ Predictive 방식은 기존 `BP_SimpleEnemy`, Live Grace 방식은 `BP_SimpleEne
 
 Listener는 `BP_ListenerEnemy`를 NavMesh 위에 배치한다. Patrol 중에는 Sight 자체가 비활성화되어 눈앞의 Player도 먼저 발견하지 않는다. Accepted Noise가 들어와 `InvestigateSound`가 시작된 동안에만 Sight를 켜 Player를 확인하며, 미발견 조사는 Sight를 다시 끄고 Patrol로 복귀한다.
 
-복잡한 소음 단계/점수, Suspicion, Combo, Ability/Animation Framework와 장기·복수 대상 Memory Framework는 포함되지 않는다.
+Watcher는 `BP_WatcherEnemy`를 NavMesh 위에 배치한다. Watcher의 눈·상체·몸통·하체 중 하나가 실제 Player Camera FOV의 85% 화면 영역 안에 있고 Visibility Trace가 막히지 않으면 즉시 정지한다. 한 프레임 판정 흔들림은 0.12초 해제 완충으로 무시하며, 충분히 시선을 돌리거나 벽이 가리면 Player를 향해 이동할 수 있다. 별도 거리 제한은 없고 AI Sight나 Hearing도 Trigger로 사용하지 않는다.
+
+Encounter 단계, Flee/Hide/ReApproach, Enrage/Frenzy, 복잡한 소음 단계/점수, Suspicion, Combo, Ability/Animation Framework와 장기·복수 대상 Memory Framework는 포함되지 않는다.
