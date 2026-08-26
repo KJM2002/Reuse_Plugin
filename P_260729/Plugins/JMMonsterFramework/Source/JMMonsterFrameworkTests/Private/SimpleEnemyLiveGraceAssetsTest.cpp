@@ -70,7 +70,7 @@ namespace
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FJMSimpleEnemyLiveGraceAssetsTest,
-    "JM.MonsterFramework.Phase4_6.BuildAndValidateAssets",
+    "JM.MonsterFramework.Phase5.BuildAndValidateLiveGraceAssets",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
@@ -117,7 +117,7 @@ bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
     UStateTreeState& Root = EditorData->AddRootState();
     UStateTreeState& Chase = Root.AddChildState(TEXT("Chase"));
     UStateTreeState& LiveGrace = Root.AddChildState(TEXT("LiveGraceTracking"));
-    UStateTreeState& Idle = Root.AddChildState(TEXT("Idle"));
+    UStateTreeState& Patrol = Root.AddChildState(TEXT("Patrol"));
     UStateTreeState& Investigate = Root.AddChildState(TEXT("InvestigateLastLocation"));
     UStateTreeState& Search = Root.AddChildState(TEXT("Search"));
 
@@ -135,7 +135,8 @@ bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
         EStateTreeTransitionType::GotoState,
         &Investigate);
 
-    Idle.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
+    FJMSimpleEnemyPatrolTask& PatrolTask = Patrol.AddTask<FJMSimpleEnemyPatrolTask>().GetNode();
+    Patrol.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
         .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
 
     Investigate.AddTask<FJMSimpleEnemyMoveToLastSeenLocationTask>();
@@ -148,7 +149,7 @@ bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
     SearchTask.RotationSpeedDegrees = 90.0f;
     Search.AddTransition(EStateTreeTransitionTrigger::OnTick, EStateTreeTransitionType::GotoState, &Chase)
         .AddCondition<FJMSimpleEnemyCanSeeTargetCondition>().GetNode().bExpectedValue = true;
-    Search.AddTransition(EStateTreeTransitionTrigger::OnStateCompleted, EStateTreeTransitionType::GotoState, &Idle);
+    Search.AddTransition(EStateTreeTransitionTrigger::OnStateCompleted, EStateTreeTransitionType::GotoState, &Patrol);
 
     FStateTreeCompilerLog CompilerLog;
     FStateTreeCompiler Compiler(CompilerLog);
@@ -163,6 +164,10 @@ bool FJMSimpleEnemyLiveGraceAssetsTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Live Grace state has one validity condition"), LiveGrace.EnterConditions.Num(), 1);
     TestEqual(TEXT("Live Grace state has one live tracking task"), LiveGrace.Tasks.Num(), 1);
     TestEqual(TEXT("Live Grace can reacquire or investigate"), LiveGrace.Transitions.Num(), 2);
+    TestEqual(TEXT("Live Grace tree Patrol has one NavMesh task"), Patrol.Tasks.Num(), 1);
+    TestEqual(TEXT("Live Grace tree Patrol can enter Chase"), Patrol.Transitions.Num(), 1);
+    TestTrue(TEXT("Live Grace tree Patrol radius is positive"), PatrolTask.PatrolRadius > 0.0f);
+    TestTrue(TEXT("Live Grace tree Patrol wait is finite"), PatrolTask.WaitDuration > 0.0f);
     TestTrue(TEXT("Search remains finite"), SearchTask.SearchDuration > 0.0f);
 
     if (bCreatedStateTree)

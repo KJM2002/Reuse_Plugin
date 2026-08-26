@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 4.6"
+title: "JMMonsterFramework Phase 5"
 status: Current
 authority: Guide
-scope: "JMMonsterFramework Phase 0-4.6 setup and usage"
+scope: "JMMonsterFramework Phase 0-5 setup and usage"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -17,23 +17,25 @@ related:
   - "Testing/PHASE4_SEARCH_TEST_KO.md"
   - "Testing/PHASE4_5_RECENT_TRACKING_TEST_KO.md"
   - "Testing/PHASE4_6_LIVE_GRACE_TEST_KO.md"
+  - "Testing/PHASE5_PATROL_TEST_KO.md"
 ---
 
-# JMMonsterFramework Phase 4.6
+# JMMonsterFramework Phase 5
 
-현재 범위는 Enemy 자동 Possession, 플레이어 Sight, 선택 가능한 Predictive/Live Grace 추적, 마지막 관측 위치 조사와 유한 Search다.
+현재 범위는 Enemy 자동 Possession, NavMesh Patrol, 플레이어 Sight, 선택 가능한 Predictive/Live Grace 추적, 마지막 관측 위치 조사와 유한 Search다.
 
 ## 포함 기능
 
 - `ASimpleEnemyCharacter`: Capsule, Mesh, CharacterMovement를 사용하는 최소 Enemy
 - `ASimpleEnemyAIController`: Sight 상태, 마지막 가시 위치·속도, 제한된 예상 위치와 StateTree 실행 소유
-- `ST_SimpleEnemy`: `Idle`, `Chase`, `RecentTracking`, `InvestigateLastLocation`, `Search`
-- `ST_SimpleEnemy_LiveGrace`: `Idle`, `Chase`, `LiveGraceTracking`, `InvestigateLastLocation`, `Search`
+- `ST_SimpleEnemy`: `Patrol`, `Chase`, `RecentTracking`, `InvestigateLastLocation`, `Search`
+- `ST_SimpleEnemy_LiveGrace`: `Patrol`, `Chase`, `LiveGraceTracking`, `InvestigateLastLocation`, `Search`
+- `Patrol`: 반경 800uu 안의 도달 가능한 NavMesh 목적지를 반복 방문하고 1.5초 대기
 - `Chase`: 보이는 `TargetActor`를 NavMesh로 추적
 - `RecentTracking`: Sight Lost 순간 만든 예상 위치를 최대 1.5초 동안 추적
 - `LiveGraceTracking`: 별도 프리셋에서 Sight Lost 후 실제 Player Actor를 최대 1.5초 동안 추적
 - `InvestigateLastLocation`: 시야를 잃은 순간의 실제 마지막 관측 위치까지만 이동
-- `Search`: 도착 후 4초 동안 제자리에서 한 바퀴 탐색하고 미발견 시 Idle
+- `Search`: 도착 후 4초 동안 제자리에서 한 바퀴 탐색하고 미발견 시 Patrol
 
 ## 사용
 
@@ -45,4 +47,4 @@ related:
 
 Predictive 방식은 기존 `BP_SimpleEnemy`, Live Grace 방식은 `BP_SimpleEnemy_LiveGrace`를 배치해 독립적으로 비교한다.
 
-Patrol, Attack, Hearing, 장기 Memory와 범용 예측 시스템은 포함되지 않는다.
+Attack, Hearing, 장기 Memory와 범용 예측 시스템은 포함되지 않는다.

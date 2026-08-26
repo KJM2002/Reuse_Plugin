@@ -12,6 +12,7 @@ public class JMMonsterFrameworkRuntime : ModuleRules
             "CoreUObject",
             "Engine",
             "AIModule",
+            "NavigationSystem",
             "StateTreeModule",
             "GameplayStateTreeModule"
         });

@@ -18,7 +18,7 @@ related:
 
 Automation 창에서 다음을 실행한다.
 
-- `JM.MonsterFramework.Phase4_6.BuildAndValidateAssets`
+- `JM.MonsterFramework.Phase5.BuildAndValidateLiveGraceAssets`
 - `JM.MonsterFramework.Phase4_6.LiveGraceState`
 - 기존 `JM.MonsterFramework` 회귀 테스트
 
@@ -34,7 +34,7 @@ Automation 창에서 다음을 실행한다.
 3. 1.5초 넘게 도망간 뒤 다시 방향을 바꾼다. Enemy가 새 위치를 따라가지 않고 Grace 만료 위치를 Investigate하는지 확인한다.
 4. Grace 도중 다시 나타나 즉시 Chase로 복귀하는지 확인한다.
 5. 재감지 후 다시 숨고, 두 번째 Grace가 0초부터 1.5초 동안 새로 실행되는지 확인한다.
-6. 끝까지 숨은 상태에서 `LiveGraceTracking -> InvestigateLastLocation -> Search -> Idle`을 확인한다.
+6. 끝까지 숨은 상태에서 `LiveGraceTracking -> InvestigateLastLocation -> Search -> Patrol`을 확인한다.
 7. 위 성공/실패 흐름을 반복해 이동 요청 누적, 상태 고착, Warning/Error가 없는지 확인한다.
 
 ## PASS 기준

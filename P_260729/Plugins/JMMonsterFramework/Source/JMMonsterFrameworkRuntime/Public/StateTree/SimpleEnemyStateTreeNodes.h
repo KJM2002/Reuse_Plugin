@@ -6,6 +6,7 @@
 
 struct FStateTreeExecutionContext;
 struct FStateTreeTransitionResult;
+class ASimpleEnemyAIController;
 
 /** Per-execution storage required by StateTree for the sight condition. */
 USTRUCT()
@@ -53,6 +54,19 @@ struct FJMSimpleEnemyLiveGraceTrackingInstanceData
 
     UPROPERTY(Transient)
     float ElapsedTime = 0.0f;
+};
+
+/** Per-execution wait state between NavMesh patrol moves. */
+USTRUCT()
+struct FJMSimpleEnemyPatrolInstanceData
+{
+    GENERATED_BODY()
+
+    UPROPERTY(Transient)
+    float ElapsedWaitTime = 0.0f;
+
+    UPROPERTY(Transient)
+    bool bWaiting = false;
 };
 
 /** Per-execution storage required by StateTree for the investigation task. */
@@ -216,6 +230,46 @@ struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyLiveGraceTrackingTask : publi
 
     UPROPERTY(EditAnywhere, Category = "Movement", meta = (ClampMin = "0.0"))
     float AcceptanceRadius = 75.0f;
+};
+
+/** Repeatedly visits random reachable NavMesh points and waits briefly at each destination. */
+USTRUCT(meta = (DisplayName = "Patrol NavMesh Area", Category = "JM Monster Framework"))
+struct JMMONSTERFRAMEWORKRUNTIME_API FJMSimpleEnemyPatrolTask : public FStateTreeAIActionTaskBase
+{
+    GENERATED_BODY()
+
+    using FInstanceDataType = FJMSimpleEnemyPatrolInstanceData;
+
+    FJMSimpleEnemyPatrolTask();
+
+    virtual const UStruct* GetInstanceDataType() const override
+    {
+        return FInstanceDataType::StaticStruct();
+    }
+
+    virtual EStateTreeRunStatus EnterState(
+        FStateTreeExecutionContext& Context,
+        const FStateTreeTransitionResult& Transition) const override;
+
+    virtual EStateTreeRunStatus Tick(
+        FStateTreeExecutionContext& Context,
+        float DeltaTime) const override;
+
+    virtual void ExitState(
+        FStateTreeExecutionContext& Context,
+        const FStateTreeTransitionResult& Transition) const override;
+
+    UPROPERTY(EditAnywhere, Category = "Patrol", meta = (ClampMin = "0.0"))
+    float PatrolRadius = 800.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Patrol", meta = (ClampMin = "0.0"))
+    float AcceptanceRadius = 75.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Patrol", meta = (ClampMin = "0.0"))
+    float WaitDuration = 1.5f;
+
+private:
+    bool RequestPatrolMove(ASimpleEnemyAIController& Controller) const;
 };
 
 /** Moves to a snapshot of LastSeenLocation without following the hidden Actor. */

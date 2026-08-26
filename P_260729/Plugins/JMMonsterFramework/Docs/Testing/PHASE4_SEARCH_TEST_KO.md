@@ -23,7 +23,7 @@ Automation 창에서 `JM.MonsterFramework.Phase4.BuildAndValidateStateTree`를 �
 2. Enemy에게 발견된 뒤 코너 뒤로 숨는다.
 3. Enemy가 `LastSeenLocation`까지 이동하는지 확인한다.
 4. 도착 직후 제자리 Search를 시작해 약 4초 동안 한 바퀴 회전하는지 확인한다.
-5. 계속 숨은 상태라면 Search가 끝나고 Idle로 정지하는지 확인한다.
+5. 계속 숨은 상태라면 Search가 끝나고 Patrol로 복귀하는지 확인한다.
 6. 다시 반복하고 Search 도중 Enemy 시야에 나타난다.
 7. 회전을 즉시 끝내고 Chase로 전환해 Player를 추적하는지 확인한다.
 

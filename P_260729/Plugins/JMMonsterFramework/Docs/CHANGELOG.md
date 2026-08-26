@@ -11,6 +11,16 @@ owners:
 
 # Changelog
 
+## 1.5.0 - 2026-08-26
+
+### Added
+
+- 현재 위치 반경 800uu 안의 도달 가능한 NavMesh 목적지를 선택하는 `Patrol`
+- 목적지 도착 후 1.5초 대기하고 다음 목적지를 반복 선택하는 Patrol Task
+- Patrol 중 Player 감지 시 즉시 Chase 전환
+- Search 완료 후 Idle 대신 Patrol 복귀
+- Predictive와 Live Grace StateTree의 기존 Lost Sight 정책을 유지한 독립 Patrol 연결
+
 ## 1.4.6 - 2026-08-26
 
 ### Added

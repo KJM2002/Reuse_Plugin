@@ -3,6 +3,7 @@
 #include "AI/SimpleEnemyAIController.h"
 #include "GameFramework/Pawn.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "NavigationSystem.h"
 #include "StateTreeExecutionContext.h"
 
 bool FJMSimpleEnemyCanSeeTargetCondition::TestCondition(FStateTreeExecutionContext& Context) const
@@ -276,6 +277,106 @@ void FJMSimpleEnemyLiveGraceTrackingTask::ExitState(
         Controller->StopMovement();
         Controller->EndLiveGraceTracking();
     }
+}
+
+FJMSimpleEnemyPatrolTask::FJMSimpleEnemyPatrolTask()
+{
+    bShouldCallTick = true;
+}
+
+EStateTreeRunStatus FJMSimpleEnemyPatrolTask::EnterState(
+    FStateTreeExecutionContext& Context,
+    const FStateTreeTransitionResult& Transition) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    if (!IsValid(Controller) || !IsValid(Controller->GetPawn()))
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
+    InstanceData.ElapsedWaitTime = 0.0f;
+    InstanceData.bWaiting = !RequestPatrolMove(*Controller);
+    return EStateTreeRunStatus::Running;
+}
+
+EStateTreeRunStatus FJMSimpleEnemyPatrolTask::Tick(
+    FStateTreeExecutionContext& Context,
+    const float DeltaTime) const
+{
+    ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner());
+    if (!IsValid(Controller) || !IsValid(Controller->GetPawn()))
+    {
+        return EStateTreeRunStatus::Failed;
+    }
+
+    // Keep Patrol alive for this tick so its sight transition can preempt immediately.
+    if (Controller->bCanSeeTarget && IsValid(Controller->TargetActor))
+    {
+        return EStateTreeRunStatus::Running;
+    }
+
+    FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
+    if (!InstanceData.bWaiting && Controller->GetMoveStatus() == EPathFollowingStatus::Idle)
+    {
+        InstanceData.bWaiting = true;
+        InstanceData.ElapsedWaitTime = 0.0f;
+    }
+
+    if (InstanceData.bWaiting)
+    {
+        InstanceData.ElapsedWaitTime += FMath::Max(DeltaTime, 0.0f);
+        if (InstanceData.ElapsedWaitTime >= WaitDuration)
+        {
+            InstanceData.ElapsedWaitTime = 0.0f;
+            InstanceData.bWaiting = !RequestPatrolMove(*Controller);
+        }
+    }
+
+    return EStateTreeRunStatus::Running;
+}
+
+void FJMSimpleEnemyPatrolTask::ExitState(
+    FStateTreeExecutionContext& Context,
+    const FStateTreeTransitionResult& Transition) const
+{
+    if (ASimpleEnemyAIController* Controller = Cast<ASimpleEnemyAIController>(Context.GetOwner()))
+    {
+        Controller->StopMovement();
+    }
+}
+
+bool FJMSimpleEnemyPatrolTask::RequestPatrolMove(ASimpleEnemyAIController& Controller) const
+{
+    APawn* ControlledPawn = Controller.GetPawn();
+    UWorld* World = Controller.GetWorld();
+    UNavigationSystemV1* NavigationSystem = IsValid(World)
+        ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(World)
+        : nullptr;
+    if (!IsValid(ControlledPawn) || !IsValid(NavigationSystem))
+    {
+        return false;
+    }
+
+    FNavLocation PatrolLocation;
+    if (!NavigationSystem->GetRandomReachablePointInRadius(
+        ControlledPawn->GetActorLocation(),
+        PatrolRadius,
+        PatrolLocation))
+    {
+        return false;
+    }
+
+    const EPathFollowingRequestResult::Type MoveResult = Controller.MoveToLocation(
+        PatrolLocation.Location,
+        AcceptanceRadius,
+        true,
+        true,
+        true,
+        true,
+        nullptr,
+        true);
+    return MoveResult != EPathFollowingRequestResult::Failed;
 }
 
 FJMSimpleEnemyMoveToLastSeenLocationTask::FJMSimpleEnemyMoveToLastSeenLocationTask()
