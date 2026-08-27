@@ -11,6 +11,21 @@ owners:
 
 # Changelog
 
+## 1.11.0 - 2026-08-27
+
+### Added
+
+- 실제 Sight Target과의 2D 거리로 `TooFar`, `Preferred`, `TooClose`를 구분하는 `AStalkerEnemyAIController`
+- 멀면 `Approach`, 선호 거리면 `HoldDistance`, 가까우면 NavMesh 위치로 `Retreat`하는 Stalker StateTree Task
+- 실제 배치용 `BP_StalkerEnemy`, `BP_StalkerEnemyAIController`, `ST_StalkerEnemy`
+- 실제 `Level_TestAI` PIE와 기존 NavMesh에서 Player 이동·접근·유지·후퇴·Sight Lost를 검증하는 통합 검사
+
+### Changed
+
+- 75uu 거리 히스테리시스로 경계 왕복과 빠른 접근에서 상태 진동 방지
+- 후퇴 중 Player Focus를 유지해 등을 돌리며 실제 Sight를 잃는 문제 방지
+- Stalker Sight Lost를 기존 Predictive Tracking → Investigate → Search → Patrol 흐름에 연결
+
 ## 1.10.1 - 2026-08-26
 
 ### Changed

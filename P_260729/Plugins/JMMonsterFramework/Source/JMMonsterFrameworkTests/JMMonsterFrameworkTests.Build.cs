@@ -12,6 +12,7 @@ public class JMMonsterFrameworkTests : ModuleRules
             "CoreUObject",
             "Engine",
             "AIModule",
+            "NavigationSystem",
             "JMMonsterFrameworkRuntime",
             "StateTreeModule",
             "GameplayStateTreeModule",

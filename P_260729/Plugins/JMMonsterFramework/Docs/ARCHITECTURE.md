@@ -1,8 +1,8 @@
 ---
-title: "JMMonsterFramework Phase 10 Architecture"
+title: "JMMonsterFramework Phase 11 Architecture"
 status: Current
 authority: Canonical
-scope: "JMMonsterFramework Phase 0-10 runtime architecture"
+scope: "JMMonsterFramework Phase 0-11 runtime architecture"
 last_verified: 2026-08-26
 verified_against: "working-tree"
 owners:
@@ -30,10 +30,11 @@ related:
 - Phase 8: 실제 사용 중인 Sight, Hearing, Predictive, Live Grace 사실을 단일 `EnemyMemory` 소유 구조로 정리
 - Phase 9: 실제 Hearing 경로를 주요 Trigger로 사용하는 첫 특수 Enemy `Listener` 추가
 - Phase 10: 실제 Player Camera 방향과 Visibility Trace로 멈춤을 결정하는 특수 Enemy `Watcher` 추가
+- Phase 11: 실제 Sight Target과 NavMesh 이동으로 선호 거리를 유지하는 특수 Enemy `Stalker` 추가
 
 ## 비책임
 
-Encounter 단계, Flee/Hide/ReApproach, Enrage/Frenzy, Crawler, 소음 단계/누적/Threat Score, Suspicion, Combo, Ability/Animation Framework, Memory Manager/Subsystem/Interface, 장기·복수 대상 Memory는 제공하지 않는다.
+Encounter 단계, Flee/Hide/ReApproach, Enrage/Frenzy, Crawler, Stalker Gaze 반응, 소음 단계/누적/Threat Score, Suspicion, Combo, Ability/Animation Framework, Memory Manager/Subsystem/Interface, 장기·복수 대상 Memory는 제공하지 않는다.
 
 ## 모듈과 의존성
 
@@ -116,6 +117,24 @@ UnwatchedMove -- 각도와 Visibility 모두 통과 --> WatchedStop
 ```
 
 `WatchedStop`은 매 Tick `StopMovement`만 수행한다. `UnwatchedMove`는 실제 Player Pawn으로 `MoveToActor`를 요청한다. Encounter 횟수, 도망, 숨기, 재접근, 분노 같은 추가 행동은 없다.
+
+## Stalker Enemy
+
+`AStalkerEnemyAIController`는 기존 Sight, Memory, Possession, Navigation과 Predictive Tracking을 재사용한다. Hearing은 Stalker Trigger가 아니므로 Possess 후 비활성화하고 Watcher Gaze도 결합하지 않는다. Controller는 보이는 Target과 Pawn 사이의 실제 2D 거리만 `TooFar`, `Preferred`, `TooClose`로 분류하며 행동 선택은 `ST_StalkerEnemy`가 담당한다.
+
+```text
+Patrol -- 실제 Sight / 750uu 초과 --> Approach
+Approach -- 선호 거리 진입 --> HoldDistance
+HoldDistance -- 450uu 아래 --> Retreat
+Retreat -- 선호 거리 회복 --> HoldDistance
+HoldDistance -- 750uu 위 --> Approach
+Approach/HoldDistance/Retreat -- Sight Lost --> RecentTracking
+RecentTracking --> InvestigateLastLocation --> Search --> Patrol
+```
+
+기본 거리는 Minimum 450uu, Maximum 750uu, Hysteresis 75uu다. `Preferred`에서 375uu 아래로 내려가야 Retreat가 시작되고 825uu 위로 벌어져야 Approach가 다시 시작된다. Retreat에서 525uu 이상, Approach에서 675uu 이하로 회복되면 HoldDistance로 돌아간다. 이 서로 다른 진입·해제 경계가 Player의 빠른 이동과 경계 왕복에서 StateTree 진동을 막는다.
+
+Approach는 Player Actor에 `MoveToActor`를 요청하고 HoldDistance는 `StopMovement`만 수행한다. Retreat는 Player 반대 방향에서 `MinimumFollowDistance + Hysteresis` 지점을 계산한 뒤 `ProjectPointToNavigation` 성공 위치만 `MoveToLocation`에 전달한다. Stalker Pawn만 이동 방향 회전을 끄고 Player Focus를 유지해, 후퇴 중 등을 돌려 실제 Sight를 잃지 않도록 한다. 거리 상태를 벗어나면 Focus와 Move 요청을 모두 정리한다.
 
 ## 수명과 실패 동작
 

@@ -1,9 +1,9 @@
 {
   "FileVersion": 3,
-  "Version": 14,
-  "VersionName": "1.10.1",
+  "Version": 15,
+  "VersionName": "1.11.0",
   "FriendlyName": "JM Monster Framework",
-  "Description": "Reusable enemy foundation with Listener hearing and Watcher camera-gaze enemies.",
+  "Description": "Reusable enemy foundation with Listener, Watcher, and distance-keeping Stalker enemies.",
   "Category": "JM Plugins",
   "CreatedBy": "JM",
   "CanContainContent": true,
